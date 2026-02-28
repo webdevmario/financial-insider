@@ -337,8 +337,8 @@ function renderDash(){
   const bdEl=document.getElementById('dashBreakdown');
   if(!data.accounts.length){bdEl.innerHTML='<div class="empty-state"><p>Add accounts to see breakdown</p></div>';}
   else{
-    const groups={'Retirement':['401k','Roth 401k','IRA','Roth IRA','Rollover IRA'],'Investments':['Brokerage','Crypto','IUL'],'Cash':['Checking','Savings','HSA'],'Property':['Home Equity','Vehicle']};
-    const groupColors={'Retirement':'#a78bfa','Investments':'#fbbf24','Cash':'#34d399','Property':'#6366f1','Other':'#64748b'};
+    const groups={'Investments':['401k','Roth 401k','IRA','Roth IRA','Rollover IRA','Brokerage','Crypto','IUL'],'Cash':['Checking','Savings','HSA'],'Property':['Home Equity','Vehicle']};
+    const groupColors={'Investments':'#a78bfa','Cash':'#34d399','Property':'#6366f1','Other':'#64748b'};
     const gt={},gTypes={};
     data.accounts.forEach(a=>{let g='Other';for(const[k,v]of Object.entries(groups)){if(v.includes(a.type)){g=k;break;}}gt[g]=(gt[g]||0)+(a.balance||0);if(!gTypes[g])gTypes[g]=new Set();gTypes[g].add(a.type);});
     const total=Object.values(gt).reduce((s,v)=>s+v,0);
