@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Finance Command Center</title>
+  <title>Financial Insider</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%234a6cf7'/><text x='50' y='68' font-size='55' font-family='sans-serif' font-weight='bold' fill='white' text-anchor='middle'>⬡</text></svg>">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
@@ -22,14 +22,14 @@
     body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;min-height:100dvh;overflow-x:hidden}
     body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(ellipse 80% 50% at 50% -20%,rgba(74,108,247,.08),transparent),radial-gradient(ellipse 60% 40% at 80% 100%,rgba(52,211,153,.04),transparent)}
 
-    .topnav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:0 32px;height:60px;background:rgba(15,17,23,.85);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
-    .topnav-brand{font-family:'DM Sans',sans-serif;font-weight:600;font-size:18px;letter-spacing:-.2px;display:flex;align-items:center;gap:10px;flex-shrink:0}
+    .topnav{position:sticky;top:0;z-index:100;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:0 32px;height:60px;background:rgba(15,17,23,.85);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
+    .topnav-brand{font-family:'DM Sans',sans-serif;font-weight:600;font-size:18px;letter-spacing:-.2px;display:flex;align-items:center;gap:10px;flex-shrink:0;justify-self:start}
     .topnav-brand .icon{width:28px;height:28px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;box-shadow:0 0 16px rgba(74,108,247,.3)}
     .topnav-tabs{display:flex;gap:4px;background:var(--bg-input);border-radius:10px;padding:4px}
     .topnav-tab{padding:7px 18px;border-radius:7px;font-size:13px;font-weight:500;color:var(--text-dim);cursor:pointer;transition:all .2s;border:none;background:none;white-space:nowrap}
     .topnav-tab:hover{color:var(--text)}
     .topnav-tab.active{background:var(--bg-card);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.2)}
-    .topnav-actions{display:flex;align-items:center;gap:12px;flex-shrink:0}
+    .topnav-actions{display:flex;align-items:center;gap:12px;justify-self:end}
 
     .page-wrap{position:relative;z-index:1;max-width:1280px;margin:0 auto;padding:28px 32px 60px}
     .view{display:none}.view.active{display:block}
@@ -41,7 +41,7 @@
     .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px}
     .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
 
-    .stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;position:relative;overflow:hidden}
+    .stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;position:relative}
     .stat-card::after{content:'';position:absolute;top:0;left:0;right:0;height:2px}
     .stat-card.blue::after{background:var(--accent)}.stat-card.green::after{background:var(--green)}.stat-card.amber::after{background:var(--amber)}.stat-card.purple::after{background:var(--purple)}
     .stat-label{font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.6px;color:var(--text-muted);margin-bottom:8px}
@@ -70,13 +70,18 @@
     .modal-overlay{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);justify-content:center;align-items:center}
     .modal-overlay.active{display:flex}
     .modal{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:32px;width:520px;max-width:90vw;max-height:85vh;overflow-y:auto;box-shadow:0 24px 48px rgba(0,0,0,.4)}
-    .modal h2{font-family:'DM Sans',sans-serif;font-size:22px;font-weight:600;margin-bottom:24px}
+    .modal h2{font-family:'DM Sans',sans-serif;font-size:22px;font-weight:600;margin:0}
     .modal-form{display:flex;flex-direction:column;gap:16px}
     .modal-form .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
     .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}
 
     .badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.3px}
+    .badge-cat{background:rgba(167,139,250,.12);color:var(--purple)}
+    .badge-essential{background:var(--green-dim);color:var(--green)}
+    .badge-review{background:var(--amber-dim);color:var(--amber)}
     .badge-blue{background:var(--accent-glow);color:var(--accent)}
+    .sub-chevron{color:var(--text-muted);font-size:16px;opacity:.3;transition:opacity .15s;text-align:right}
+    .sub-row:hover .sub-chevron{opacity:.7;color:var(--accent)}
     .freq-monthly{background:var(--accent-glow);color:var(--accent)}
     .freq-quarterly{background:var(--amber-dim);color:var(--amber)}
     .freq-annual{background:var(--green-dim);color:var(--green)}
@@ -127,8 +132,9 @@
     .info-tooltip{position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%);background:#1e2130;border:1px solid var(--border);color:var(--text-dim);font-size:12px;font-weight:400;padding:10px 14px;border-radius:8px;min-width:200px;max-width:320px;white-space:normal;line-height:1.5;pointer-events:none;opacity:0;transition:opacity .15s;z-index:20;box-shadow:0 8px 24px rgba(0,0,0,.4)}
     .info-tooltip::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:6px solid transparent;border-top-color:var(--border)}
     .info-icon:hover .info-tooltip{opacity:1}
-    .sub-row{display:grid;grid-template-columns:1fr 120px 100px 100px 80px;align-items:center;padding:12px 16px;border-bottom:1px solid rgba(42,45,62,.4);font-size:14px;transition:background .1s}
-    .sub-row:hover{background:rgba(255,255,255,.015)}.sub-row:last-child{border-bottom:none}
+    .sub-row{display:grid;grid-template-columns:1fr 120px 100px 110px 32px;align-items:center;padding:12px 16px;border-bottom:1px solid rgba(42,45,62,.4);font-size:14px;transition:all .15s}
+    .sub-row:hover{background:rgba(74,108,247,.04);border-color:rgba(74,108,247,.15)}.sub-row:last-child{border-bottom:none}
+    .sub-row.sub-header:hover{background:none;border-color:transparent}
     .sub-row-header{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--text-muted);padding:10px 16px;border-bottom:1px solid var(--border)}
     .toast{position:fixed;bottom:24px;right:24px;z-index:300;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 20px;font-size:13px;box-shadow:0 8px 32px rgba(0,0,0,.3);transform:translateY(100px);opacity:0;transition:all .3s ease}
     .toast.show{transform:translateY(0);opacity:1}
@@ -151,10 +157,10 @@
       .grid-4{grid-template-columns:1fr 1fr}.grid-3,.grid-2{grid-template-columns:1fr}
       .stat-value{font-size:22px}.stat-card{padding:16px}
       .section-header{flex-wrap:wrap;gap:12px}
-      .sub-row{display:flex;flex-wrap:wrap;align-items:center;padding:12px 16px;border-bottom:1px solid rgba(42,45,62,.4);font-size:14px;gap:4px}
+      .sub-row{display:flex;align-items:center;padding:12px 16px;border-bottom:1px solid rgba(42,45,62,.4);font-size:14px;gap:8px}
       .sub-row>:nth-child(1){flex:1;min-width:0}
       .sub-row>:nth-child(2),.sub-row>:nth-child(3){display:none}
-      .sub-row>:nth-child(4){margin-left:auto}
+      .sub-row>:nth-child(4){margin-left:auto;flex-shrink:0}
       .sub-row>:nth-child(5){flex-shrink:0}
       .modal-overlay.active{align-items:flex-end;justify-content:center}
       .modal{
@@ -174,19 +180,19 @@
       .settings-row .btn{align-self:flex-start}
       .quick-add-row{flex-wrap:wrap}.quick-add-row .btn-primary{width:100%;height:48px}
       .toast{bottom:80px;right:16px;left:16px}
-      .sub-row-header{display:none!important}
+      .sub-header{display:none!important}
     }
     @media(min-width:769px){.mobile-nav{display:none!important}}
   </style>
 </head>
 <body>
 <nav class="topnav">
-  <div class="topnav-brand"><div class="icon">⬡</div><span>Finance Command Center</span></div>
+  <div class="topnav-brand"><div class="icon">⬡</div><span>Financial Insider</span></div>
   <div class="topnav-tabs">
     <button class="topnav-tab active" data-view="dashboard">Dashboard</button>
     <button class="topnav-tab" data-view="accounts">Assets</button>
     <button class="topnav-tab" data-view="budget">Budget</button>
-    <button class="topnav-tab" data-view="subscriptions">Recurring</button>
+    <button class="topnav-tab" data-view="subscriptions">Bills</button>
   </div>
   <div class="topnav-actions"><button class="icon-btn" onclick="openModal('settings')" title="Settings">⚙️</button></div>
 </nav>
@@ -194,21 +200,21 @@
   <button class="mobile-nav-btn active" data-view="dashboard"><span class="nav-icon">📊</span>Home</button>
   <button class="mobile-nav-btn" data-view="accounts"><span class="nav-icon">🏦</span>Assets</button>
   <button class="mobile-nav-btn" data-view="budget"><span class="nav-icon">💰</span>Budget</button>
-  <button class="mobile-nav-btn" data-view="subscriptions"><span class="nav-icon">🔄</span>Recurring</button>
+  <button class="mobile-nav-btn" data-view="subscriptions"><span class="nav-icon">🔄</span>Bills</button>
 </div></div>
 
 <div class="page-wrap">
   <div class="view active" id="view-dashboard">
     <div class="grid-4" style="margin-bottom:24px">
-      <div class="stat-card blue"><div class="stat-label">Net Worth</div><div class="stat-value" id="statNetWorth">$0</div><div class="stat-sub" id="statNetWorthChange"></div></div>
-      <div class="stat-card green"><div class="stat-label">Monthly Income</div><div class="stat-value" id="statIncome">$0</div><div class="stat-sub">After tax</div></div>
-      <div class="stat-card amber"><div class="stat-label">Monthly Expenses</div><div class="stat-value" id="statExpenses">$0</div><div class="stat-sub" id="statExpensesSub"></div></div>
-      <div class="stat-card purple"><div class="stat-label">Savings Rate</div><div class="stat-value" id="statSavingsRate">0%</div><div class="stat-sub">Income - Expenses</div></div>
+      <div class="stat-card blue"><div class="stat-label">Net Worth</div><div class="stat-value" id="statNetWorth">$0</div></div>
+      <div class="stat-card green"><div class="stat-label">Monthly Income</div><div class="stat-value" id="statIncome">$0</div></div>
+      <div class="stat-card amber"><div class="stat-label">Bills</div><div class="stat-value" id="statFixed">$0</div></div>
+      <div class="stat-card purple"><div class="stat-label"><span style="display:inline-flex;align-items:center;gap:6px">Savings Rate <span class="info-icon" style="position:relative;top:0">i<span class="info-tooltip" style="min-width:180px;text-transform:none;letter-spacing:0;font-weight:400;bottom:auto;top:calc(100% + 10px)">Income minus bills, divided by income.<span style="position:absolute;bottom:100%;top:auto;left:50%;transform:translateX(-50%);border:6px solid transparent;border-bottom-color:var(--border);border-top:none"></span></span></span></span></div><div class="stat-value" id="statSavingsRate">0%</div></div>
     </div>
     <div id="upcomingCallout"></div>
     <div class="grid-2">
       <div class="card"><div class="card-header"><span class="card-title">Asset Breakdown</span></div><div id="dashBreakdown"><div class="empty-state"><p>Add assets to see breakdown</p></div></div></div>
-      <div class="card"><div class="card-header"><span class="card-title">Top Recurring Costs</span></div><div id="dashTopSubs"><div class="empty-state"><p>Add recurring items to see top costs</p></div></div></div>
+      <div class="card"><div class="card-header"><span class="card-title">Top Bills</span></div><div id="dashTopSubs"><div class="empty-state"><p>Add bills to see top costs</p></div></div></div>
     </div>
   </div>
 
@@ -234,7 +240,7 @@
   </div>
 
   <div class="view" id="view-subscriptions">
-    <div class="section-header"><h2 class="section-title">Recurring</h2><button class="btn btn-primary" onclick="openModal('subscription')">+ Add Recurring</button></div>
+    <div class="section-header"><h2 class="section-title">Bills</h2><button class="btn btn-primary" onclick="openModal('subscription')">+ Add Bill</button></div>
     <div class="grid-3" style="margin-bottom:24px">
       <div class="stat-card blue"><div class="stat-label">Monthly Total</div><div class="stat-value mono" id="subMonthly">$0</div></div>
       <div class="stat-card amber"><div class="stat-label">Quarterly (Mo. Equiv.)</div><div class="stat-value mono" id="subQuarterly">$0</div></div>
@@ -247,13 +253,16 @@
         <div style="flex:1;background:var(--bg-input);border-radius:8px;padding:14px 16px"><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">16th — 31st</div><div class="mono" style="font-size:20px;font-weight:600" id="ppSecond">$0</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px" id="ppSecondCount">0 items</div></div>
       </div>
     </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+      <span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted)">Filter by</span>
+      <select id="subFilter" onchange="renderSubs()" style="width:auto;font-size:12px;padding:5px 10px"><option value="">All Categories</option></select>
+      <select id="subFreqFilter" onchange="renderSubs()" style="width:auto;font-size:12px;padding:5px 10px"><option value="">All Frequencies</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="annual">Annual</option></select>
+      <select id="subStatusFilter" onchange="renderSubs()" style="width:auto;font-size:12px;padding:5px 10px"><option value="">All Statuses</option><option value="essential">Essential</option><option value="review">Under Review</option></select>
+    </div>
     <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-        <div class="sub-row-header" style="display:grid;grid-template-columns:1fr 120px 100px 100px 80px;flex:1;border:none;padding:0;margin:0"><span>Service</span><span>Category</span><span>Frequency</span><span style="text-align:right">Amount</span><span></span></div>
-        <select id="subFilter" onchange="renderSubs()" style="width:auto;font-size:11px;padding:5px 10px;margin-left:12px"><option value="">All Categories</option></select>
-      </div>
+      <div class="sub-row sub-header" style="border-bottom:1px solid var(--border);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--text-muted)"><span>Service</span><span>Category</span><span>Frequency</span><span style="text-align:right">Amount</span><span></span></div>
       <div id="subList"></div>
-      <div class="empty-state" id="subEmpty" style="display:none"><div class="empty-icon">🔄</div><p>No recurring items yet</p></div>
+      <div class="empty-state" id="subEmpty" style="display:none"><div class="empty-icon">🔄</div><p>No bills yet</p></div>
     </div>
   </div>
 
@@ -304,6 +313,7 @@ function switchView(v){
   const mb=document.querySelector('.mobile-nav-btn[data-view="'+v+'"]');if(mb)mb.classList.add('active');
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   const ve=document.getElementById('view-'+v);if(ve)ve.classList.add('active');
+  try{sessionStorage.setItem('activeView',v);}catch(e){}
 }
 document.querySelectorAll('.topnav-tab').forEach(t=>t.addEventListener('click',()=>switchView(t.dataset.view)));
 document.querySelectorAll('.mobile-nav-btn').forEach(t=>t.addEventListener('click',()=>switchView(t.dataset.view)));
@@ -314,12 +324,10 @@ function subsMo(){return data.subscriptions.reduce((s,x)=>{const my=x.amount/(x.
 function renderDash(){
   const tot=data.accounts.reduce((s,a)=>s+(a.balance||0),0);
   document.getElementById('statNetWorth').textContent=fmt(tot);
-  if(data.lastNetWorth!==null){const d=tot-data.lastNetWorth;document.getElementById('statNetWorthChange').innerHTML=d>=0?'<span class="up">\u25B2 '+fmt(d)+'</span> since last update':'<span class="down">\u25BC '+fmt(Math.abs(d))+'</span> since last update';}
   document.getElementById('statIncome').textContent=fmt(data.income);
-  const sm=subsMo(),cm=curMo(),et=data.expenses.filter(e=>e.month===cm).reduce((s,e)=>s+e.amount,0),te=sm+et;
-  document.getElementById('statExpenses').textContent=fmt(te);
-  document.getElementById('statExpensesSub').textContent='Subs: '+fmt(sm)+' + Spending: '+fmt(et);
-  document.getElementById('statSavingsRate').textContent=Math.round(data.income>0?(data.income-te)/data.income*100:0)+'%';
+  const sm=subsMo();
+  document.getElementById('statFixed').textContent=fmt(sm);
+  document.getElementById('statSavingsRate').textContent=Math.round(data.income>0?(data.income-sm)/data.income*100:0)+'%';
 
   const ucEl=document.getElementById('upcomingCallout'),today=new Date(),future=new Date(today);future.setDate(future.getDate()+30);
   const up=data.subscriptions.filter(s=>{if(!s.nextCharge)return false;const d=new Date(s.nextCharge+'T00:00:00');return d>=today&&d<=future&&s.frequency!=='monthly';});
@@ -331,7 +339,7 @@ function renderDash(){
     bdEl.innerHTML=Object.entries(bt).sort((a,b)=>b[1]-a[1]).map(([t,v])=>'<div style="display:flex;align-items:center;gap:12px;padding:8px 0"><div style="width:10px;height:10px;border-radius:3px;background:'+(ACCT_COLORS[t]||'#64748b')+';flex-shrink:0"></div><span style="flex:1;font-size:14px">'+t+'</span><span class="mono" style="font-size:13px">'+fmt(v)+'</span><span style="font-size:12px;color:var(--text-muted);width:40px;text-align:right">'+(gt>0?(v/gt*100).toFixed(0):0)+'%</span></div>').join('');}
 
   const tsEl=document.getElementById('dashTopSubs');
-  if(!data.subscriptions.length){tsEl.innerHTML='<div class="empty-state"><p>Add recurring items to see top costs</p></div>';}
+  if(!data.subscriptions.length){tsEl.innerHTML='<div class="empty-state"><p>Add bills to see top costs</p></div>';}
   else{tsEl.innerHTML=[...data.subscriptions].map(s=>({...s,me:(s.frequency==='monthly'?s.amount:s.frequency==='quarterly'?s.amount/3:s.amount/12)/(s.splitBy||1)})).sort((a,b)=>b.me-a.me).slice(0,6).map(s=>'<div style="display:flex;align-items:center;gap:12px;padding:8px 0"><span style="flex:1;font-size:14px">'+s.name+'</span><span class="mono" style="font-size:13px">'+fmtP(s.me)+'/mo</span></div>').join('');}
 }
 
@@ -401,15 +409,18 @@ function renderSubs(){
   document.getElementById('ppFirst').textContent=fmtP(pp1);document.getElementById('ppSecond').textContent=fmtP(pp2);document.getElementById('ppFirstCount').textContent=pp1c+' item'+(pp1c!==1?'s':'');document.getElementById('ppSecondCount').textContent=pp2c+' item'+(pp2c!==1?'s':'');
   const filterEl=document.getElementById('subFilter'),cats=[...new Set(data.subscriptions.map(s=>s.category||'General'))].sort(),cf=filterEl.value;
   filterEl.innerHTML='<option value="">All Categories</option>'+cats.map(c=>'<option value="'+c+'"'+(c===cf?' selected':'')+'>'+c+'</option>').join('');
-  const filtered=cf?data.subscriptions.filter(s=>(s.category||'General')===cf):data.subscriptions;
+  const ff=document.getElementById('subFreqFilter').value;
+  const sf=document.getElementById('subStatusFilter').value;
+  let filtered=cf?data.subscriptions.filter(s=>(s.category||'General')===cf):data.subscriptions;
+  if(ff)filtered=filtered.filter(s=>s.frequency===ff);
+  if(sf)filtered=filtered.filter(s=>(s.status||'')===(sf==='review'?'review':sf==='essential'?'essential':''));
   listEl.innerHTML=[...filtered].sort((a,b)=>a.name.localeCompare(b.name)).map(s=>{
     const fc=s.frequency==='monthly'?'freq-monthly':s.frequency==='quarterly'?'freq-quarterly':'freq-annual';
-    const pc=s.priceHistory&&s.priceHistory.length>1,isSplit=s.splitBy&&s.splitBy>1,my=isSplit?s.amount/s.splitBy:s.amount;
-    const sb=isSplit?'<span style="font-size:10px;color:var(--cyan);background:rgba(34,211,238,.1);padding:2px 6px;border-radius:10px;margin-left:6px">\u00F7'+s.splitBy+'</span>':'';
+    const isSplit=s.splitBy&&s.splitBy>1,my=s.amount/(s.splitBy||1);
+    const sharedTag=isSplit?'<span style="font-size:10px;color:var(--cyan);background:rgba(34,211,238,.1);padding:2px 6px;border-radius:10px;margin-left:6px">Shared</span>':'';
+    const reviewIcon=s.status==='review'?'<span title="Under review" style="margin-left:6px;font-size:13px;cursor:default">\u26A0\uFE0F</span>':'';
     const nl=s.notes?'<div style="font-size:11px;color:var(--text-muted);margin-top:4px;max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+s.notes.replace(/</g,'&lt;').replace(/\n/g,' ')+'</div>':'';
-    const pci=pc?'<span style="font-size:11px;color:var(--amber);margin-left:8px">\u25CF changed</span>':'';
-    const ad=isSplit?'<span style="font-size:10px;color:var(--text-muted);text-decoration:line-through">'+fmtP(s.amount)+'</span> '+fmtP(my):fmtP(my);
-    return'<div class="sub-row"><div><div style="display:flex;align-items:center;flex-wrap:wrap;gap:2px"><span>'+s.name+'</span>'+sb+pci+'</div>'+nl+'</div><span><span class="badge badge-blue">'+(s.category||'General')+'</span></span><span><span class="badge '+fc+'">'+s.frequency+'</span></span><span class="mono" style="text-align:right">'+ad+'</span><div class="row-actions" style="justify-content:flex-end"><button class="row-action-btn" onclick="editSub(\''+s.id+'\')" title="Edit">\u270F\uFE0F</button><button class="row-action-btn del" onclick="deleteSub(\''+s.id+'\')" title="Delete">\uD83D\uDDD1\uFE0F</button></div></div>';
+    return'<div class="sub-row" style="cursor:pointer" onclick="editSub(\''+s.id+'\')"><div><div style="display:flex;align-items:center;flex-wrap:wrap;gap:2px"><span>'+s.name+'</span>'+sharedTag+reviewIcon+'</div>'+nl+'</div><span><span class="badge badge-cat">'+(s.category||'General')+'</span></span><span><span class="badge '+fc+'">'+s.frequency+'</span></span><span class="mono" style="text-align:right">'+fmtP(my)+'</span><span class="sub-chevron">\u276F</span></div>';
   }).join('');
 }
 function editSub(id){const s=data.subscriptions.find(x=>x.id===id);if(s)openModal('subscription',s);}
@@ -422,19 +433,25 @@ function buildSettingsHTML(){
 }
 
 // MODALS
+function modalHeader(title){
+  return'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px"><h2 style="margin:0">'+title+'</h2><button class="icon-btn" onclick="closeModal()" title="Close" style="font-size:16px">\u2715</button></div>';
+}
 function openModal(type,existing){
   const overlay=document.getElementById('modalOverlay'),mc=document.getElementById('modalContent');
   if(type==='settings'){
-    mc.innerHTML='<h2>Settings</h2>'+buildSettingsHTML()+'<div class="modal-actions" style="margin-top:20px"><button class="btn" onclick="closeModal()">Close</button></div>';
+    mc.innerHTML=modalHeader('Settings')+'<div>'+buildSettingsHTML()+'</div>';
   }else if(type==='account'){
     const ex=existing,isV=ex?.type==='Vehicle';
-    mc.innerHTML='<h2>'+(ex?'Edit':'Add')+' Asset</h2><div class="modal-form"><div class="row"><div class="input-group"><label>Type</label><select id="mType" onchange="onTypeChange()">'+ACCOUNT_TYPES.map(t=>'<option value="'+t+'"'+(ex?.type===t?' selected':'')+'>'+t+'</option>').join('')+'</select></div><div class="input-group"><label>Value</label><input type="number" id="mBal" step="0.01" placeholder="0.00" value="'+(ex?.balance||'')+'"></div></div><div class="row"><div class="input-group"><label>Owner</label><select id="mOwner">'+OWNERS.map(o=>'<option value="'+o+'"'+(ex?.owner===o?' selected':'')+'>'+(o||'\u2014 None \u2014')+'</option>').join('')+'</select></div><div class="input-group"><label>Held At</label><select id="mInst">'+INSTITUTIONS.map(i=>'<option value="'+i+'"'+(ex?.institution===i?' selected':'')+'>'+(i||'\u2014 N/A \u2014')+'</option>').join('')+'</select></div></div><div id="typeHelper" style="'+(isV?'':'display:none;')+'font-size:12px;color:var(--text-dim);background:var(--bg-input);border-radius:8px;padding:10px 14px;line-height:1.5">\uD83D\uDCA1 Check your vehicle value at <a href="https://www.kbb.com/whats-my-car-worth/" target="_blank" style="color:var(--accent);text-decoration:none">KBB.com</a></div><div class="input-group"><label>Notes (optional)</label><textarea id="mNotes" rows="3" placeholder="Add context, reminders, or details...">'+(ex?.notes||'')+'</textarea></div><div class="modal-actions"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveAccount(\''+(ex?.id||'')+'\')">'+(ex?'Update':'Add')+'</button></div></div>';
+    const delBtn=ex?'<button class="btn btn-danger btn-sm" onclick="deleteAccount(\''+ex.id+'\')">\uD83D\uDDD1\uFE0F Delete</button>':'';
+    mc.innerHTML=modalHeader((ex?'Edit':'Add')+' Asset')+'<div class="modal-form"><div class="row"><div class="input-group"><label>Type</label><select id="mType" onchange="onTypeChange()">'+ACCOUNT_TYPES.map(t=>'<option value="'+t+'"'+(ex?.type===t?' selected':'')+'>'+t+'</option>').join('')+'</select></div><div class="input-group"><label>Value</label><input type="number" id="mBal" step="0.01" placeholder="0.00" value="'+(ex?.balance||'')+'"></div></div><div class="row"><div class="input-group"><label>Owner</label><select id="mOwner">'+OWNERS.map(o=>'<option value="'+o+'"'+(ex?.owner===o?' selected':'')+'>'+(o||'\u2014 None \u2014')+'</option>').join('')+'</select></div><div class="input-group"><label>Held At</label><select id="mInst">'+INSTITUTIONS.map(i=>'<option value="'+i+'"'+(ex?.institution===i?' selected':'')+'>'+(i||'\u2014 N/A \u2014')+'</option>').join('')+'</select></div></div><div id="typeHelper" style="'+(isV?'':'display:none;')+'font-size:12px;color:var(--text-dim);background:var(--bg-input);border-radius:8px;padding:10px 14px;line-height:1.5">\uD83D\uDCA1 Check your vehicle value at <a href="https://www.kbb.com/whats-my-car-worth/" target="_blank" style="color:var(--accent);text-decoration:none">KBB.com</a></div><div class="input-group"><label>Notes (optional)</label><textarea id="mNotes" rows="3" placeholder="Add context, reminders, or details...">'+(ex?.notes||'')+'</textarea></div><div class="modal-actions">'+delBtn+'<button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveAccount(\''+(ex?.id||'')+'\')">'+(ex?'Update':'Add')+'</button></div></div>';
   }else if(type==='subscription'){
     const ex=existing,sv=ex?.splitBy||1;
-    mc.innerHTML='<h2>'+(ex?'Edit':'Add')+' Recurring</h2><div class="modal-form"><div class="input-group"><label>Service Name</label><input type="text" id="mSubName" placeholder="e.g. Netflix, Allstate" value="'+(ex?.name||'')+'"></div><div class="row"><div class="input-group"><label>Category</label><select id="mSubCat">'+SUB_CATS.map(c=>'<option value="'+c+'"'+(ex?.category===c?' selected':'')+'>'+c+'</option>').join('')+'</select></div><div class="input-group"><label>Frequency</label><select id="mSubFreq"><option value="monthly"'+(ex?.frequency==='monthly'?' selected':'')+'>Monthly</option><option value="quarterly"'+(ex?.frequency==='quarterly'?' selected':'')+'>Quarterly</option><option value="annual"'+(ex?.frequency==='annual'?' selected':'')+'>Annual</option></select></div></div><div class="row"><div class="input-group"><label>Charge Amount</label><input type="number" id="mSubAmt" step="0.01" placeholder="0.00" value="'+(ex?.amount||'')+'" oninput="updateSplitPreview()"></div><div class="input-group"><label>Next Charge Date</label><input type="date" id="mSubNext" value="'+(ex?.nextCharge||'')+'"></div></div><div class="row"><div class="input-group"><label>Split Between</label><select id="mSubSplit" onchange="updateSplitPreview()">'+ [1,2,3,4].map(n=>'<option value="'+n+'"'+(sv===n?' selected':'')+'>'+(n===1?'Just me':n+' people')+'</option>').join('')+'</select></div><div class="input-group"><label>My Cost</label><div id="splitPreview" class="mono" style="padding:10px 14px;border-radius:8px;background:var(--bg-input);border:1px solid var(--border);font-size:14px;color:var(--green)">'+fmtP((ex?.amount||0)/(sv||1))+'</div></div></div><div class="input-group"><label>Notes (optional)</label><textarea id="mSubNotes" rows="3" placeholder="e.g. Split with mom, seasonal pricing...">'+(ex?.notes||'')+'</textarea></div><div class="modal-actions"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveSub(\''+(ex?.id||'')+'\')">'+(ex?'Update':'Add')+'</button></div></div>';
+    const delBtn=ex?'<button class="btn btn-danger btn-sm" onclick="deleteSub(\''+ex.id+'\')">\uD83D\uDDD1\uFE0F Delete</button>':'';
+    const statusVal=ex?.status||'';
+    mc.innerHTML=modalHeader((ex?'Edit':'Add')+' Bill')+'<div class="modal-form"><div class="input-group"><label>Service Name</label><input type="text" id="mSubName" placeholder="e.g. Netflix, Allstate" value="'+(ex?.name||'')+'"></div><div class="row"><div class="input-group"><label>Category</label><select id="mSubCat">'+SUB_CATS.map(c=>'<option value="'+c+'"'+(ex?.category===c?' selected':'')+'>'+c+'</option>').join('')+'</select></div><div class="input-group"><label>Frequency</label><select id="mSubFreq"><option value="monthly"'+(ex?.frequency==='monthly'?' selected':'')+'>Monthly</option><option value="quarterly"'+(ex?.frequency==='quarterly'?' selected':'')+'>Quarterly</option><option value="annual"'+(ex?.frequency==='annual'?' selected':'')+'>Annual</option></select></div></div><div class="row"><div class="input-group"><label>Charge Amount</label><input type="number" id="mSubAmt" step="0.01" placeholder="0.00" value="'+(ex?.amount||'')+'" oninput="updateSplitPreview()"></div><div class="input-group"><label>Next Charge Date</label><input type="date" id="mSubNext" value="'+(ex?.nextCharge||'')+'"></div></div><div class="row"><div class="input-group"><label>Split Between</label><select id="mSubSplit" onchange="updateSplitPreview()">'+ [1,2,3,4].map(n=>'<option value="'+n+'"'+(sv===n?' selected':'')+'>'+(n===1?'Just me':n+' people')+'</option>').join('')+'</select></div><div class="input-group"><label>My Cost</label><div id="splitPreview" class="mono" style="padding:10px 14px;border-radius:8px;background:var(--bg-input);border:1px solid var(--border);font-size:14px;color:var(--green)">'+fmtP((ex?.amount||0)/(sv||1))+'</div></div></div><div class="input-group"><label>Status</label><select id="mSubStatus"><option value=""'+(!statusVal?' selected':'')+'>None</option><option value="essential"'+(statusVal==='essential'?' selected':'')+'>Essential</option><option value="review"'+(statusVal==='review'?' selected':'')+'>Under Review</option></select></div><div class="input-group"><label>Notes (optional)</label><textarea id="mSubNotes" rows="2" placeholder="e.g. Split with mom, seasonal pricing...">'+(ex?.notes||'')+'</textarea></div><div class="modal-actions">'+delBtn+'<button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveSub(\''+(ex?.id||'')+'\')">'+(ex?'Update':'Add')+'</button></div></div>';
   }else if(type==='budgetTarget'){
     const mo=document.getElementById('_bmSel').value,cur=data.budgetTargets[mo]||'';
-    mc.innerHTML='<h2>Set Budget Target</h2><p style="font-size:13px;color:var(--text-dim);margin-bottom:20px">Set your spending target for '+moLabel(mo)+'.</p><div class="modal-form"><div class="row"><div class="input-group"><label>Month</label><input type="text" value="'+moLabel(mo)+'" disabled></div><div class="input-group"><label>Target Amount</label><input type="number" id="mBudgetAmt" step="0.01" placeholder="0.00" value="'+cur+'"></div></div><div class="modal-actions"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveBudgetTarget(\''+mo+'\')">Save</button></div></div>';
+    mc.innerHTML=modalHeader('Set Budget Target')+'<p style="font-size:13px;color:var(--text-dim);margin-bottom:20px">Set your spending target for '+moLabel(mo)+'.</p><div class="modal-form"><div class="row"><div class="input-group"><label>Month</label><input type="text" value="'+moLabel(mo)+'" disabled></div><div class="input-group"><label>Target Amount</label><input type="number" id="mBudgetAmt" step="0.01" placeholder="0.00" value="'+cur+'"></div></div><div class="modal-actions"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveBudgetTarget(\''+mo+'\')">Save</button></div></div>';
   }
   overlay.classList.add('active');setTimeout(()=>{const fi=mc.querySelector('input:not([disabled])');if(fi)fi.focus();},100);
 }
@@ -445,14 +462,14 @@ function onTypeChange(){const t=document.getElementById('mType').value,h=documen
 function saveAccount(eid){
   const type=document.getElementById('mType').value,balance=parseFloat(document.getElementById('mBal').value)||0,owner=document.getElementById('mOwner').value,inst=document.getElementById('mInst').value,notes=document.getElementById('mNotes').value.trim(),today=new Date().toISOString().slice(0,10);
   if(eid){const a=data.accounts.find(x=>x.id===eid);if(a)Object.assign(a,{name:type,type,balance,owner,institution:inst,notes,lastUpdated:today});}
-  else{data.lastNetWorth=data.accounts.reduce((s,a)=>s+(a.balance||0),0);data.accounts.push({id:gid(),name:type,type,balance,owner,institution:inst,notes,lastUpdated:today});}
+  else{data.accounts.push({id:gid(),name:type,type,balance,owner,institution:inst,notes,lastUpdated:today});}
   save();closeModal();renderAll();toast(eid?'Updated':'Added');
 }
 function saveSub(eid){
-  const name=document.getElementById('mSubName').value.trim(),cat=document.getElementById('mSubCat').value,freq=document.getElementById('mSubFreq').value,amt=parseFloat(document.getElementById('mSubAmt').value)||0,next=document.getElementById('mSubNext').value,notes=document.getElementById('mSubNotes').value.trim(),splitBy=parseInt(document.getElementById('mSubSplit').value)||1;
+  const name=document.getElementById('mSubName').value.trim(),cat=document.getElementById('mSubCat').value,freq=document.getElementById('mSubFreq').value,amt=parseFloat(document.getElementById('mSubAmt').value)||0,next=document.getElementById('mSubNext').value,notes=document.getElementById('mSubNotes').value.trim(),splitBy=parseInt(document.getElementById('mSubSplit').value)||1,status=document.getElementById('mSubStatus').value;
   if(!name){toast('Enter service name',true);return;}
-  if(eid){const s=data.subscriptions.find(x=>x.id===eid);if(s){if(s.amount!==amt){if(!s.priceHistory)s.priceHistory=[{date:new Date().toISOString().slice(0,10),amount:s.amount}];s.priceHistory.push({date:new Date().toISOString().slice(0,10),amount:amt});}Object.assign(s,{name,category:cat,frequency:freq,amount:amt,nextCharge:next,notes,splitBy});}}
-  else{data.subscriptions.push({id:gid(),name,category:cat,frequency:freq,amount:amt,nextCharge:next,notes,splitBy,priceHistory:[{date:new Date().toISOString().slice(0,10),amount:amt}]});}
+  if(eid){const s=data.subscriptions.find(x=>x.id===eid);if(s){if(s.amount!==amt){if(!s.priceHistory)s.priceHistory=[{date:new Date().toISOString().slice(0,10),amount:s.amount}];s.priceHistory.push({date:new Date().toISOString().slice(0,10),amount:amt});}Object.assign(s,{name,category:cat,frequency:freq,amount:amt,nextCharge:next,notes,splitBy,status});}}
+  else{data.subscriptions.push({id:gid(),name,category:cat,frequency:freq,amount:amt,nextCharge:next,notes,splitBy,status,priceHistory:[{date:new Date().toISOString().slice(0,10),amount:amt}]});}
   save();closeModal();renderAll();toast(eid?'Updated':'Added');
 }
 function updateSplitPreview(){const a=parseFloat(document.getElementById('mSubAmt').value)||0,s=parseInt(document.getElementById('mSubSplit').value)||1;document.getElementById('splitPreview').textContent=fmtP(a/s);}
@@ -484,6 +501,7 @@ function toast(msg,err){const el=document.getElementById('toast');el.textContent
 function renderAll(){renderDash();renderAccounts();renderBudget();renderSubs();}
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();if(e.key==='Enter'&&(e.target.id==='qaDesc'||e.target.id==='qaAmt')){e.preventDefault();quickAddExpense();}});
 load();renderAll();
+try{const sv=sessionStorage.getItem('activeView');if(sv)switchView(sv);}catch(e){}
 </script>
 </body>
 </html>
