@@ -73,15 +73,15 @@
     .modal h2{font-family:'DM Sans',sans-serif;font-size:22px;font-weight:600;margin:0}
     .modal-form{display:flex;flex-direction:column;gap:16px}
     .modal-form .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}
+    .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)}
 
     .badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.3px}
     .badge-cat{background:rgba(167,139,250,.12);color:var(--purple)}
     .badge-essential{background:var(--green-dim);color:var(--green)}
     .badge-review{background:var(--amber-dim);color:var(--amber)}
     .badge-blue{background:var(--accent-glow);color:var(--accent)}
-    .sub-chevron{color:var(--text-muted);font-size:16px;opacity:.3;transition:opacity .15s;text-align:right}
-    .sub-row:hover .sub-chevron{opacity:.7;color:var(--accent)}
+    .sub-chevron{color:var(--text-muted);font-size:18px;opacity:.6;transition:all .15s;text-align:right}
+    .sub-row:hover .sub-chevron,.account-row:hover .sub-chevron{opacity:1;color:var(--accent)}
     .freq-monthly{background:var(--accent-glow);color:var(--accent)}
     .freq-quarterly{background:var(--amber-dim);color:var(--amber)}
     .freq-annual{background:var(--green-dim);color:var(--green)}
@@ -120,7 +120,8 @@
     .row-action-btn{background:none;border:1px solid transparent;cursor:pointer;font-size:13px;padding:4px 8px;border-radius:6px;transition:all .15s;color:var(--text-muted)}
     .row-action-btn:hover{background:rgba(255,255,255,.06);border-color:var(--border);color:var(--text)}
     .row-action-btn.del:hover{background:var(--red-dim);border-color:rgba(248,113,113,.3);color:var(--red)}
-    .account-row{display:flex;align-items:flex-start;justify-content:space-between;padding:12px 0}
+    .account-row{display:flex;align-items:flex-start;justify-content:space-between;padding:12px 0;transition:all .15s;border-radius:6px;margin:0 -8px;padding-left:8px;padding-right:8px}
+    .account-row:hover{background:rgba(74,108,247,.04)}
     .account-divider{height:1px;background:var(--border);opacity:.5;margin:0 4px}
     .account-info{flex:1;min-width:0}
     .account-name-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
@@ -131,6 +132,8 @@
     .info-icon:hover{border-color:var(--accent);color:var(--accent)}
     .info-tooltip{position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%);background:#1e2130;border:1px solid var(--border);color:var(--text-dim);font-size:12px;font-weight:400;padding:10px 14px;border-radius:8px;min-width:200px;max-width:320px;white-space:normal;line-height:1.5;pointer-events:none;opacity:0;transition:opacity .15s;z-index:20;box-shadow:0 8px 24px rgba(0,0,0,.4)}
     .info-tooltip::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:6px solid transparent;border-top-color:var(--border)}
+    .info-tooltip.tip-down{bottom:auto;top:calc(100% + 10px)}
+    .info-tooltip.tip-down::after{top:auto;bottom:100%;border-top-color:transparent;border-bottom-color:var(--border)}
     .info-icon:hover .info-tooltip{opacity:1}
     .sub-row{display:grid;grid-template-columns:1fr 120px 100px 110px 32px;align-items:center;padding:12px 16px;border-bottom:1px solid rgba(42,45,62,.4);font-size:14px;transition:all .15s}
     .sub-row:hover{background:rgba(74,108,247,.04);border-color:rgba(74,108,247,.15)}.sub-row:last-child{border-bottom:none}
@@ -205,11 +208,10 @@
 
 <div class="page-wrap">
   <div class="view active" id="view-dashboard">
-    <div class="grid-4" style="margin-bottom:24px">
+    <div class="grid-3" style="margin-bottom:24px">
       <div class="stat-card blue"><div class="stat-label">Net Worth</div><div class="stat-value" id="statNetWorth">$0</div></div>
       <div class="stat-card green"><div class="stat-label">Monthly Income</div><div class="stat-value" id="statIncome">$0</div></div>
-      <div class="stat-card amber"><div class="stat-label">Bills</div><div class="stat-value" id="statFixed">$0</div></div>
-      <div class="stat-card purple"><div class="stat-label"><span style="display:inline-flex;align-items:center;gap:6px">Savings Rate <span class="info-icon" style="position:relative;top:0">i<span class="info-tooltip" style="min-width:180px;text-transform:none;letter-spacing:0;font-weight:400;bottom:auto;top:calc(100% + 10px)">Income minus bills, divided by income.<span style="position:absolute;bottom:100%;top:auto;left:50%;transform:translateX(-50%);border:6px solid transparent;border-bottom-color:var(--border);border-top:none"></span></span></span></span></div><div class="stat-value" id="statSavingsRate">0%</div></div>
+      <div class="stat-card amber"><div class="stat-label">Monthly Bills</div><div class="stat-value" id="statFixed">$0</div></div>
     </div>
     <div id="upcomingCallout"></div>
     <div class="grid-2">
@@ -301,7 +303,7 @@ function gid(){return Date.now().toString(36)+Math.random().toString(36).slice(2
 
 function fmt(n){if(n==null||isNaN(n))return'$0';const a=Math.abs(n),s=a>=1000?a.toLocaleString('en-US',{maximumFractionDigits:0}):a.toFixed(2);return(n<0?'-$':'$')+s;}
 function fmtP(n){if(n==null||isNaN(n))return'$0.00';return(n<0?'-$':'$')+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
-function fmtDate(ds){if(!ds)return'';try{const[y,m,d]=ds.split('-').map(Number);return['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m-1]+' '+d;}catch(e){return ds;}}
+function fmtDate(ds){if(!ds)return'';try{const[y,m,d]=ds.split('-').map(Number);return['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m-1]+' '+d+', '+y;}catch(e){return ds;}}
 function curMo(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
 function moLabel(ym){const[y,m]=ym.split('-');return['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m)-1]+' '+y;}
 
@@ -327,7 +329,6 @@ function renderDash(){
   document.getElementById('statIncome').textContent=fmt(data.income);
   const sm=subsMo();
   document.getElementById('statFixed').textContent=fmt(sm);
-  document.getElementById('statSavingsRate').textContent=Math.round(data.income>0?(data.income-sm)/data.income*100:0)+'%';
 
   const ucEl=document.getElementById('upcomingCallout'),today=new Date(),future=new Date(today);future.setDate(future.getDate()+30);
   const up=data.subscriptions.filter(s=>{if(!s.nextCharge)return false;const d=new Date(s.nextCharge+'T00:00:00');return d>=today&&d<=future&&s.frequency!=='monthly';});
@@ -335,8 +336,17 @@ function renderDash(){
 
   const bdEl=document.getElementById('dashBreakdown');
   if(!data.accounts.length){bdEl.innerHTML='<div class="empty-state"><p>Add accounts to see breakdown</p></div>';}
-  else{const bt={};data.accounts.forEach(a=>{bt[a.type]=(bt[a.type]||0)+(a.balance||0);});const gt=Object.values(bt).reduce((s,v)=>s+v,0);
-    bdEl.innerHTML=Object.entries(bt).sort((a,b)=>b[1]-a[1]).map(([t,v])=>'<div style="display:flex;align-items:center;gap:12px;padding:8px 0"><div style="width:10px;height:10px;border-radius:3px;background:'+(ACCT_COLORS[t]||'#64748b')+';flex-shrink:0"></div><span style="flex:1;font-size:14px">'+t+'</span><span class="mono" style="font-size:13px">'+fmt(v)+'</span><span style="font-size:12px;color:var(--text-muted);width:40px;text-align:right">'+(gt>0?(v/gt*100).toFixed(0):0)+'%</span></div>').join('');}
+  else{
+    const groups={'Retirement':['401k','Roth 401k','IRA','Roth IRA','Rollover IRA'],'Investments':['Brokerage','Crypto','IUL'],'Cash':['Checking','Savings','HSA'],'Property':['Home Equity','Vehicle']};
+    const groupColors={'Retirement':'#a78bfa','Investments':'#fbbf24','Cash':'#34d399','Property':'#6366f1','Other':'#64748b'};
+    const gt={},gTypes={};
+    data.accounts.forEach(a=>{let g='Other';for(const[k,v]of Object.entries(groups)){if(v.includes(a.type)){g=k;break;}}gt[g]=(gt[g]||0)+(a.balance||0);if(!gTypes[g])gTypes[g]=new Set();gTypes[g].add(a.type);});
+    const total=Object.values(gt).reduce((s,v)=>s+v,0);
+    bdEl.innerHTML=Object.entries(gt).sort((a,b)=>b[1]-a[1]).map(([g,v])=>{
+      const types=[...gTypes[g]].sort().join('<br>');
+      return'<div style="display:flex;align-items:center;gap:12px;padding:8px 0"><div style="width:10px;height:10px;border-radius:3px;background:'+(groupColors[g]||'#64748b')+';flex-shrink:0"></div><span style="flex:1;font-size:14px;display:inline-flex;align-items:center;gap:6px">'+g+' <span class="info-icon" style="position:relative;top:0">i<span class="info-tooltip" style="min-width:140px;text-transform:none;letter-spacing:0;font-weight:400">'+types+'</span></span></span><span class="mono" style="font-size:13px">'+fmt(v)+'</span><span style="font-size:12px;color:var(--text-muted);width:40px;text-align:right">'+(total>0?(v/total*100).toFixed(0):0)+'%</span></div>';
+    }).join('');
+  }
 
   const tsEl=document.getElementById('dashTopSubs');
   if(!data.subscriptions.length){tsEl.innerHTML='<div class="empty-state"><p>Add bills to see top costs</p></div>';}
@@ -354,10 +364,11 @@ function renderAccounts(){
       const ow=a.owner?'<span class="owner-badge">'+a.owner+'</span>':'';
       const nt=a.notes?a.notes.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'):'';
       const ii=nt?'<span class="info-icon">i<span class="info-tooltip">'+nt+'</span></span>':'';
-      const mp=[];if(a.institution)mp.push(a.institution);mp.push(fmtDate(a.lastUpdated));mp.push('<span class="mono" style="color:var(--text-dim)">'+fmt(a.balance)+'</span>');
-      return'<div class="account-row"><div class="account-info"><div class="account-name-row">'+ow+ii+'</div><div class="account-meta">'+mp.join('<span class="meta-dot">\u00B7</span>')+'</div></div><div style="display:flex;gap:2px;flex-shrink:0;padding-top:1px"><button class="row-action-btn" onclick="editAccount(\''+a.id+'\')" title="Edit">\u270F\uFE0F</button><button class="row-action-btn del" onclick="deleteAccount(\''+a.id+'\')" title="Delete">\uD83D\uDDD1\uFE0F</button></div></div>';
+      const mp=[];if(a.institution)mp.push(a.institution);mp.push('<span class="mono" style="color:var(--text-dim)">'+fmt(a.balance)+'</span>');
+      const upd=a.lastUpdated?'<div style="margin-top:12px;font-size:10px;color:var(--text-dim);font-weight:500;letter-spacing:.3px">Updated '+fmtDate(a.lastUpdated)+'</div>':'';
+      return'<div class="account-row" style="cursor:pointer" onclick="editAccount(\''+a.id+'\')"><div class="account-info"><div class="account-name-row">'+ow+ii+'</div><div class="account-meta">'+mp.join('<span class="meta-dot">\u00B7</span>')+'</div>'+upd+'</div><span class="sub-chevron" style="align-self:center">\u276F</span></div>';
     }).join('<div class="account-divider"></div>');
-    return'<div class="card"><div class="card-header"><span class="card-title">'+(ACCT_ICONS[type]||'\uD83D\uDCC1')+' '+type+'</span><span class="mono" style="font-size:18px;font-weight:600;color:var(--text)">'+fmt(total)+'</span></div>'+rows+'</div>';
+    return'<div class="card" style="min-height:200px"><div class="card-header"><span class="card-title">'+(ACCT_ICONS[type]||'\uD83D\uDCC1')+' '+type+'</span><span class="mono" style="font-size:18px;font-weight:600;color:var(--text)">'+fmt(total)+'</span></div>'+rows+'</div>';
   }).join('');
 }
 function editAccount(id){const a=data.accounts.find(x=>x.id===id);if(a)openModal('account',a);}
@@ -433,17 +444,18 @@ function buildSettingsHTML(){
 }
 
 // MODALS
-function modalHeader(title){
-  return'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px"><h2 style="margin:0">'+title+'</h2><button class="icon-btn" onclick="closeModal()" title="Close" style="font-size:16px">\u2715</button></div>';
+function modalHeader(title,extra){
+  return'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px"><h2 style="margin:0;display:inline-flex;align-items:center;gap:8px">'+title+(extra||'')+'</h2><button class="icon-btn" onclick="closeModal()" title="Close" style="font-size:16px">\u2715</button></div>';
 }
 function openModal(type,existing){
   const overlay=document.getElementById('modalOverlay'),mc=document.getElementById('modalContent');
   if(type==='settings'){
     mc.innerHTML=modalHeader('Settings')+'<div>'+buildSettingsHTML()+'</div>';
   }else if(type==='account'){
-    const ex=existing,isV=ex?.type==='Vehicle';
+    const ex=existing,isV=ex?.type==='Vehicle',isHE=ex?.type==='Home Equity';
     const delBtn=ex?'<button class="btn btn-danger btn-sm" onclick="deleteAccount(\''+ex.id+'\')">\uD83D\uDDD1\uFE0F Delete</button>':'';
-    mc.innerHTML=modalHeader((ex?'Edit':'Add')+' Asset')+'<div class="modal-form"><div class="row"><div class="input-group"><label>Type</label><select id="mType" onchange="onTypeChange()">'+ACCOUNT_TYPES.map(t=>'<option value="'+t+'"'+(ex?.type===t?' selected':'')+'>'+t+'</option>').join('')+'</select></div><div class="input-group"><label>Value</label><input type="number" id="mBal" step="0.01" placeholder="0.00" value="'+(ex?.balance||'')+'"></div></div><div class="row"><div class="input-group"><label>Owner</label><select id="mOwner">'+OWNERS.map(o=>'<option value="'+o+'"'+(ex?.owner===o?' selected':'')+'>'+(o||'\u2014 None \u2014')+'</option>').join('')+'</select></div><div class="input-group"><label>Held At</label><select id="mInst">'+INSTITUTIONS.map(i=>'<option value="'+i+'"'+(ex?.institution===i?' selected':'')+'>'+(i||'\u2014 N/A \u2014')+'</option>').join('')+'</select></div></div><div id="typeHelper" style="'+(isV?'':'display:none;')+'font-size:12px;color:var(--text-dim);background:var(--bg-input);border-radius:8px;padding:10px 14px;line-height:1.5">\uD83D\uDCA1 Check your vehicle value at <a href="https://www.kbb.com/whats-my-car-worth/" target="_blank" style="color:var(--accent);text-decoration:none">KBB.com</a></div><div class="input-group"><label>Notes (optional)</label><textarea id="mNotes" rows="3" placeholder="Add context, reminders, or details...">'+(ex?.notes||'')+'</textarea></div><div class="modal-actions">'+delBtn+'<button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveAccount(\''+(ex?.id||'')+'\')">'+(ex?'Update':'Add')+'</button></div></div>';
+    const titleExtra=ex?.lastUpdated?' <span class="info-icon" style="position:relative;top:-1px">i<span class="info-tooltip tip-down" style="min-width:160px;text-transform:none;letter-spacing:0;font-weight:400">Last updated '+fmtDate(ex.lastUpdated)+'</span></span>':'';
+    mc.innerHTML=modalHeader((ex?'Edit':'Add')+' Asset',titleExtra)+'<div class="modal-form"><div class="row"><div class="input-group"><label>Type</label><select id="mType" onchange="onTypeChange()">'+ACCOUNT_TYPES.map(t=>'<option value="'+t+'"'+(ex?.type===t?' selected':'')+'>'+t+'</option>').join('')+'</select></div><div class="input-group" id="valGroup" style="'+(isHE?'display:none':'')+'"><label>Value</label><input type="number" id="mBal" step="0.01" placeholder="0.00" value="'+(isHE?'':(ex?.balance||''))+'"></div></div><div id="homeEquityFields" style="'+(isHE?'':'display:none;')+'"><div class="row"><div class="input-group"><label>Home Value</label><input type="number" id="mHomeVal" step="0.01" placeholder="0.00" value="'+(ex?.homeValue||'')+'" oninput="updateEquityPreview()"></div><div class="input-group"><label>Mortgage Balance</label><input type="number" id="mMortBal" step="0.01" placeholder="0.00" value="'+(ex?.mortgageBalance||'')+'" oninput="updateEquityPreview()"></div></div><div class="row" style="margin-top:16px"><div class="input-group"><label>Your Equity</label><div id="equityPreview" class="mono" style="padding:10px 14px;border-radius:8px;background:var(--bg-input);border:1px solid var(--border);font-size:16px;font-weight:600;color:var(--green)">'+fmt((ex?.homeValue||0)-(ex?.mortgageBalance||0))+'</div></div><div class="input-group" style="visibility:hidden"><label>&nbsp;</label><div style="padding:10px 14px">&nbsp;</div></div></div></div><div class="row"><div class="input-group"><label>Owner</label><select id="mOwner">'+OWNERS.map(o=>'<option value="'+o+'"'+(ex?.owner===o?' selected':'')+'>'+(o||'None')+'</option>').join('')+'</select></div><div class="input-group"><label>Held At</label><select id="mInst">'+INSTITUTIONS.map(i=>'<option value="'+i+'"'+(ex?.institution===i?' selected':'')+'>'+(i||'None')+'</option>').join('')+'</select></div></div><div id="typeHelper" style="'+(isV||isHE?'':'display:none;')+'font-size:12px;color:var(--text-dim);background:var(--bg-input);border-radius:8px;padding:10px 14px;line-height:1.5">'+(isHE?'\uD83D\uDCA1 Check value on <a href="https://www.zillow.com" target="_blank" style="color:var(--accent);text-decoration:none">Zillow</a> or <a href="https://www.redfin.com" target="_blank" style="color:var(--accent);text-decoration:none">Redfin</a>.':'\uD83D\uDCA1 Check value at <a href="https://www.kbb.com/whats-my-car-worth/" target="_blank" style="color:var(--accent);text-decoration:none">KBB.com</a>')+'</div><div class="input-group"><label>Notes (optional)</label><textarea id="mNotes" rows="3" placeholder="Add context, reminders, or details...">'+(ex?.notes||'')+'</textarea></div><div class="modal-actions">'+delBtn+'<button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveAccount(\''+(ex?.id||'')+'\')">'+(ex?'Update':'Add')+'</button></div></div>';
   }else if(type==='subscription'){
     const ex=existing,sv=ex?.splitBy||1;
     const delBtn=ex?'<button class="btn btn-danger btn-sm" onclick="deleteSub(\''+ex.id+'\')">\uD83D\uDDD1\uFE0F Delete</button>':'';
@@ -456,13 +468,30 @@ function openModal(type,existing){
   overlay.classList.add('active');setTimeout(()=>{const fi=mc.querySelector('input:not([disabled])');if(fi)fi.focus();},100);
 }
 function closeModal(){document.getElementById('modalOverlay').classList.remove('active');}
-function onTypeChange(){const t=document.getElementById('mType').value,h=document.getElementById('typeHelper');if(t==='Vehicle'){h.style.display='';h.innerHTML='\uD83D\uDCA1 Check value at <a href="https://www.kbb.com/whats-my-car-worth/" target="_blank" style="color:var(--accent);text-decoration:none">KBB.com</a>';}else if(t==='Home Equity'){h.style.display='';h.innerHTML='\uD83D\uDCA1 Home value minus mortgage. Check <a href="https://www.zillow.com" target="_blank" style="color:var(--accent);text-decoration:none">Zillow</a> or <a href="https://www.redfin.com" target="_blank" style="color:var(--accent);text-decoration:none">Redfin</a>.';}else{h.style.display='none';}}
+function onTypeChange(){
+  const t=document.getElementById('mType').value,h=document.getElementById('typeHelper'),vg=document.getElementById('valGroup'),hef=document.getElementById('homeEquityFields');
+  vg.style.display=t==='Home Equity'?'none':'';
+  hef.style.display=t==='Home Equity'?'':'none';
+  if(t==='Vehicle'){h.style.display='';h.innerHTML='\uD83D\uDCA1 Check value at <a href="https://www.kbb.com/whats-my-car-worth/" target="_blank" style="color:var(--accent);text-decoration:none">KBB.com</a>';}
+  else if(t==='Home Equity'){h.style.display='';h.innerHTML='\uD83D\uDCA1 Check value on <a href="https://www.zillow.com" target="_blank" style="color:var(--accent);text-decoration:none">Zillow</a> or <a href="https://www.redfin.com" target="_blank" style="color:var(--accent);text-decoration:none">Redfin</a>.';}
+  else{h.style.display='none';}
+}
+function updateEquityPreview(){const hv=parseFloat(document.getElementById('mHomeVal').value)||0,mb=parseFloat(document.getElementById('mMortBal').value)||0;document.getElementById('equityPreview').textContent=fmt(hv-mb);}
 
 // SAVES
 function saveAccount(eid){
-  const type=document.getElementById('mType').value,balance=parseFloat(document.getElementById('mBal').value)||0,owner=document.getElementById('mOwner').value,inst=document.getElementById('mInst').value,notes=document.getElementById('mNotes').value.trim(),today=new Date().toISOString().slice(0,10);
-  if(eid){const a=data.accounts.find(x=>x.id===eid);if(a)Object.assign(a,{name:type,type,balance,owner,institution:inst,notes,lastUpdated:today});}
-  else{data.accounts.push({id:gid(),name:type,type,balance,owner,institution:inst,notes,lastUpdated:today});}
+  const type=document.getElementById('mType').value,owner=document.getElementById('mOwner').value,inst=document.getElementById('mInst').value,notes=document.getElementById('mNotes').value.trim(),today=new Date().toISOString().slice(0,10);
+  let balance,homeValue,mortgageBalance;
+  if(type==='Home Equity'){
+    homeValue=parseFloat(document.getElementById('mHomeVal').value)||0;
+    mortgageBalance=parseFloat(document.getElementById('mMortBal').value)||0;
+    balance=homeValue-mortgageBalance;
+  }else{
+    balance=parseFloat(document.getElementById('mBal').value)||0;
+    homeValue=undefined;mortgageBalance=undefined;
+  }
+  if(eid){const a=data.accounts.find(x=>x.id===eid);if(a)Object.assign(a,{name:type,type,balance,owner,institution:inst,notes,lastUpdated:today,homeValue,mortgageBalance});}
+  else{data.accounts.push({id:gid(),name:type,type,balance,owner,institution:inst,notes,lastUpdated:today,homeValue,mortgageBalance});}
   save();closeModal();renderAll();toast(eid?'Updated':'Added');
 }
 function saveSub(eid){
