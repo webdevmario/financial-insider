@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+backend/public/
+
+# Database (contains personal financial data — never commit)
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+data/export.json
+
+# Drizzle migration artifacts
+backend/drizzle/
+
+# Environment
+.env
+.env.*
+
+# Logs
+*.log
+/tmp/financial-insider*.log
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Tailscale (if any local config ends up here)
+*.key
+*.crt
