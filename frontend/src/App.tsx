@@ -76,7 +76,7 @@ export default function App() {
           {activeView === "dashboard" && <DashboardView />}
           {activeView === "accounts" && <AccountsView onToast={showToast} />}
           {activeView === "budget" && (
-            <BudgetView onToast={showToast} onDataChange={refresh} />
+            <BudgetView onToast={showToast} />
           )}
           {activeView === "subscriptions" && <SubscriptionsView onToast={showToast} />}
         </div>

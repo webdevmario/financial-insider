@@ -9,7 +9,7 @@ interface BudgetViewProps {
   onDataChange?: () => void;
 }
 
-export default function BudgetView({ onToast, onDataChange }: BudgetViewProps) {
+export default function BudgetView({ onToast }: BudgetViewProps) {
   const [selectedMonth, setSelectedMonth] = useState(curMo());
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [allMonths, setAllMonths] = useState<string[]>([]);
