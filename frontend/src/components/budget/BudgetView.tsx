@@ -38,11 +38,11 @@ export default function BudgetView({ onToast, onDataChange }: BudgetViewProps) {
 
   const loadMonths = useCallback(() => {
     api.expenses.months().then((months) => {
-      const set = new Set([curMo(), ...months]);
+      const set = new Set([curMo(), selectedMonth, ...months]);
       Object.keys(budgetTargets).forEach((m) => set.add(m));
       setAllMonths([...set].sort().reverse());
     }).catch(() => {});
-  }, [budgetTargets]);
+  }, [budgetTargets, selectedMonth]);
 
   const loadTargets = useCallback(() => {
     api.settings.get<Record<string, number>>("budgetTargets").then((res) => {
@@ -122,7 +122,6 @@ export default function BudgetView({ onToast, onDataChange }: BudgetViewProps) {
 
       loadExpenses();
       loadMonths();
-      onDataChange?.();
 
       // Reliable refocus to description field
       setTimeout(() => {
@@ -139,7 +138,6 @@ export default function BudgetView({ onToast, onDataChange }: BudgetViewProps) {
     try {
       await api.expenses.delete(id);
       loadExpenses();
-      onDataChange?.();
       onToast("Deleted");
     } catch {
       onToast("Failed to delete", true);
@@ -175,7 +173,6 @@ export default function BudgetView({ onToast, onDataChange }: BudgetViewProps) {
       setEditingExpense(null);
       loadExpenses();
       loadMonths();
-      onDataChange?.();
       onToast("Updated");
     } catch {
       onToast("Failed to update", true);
