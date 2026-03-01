@@ -97,14 +97,14 @@
     .quick-add-row{display:flex;gap:10px;align-items:flex-end}
     .quick-add-row .input-group{flex:1}
     .quick-add-row .btn-primary{height:44px;padding:0 20px;flex-shrink:0}
-    .expense-item{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(42,45,62,.4);gap:12px}
-    .expense-item:last-child{border-bottom:none}
+    .expense-item{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;margin:4px 0;border-radius:10px;border:none;border-bottom:none;gap:12px;transition:background .15s}
+    .expense-item:hover{background:rgba(255,255,255,.03)}
     .expense-info{flex:1;min-width:0}
     .expense-desc{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .expense-meta{font-size:12px;color:var(--text-muted);margin-top:2px;display:flex;align-items:center;gap:6px}
     .expense-amount{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:500;flex-shrink:0}
-    .expense-del{background:none;border:none;cursor:pointer;font-size:14px;padding:4px;opacity:.4;transition:opacity .15s;flex-shrink:0;color:var(--text-muted)}
-    .expense-del:hover{opacity:1;color:var(--red)}
+    .expense-del{background:none;border:none;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:6px;opacity:.3;transition:all .15s;flex-shrink:0;color:var(--text-muted)}
+    .expense-del:hover{opacity:1;color:var(--red);background:var(--red-dim)}
     .empty-state{text-align:center;padding:48px 24px;color:var(--text-dim)}
     .empty-state .empty-icon{font-size:40px;margin-bottom:12px;opacity:.4}
     .empty-state p{font-size:14px;margin-bottom:16px}
@@ -114,6 +114,8 @@
     .upcoming-callout .callout-body{font-size:13px;color:var(--text-dim);line-height:1.5}
     @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
     @keyframes sheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+    @keyframes flashGreen{0%{background:rgba(52,211,153,0.13);box-shadow:0 0 0 1px rgba(52,211,153,0.25)}60%{background:rgba(52,211,153,0.06);box-shadow:0 0 0 1px rgba(52,211,153,0.1)}100%{background:transparent;box-shadow:none}}
+    .expense-item.just-added{animation:flashGreen 1.8s ease-out}
     .view.active > *{animation:fadeIn .3s ease forwards}
     ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
     .row-actions{display:flex;gap:2px;flex-shrink:0}
@@ -229,9 +231,13 @@
     <div class="quick-add" style="border-color:var(--accent);border-width:1.5px">
       <div class="quick-add-row">
         <div class="input-group" style="flex:2"><input type="text" id="qaDesc" placeholder="What was it?" autocomplete="off" style="font-size:16px;padding:12px 14px"></div>
-        <div class="input-group" style="flex:1;max-width:140px"><input type="number" id="qaAmt" step="0.01" placeholder="$0.00" inputmode="decimal" style="padding:12px 14px"></div>
-        <button class="btn btn-primary" onclick="quickAddExpense()" style="height:48px;padding:0 24px;font-size:15px">Add</button>
+        <div class="input-group" style="flex:1;max-width:140px"><input type="number" id="qaAmt" step="0.01" placeholder="0.00" inputmode="decimal" style="padding:12px 14px"></div>
+        <button class="btn btn-primary" id="qaAddBtn" onclick="quickAddExpense()" style="height:48px;padding:0 24px;font-size:15px">Add</button>
       </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+      <select id="_bmSel" onchange="onMonthChange()" style="width:auto;font-size:14px;padding:6px 12px"></select>
+      <button class="btn btn-sm" onclick="openModal('budgetTarget')">Set Target</button>
     </div>
     <div id="budgetSummary" class="card" style="margin-bottom:20px"></div>
     <div class="card">
@@ -373,39 +379,112 @@ function renderAccounts(){
 }
 function editAccount(id){const a=data.accounts.find(x=>x.id===id);if(a)openModal('account',a);}
 function deleteAccount(id){const a=data.accounts.find(x=>x.id===id);if(!a)return;const label=a.type+(a.owner?' ('+a.owner+')':'');showConfirm('Delete "'+label+'"?','This action cannot be undone.',()=>{data.accounts=data.accounts.filter(x=>x.id!==id);save();renderAll();toast('Deleted');});}
+
 // BUDGET
-function renderBudget(){
-  const sumEl=document.getElementById('budgetSummary');
+// Track selected month persistently so it survives re-renders
+let _selectedMonth=curMo();
+
+function updateMonthSelector(forceMonth){
+  const sel=document.getElementById('_bmSel');
+  if(forceMonth)_selectedMonth=forceMonth;
   const months=new Set([curMo()]);
-  data.expenses.forEach(e=>months.add(e.month));Object.keys(data.budgetTargets).forEach(m=>months.add(m));
+  data.expenses.forEach(e=>{if(e.month)months.add(e.month);});
+  Object.keys(data.budgetTargets).forEach(m=>months.add(m));
   const allMonths=[...months].sort().reverse();
-  const curVal=(document.getElementById('_bmSel')||{}).value||curMo();
-  const selHtml='<select id="_bmSel" onchange="renderBudget()" style="width:auto;font-size:14px;padding:6px 12px">'+allMonths.map(m=>'<option value="'+m+'"'+(m===curVal?' selected':'')+'>'+moLabel(m)+'</option>').join('')+'</select>';
-  const mo=curVal,target=data.budgetTargets[mo]||0,exps=data.expenses.filter(e=>e.month===mo),spent=exps.reduce((s,e)=>s+e.amount,0),remaining=target-spent,pct=target>0?(spent/target*100):0;
+  if(!allMonths.includes(_selectedMonth))_selectedMonth=curMo();
+  sel.innerHTML=allMonths.map(m=>'<option value="'+m+'"'+(m===_selectedMonth?' selected':'')+'>'+moLabel(m)+'</option>').join('');
+  sel.value=_selectedMonth;
+}
+
+// Called when user changes the month dropdown
+function onMonthChange(){
+  _selectedMonth=document.getElementById('_bmSel').value;
+  renderBudget();
+}
+
+function renderBudget(){
+  updateMonthSelector();
+  const mo=_selectedMonth;
+  const sumEl=document.getElementById('budgetSummary');
+  const target=data.budgetTargets[mo]||0;
+  const exps=data.expenses.filter(e=>e.month===mo);
+  const spent=exps.reduce((s,e)=>s+e.amount,0);
+  const remaining=target-spent;
+  const pct=target>0?(spent/target*100):0;
+
   if(target>0){
     const hColor=remaining>=0?'var(--green)':'var(--red)';
     const barClass=pct>90?'danger':pct>70?'warn':'safe';
-    sumEl.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'+selHtml+'<button class="btn btn-sm" onclick="openModal(\'budgetTarget\')">Set Target</button></div>'+
+    sumEl.innerHTML=
       '<div style="text-align:center;padding:8px 0 16px"><div style="font-family:\'JetBrains Mono\',monospace;font-size:44px;font-weight:600;color:'+hColor+';letter-spacing:-1px">'+fmt(remaining)+'</div><div style="font-size:13px;color:var(--text-muted);margin-top:4px">remaining this month</div></div>'+
       '<div class="budget-bar-container" style="margin-bottom:10px"><div class="budget-bar '+barClass+'" style="width:'+Math.min(pct,100)+'%"></div></div>'+
       '<div style="display:flex;justify-content:space-between"><span style="font-size:12px;color:var(--text-muted)">Spent: <span class="mono">'+fmt(spent)+'</span></span><span style="font-size:12px;color:var(--text-muted)">Target: <span class="mono">'+fmt(target)+'</span></span></div>';
   }else{
-    sumEl.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'+selHtml+'</div>'+
-      '<div style="text-align:center;padding:20px 0"><div style="font-family:\'JetBrains Mono\',monospace;font-size:28px;font-weight:600;color:var(--text-dim)">'+fmt(spent)+'</div><div style="font-size:13px;color:var(--text-muted);margin-top:4px">spent this month</div><button class="btn btn-sm btn-primary" style="margin-top:16px" onclick="openModal(\'budgetTarget\')">Set a Budget Target</button></div>';
+    sumEl.innerHTML=
+      '<div style="text-align:center;padding:20px 0"><div style="font-family:\'JetBrains Mono\',monospace;font-size:28px;font-weight:600;color:var(--text-dim)">'+fmt(spent)+'</div><div style="font-size:13px;color:var(--text-muted);margin-top:4px">spent this month</div></div>';
   }
+
   const listEl=document.getElementById('expenseList'),emptyEl=document.getElementById('expenseEmpty');
   if(!exps.length){listEl.innerHTML='';emptyEl.style.display='block';}
-  else{emptyEl.style.display='none';listEl.innerHTML=exps.sort((a,b)=>b.date.localeCompare(a.date)).map(e=>'<div class="expense-item"><div class="expense-info"><div class="expense-desc">'+e.desc+'</div><div class="expense-meta"><span class="badge badge-blue" style="font-size:10px;padding:2px 7px">'+(e.category||'General')+'</span><span>'+fmtDate(e.date)+'</span></div></div><span class="expense-amount">'+fmtP(e.amount)+'</span><button class="expense-del" onclick="deleteExpense(\''+e.id+'\')" title="Delete">\u2715</button></div>').join('');}
+  else{
+    emptyEl.style.display='none';
+    listEl.innerHTML=exps.sort((a,b)=>b.date.localeCompare(a.date)).map(e=>{
+      const isNew=e._justAdded;
+      return'<div class="expense-item'+(isNew?' just-added':'')+'"><div class="expense-info"><div class="expense-desc">'+e.desc+'</div><div class="expense-meta"><span>'+fmtDate(e.date)+'</span></div></div><span class="expense-amount">'+fmtP(e.amount)+'</span><button class="expense-del" onclick="deleteExpense(\''+e.id+'\')" title="Delete">\u2715</button></div>';
+    }).join('');
+    // Clear the just-added flags
+    exps.forEach(e=>delete e._justAdded);
+  }
 }
+
 function quickAddExpense(){
-  const descEl=document.getElementById('qaDesc'),amtEl=document.getElementById('qaAmt');
-  const desc=descEl.value.trim(),amount=parseFloat(amtEl.value)||0;
-  if(!desc){descEl.style.borderColor='var(--red)';descEl.focus();setTimeout(()=>descEl.style.borderColor='',1500);return;}
-  if(!amount){amtEl.style.borderColor='var(--red)';amtEl.focus();setTimeout(()=>amtEl.style.borderColor='',1500);return;}
-  const date=new Date().toISOString().slice(0,10);
-  data.expenses.push({id:gid(),date,desc,category:'General',amount,month:date.slice(0,7)});save();
-  descEl.value='';amtEl.value='';descEl.focus();
-  renderBudget();renderDash();
+  try{
+    const descEl=document.getElementById('qaDesc'),amtEl=document.getElementById('qaAmt');
+    if(!descEl||!amtEl){console.error('Budget input elements not found');return;}
+    const desc=descEl.value.trim(),amount=parseFloat(amtEl.value);
+
+    if(!desc){
+      descEl.style.borderColor='var(--red)';descEl.focus();
+      setTimeout(()=>descEl.style.borderColor='',1500);
+      return;
+    }
+    if(!amount||isNaN(amount)||amount<=0){
+      amtEl.style.borderColor='var(--red)';amtEl.focus();
+      setTimeout(()=>amtEl.style.borderColor='',1500);
+      return;
+    }
+
+    const now=new Date();
+    const date=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+    const month=date.slice(0,7);
+    const newExpense={id:gid(),date:date,desc:desc,category:'General',amount:amount,month:month,_justAdded:true};
+    data.expenses.push(newExpense);
+    save();
+
+    // Clear inputs
+    descEl.value='';amtEl.value='';
+
+    // Only switch to the expense's month if we're not already viewing it
+    if(_selectedMonth!==month)_selectedMonth=month;
+
+    // Re-render
+    renderBudget();
+    renderDash();
+
+    // Scroll to the expense list so user can see the new entry
+    const listEl=document.getElementById('expenseList');
+    if(listEl&&listEl.children.length>0){
+      listEl.scrollIntoView({behavior:'smooth',block:'nearest'});
+    }
+
+    // Focus back on description for rapid entry
+    descEl.focus();
+
+    toast('Expense added');
+  }catch(err){
+    console.error('quickAddExpense error:',err);
+    toast('Error adding expense',true);
+  }
 }
 function deleteExpense(id){data.expenses=data.expenses.filter(e=>e.id!==id);save();renderBudget();renderDash();toast('Deleted');}
 
@@ -436,6 +515,7 @@ function renderSubs(){
 }
 function editSub(id){const s=data.subscriptions.find(x=>x.id===id);if(s)openModal('subscription',s);}
 function deleteSub(id){const s=data.subscriptions.find(x=>x.id===id);if(!s)return;showConfirm('Remove "'+s.name+'"?','This action cannot be undone.',()=>{data.subscriptions=data.subscriptions.filter(x=>x.id!==id);save();renderAll();toast('Deleted');});}
+
 // SETTINGS
 function buildSettingsHTML(){
   const pp=data.paycheck||'';
@@ -462,7 +542,7 @@ function openModal(type,existing){
     const statusVal=ex?.status||'';
     mc.innerHTML=modalHeader((ex?'Edit':'Add')+' Bill')+'<div class="modal-form"><div class="input-group"><label>Service Name</label><input type="text" id="mSubName" placeholder="e.g. Netflix, Allstate" value="'+(ex?.name||'')+'"></div><div class="row"><div class="input-group"><label>Category</label><select id="mSubCat">'+SUB_CATS.map(c=>'<option value="'+c+'"'+(ex?.category===c?' selected':'')+'>'+c+'</option>').join('')+'</select></div><div class="input-group"><label>Frequency</label><select id="mSubFreq"><option value="monthly"'+(ex?.frequency==='monthly'?' selected':'')+'>Monthly</option><option value="quarterly"'+(ex?.frequency==='quarterly'?' selected':'')+'>Quarterly</option><option value="annual"'+(ex?.frequency==='annual'?' selected':'')+'>Annual</option></select></div></div><div class="row"><div class="input-group"><label>Charge Amount</label><input type="number" id="mSubAmt" step="0.01" placeholder="0.00" value="'+(ex?.amount||'')+'" oninput="updateSplitPreview()"></div><div class="input-group"><label>Next Charge Date</label><input type="date" id="mSubNext" value="'+(ex?.nextCharge||'')+'"></div></div><div class="row"><div class="input-group"><label>Split Between</label><select id="mSubSplit" onchange="updateSplitPreview()">'+ [1,2,3,4].map(n=>'<option value="'+n+'"'+(sv===n?' selected':'')+'>'+(n===1?'Just me':n+' people')+'</option>').join('')+'</select></div><div class="input-group"><label>My Cost</label><div id="splitPreview" class="mono" style="padding:10px 14px;border-radius:8px;background:var(--bg-input);border:1px solid var(--border);font-size:14px;color:var(--green)">'+fmtP((ex?.amount||0)/(sv||1))+'</div></div></div><div class="input-group"><label>Status</label><select id="mSubStatus"><option value=""'+(!statusVal?' selected':'')+'>None</option><option value="essential"'+(statusVal==='essential'?' selected':'')+'>Essential</option><option value="review"'+(statusVal==='review'?' selected':'')+'>Under Review</option></select></div><div class="input-group"><label>Notes (optional)</label><textarea id="mSubNotes" rows="2" placeholder="e.g. Split with mom, seasonal pricing...">'+(ex?.notes||'')+'</textarea></div><div class="modal-actions">'+delBtn+'<button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveSub(\''+(ex?.id||'')+'\')">'+(ex?'Update':'Add')+'</button></div></div>';
   }else if(type==='budgetTarget'){
-    const mo=document.getElementById('_bmSel').value,cur=data.budgetTargets[mo]||'';
+    const mo=_selectedMonth||curMo(),cur=data.budgetTargets[mo]||'';
     mc.innerHTML=modalHeader('Set Budget Target')+'<p style="font-size:13px;color:var(--text-dim);margin-bottom:20px">Set your spending target for '+moLabel(mo)+'.</p><div class="modal-form"><div class="row"><div class="input-group"><label>Month</label><input type="text" value="'+moLabel(mo)+'" disabled></div><div class="input-group"><label>Target Amount</label><input type="number" id="mBudgetAmt" step="0.01" placeholder="0.00" value="'+cur+'"></div></div><div class="modal-actions"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveBudgetTarget(\''+mo+'\')">Save</button></div></div>';
   }
   overlay.classList.add('active');setTimeout(()=>{const fi=mc.querySelector('input:not([disabled])');if(fi)fi.focus();},100);
