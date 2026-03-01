@@ -1,0 +1,28 @@
+{
+  "name": "financial-insider",
+  "version": "1.0.0",
+  "description": "A self-hosted personal finance tracker. Tracks net worth, assets, monthly bills, and budget expenses across devices via Tailscale.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"pnpm --filter backend dev\" \"pnpm --filter frontend dev\"",
+    "build": "pnpm --filter frontend build",
+    "start": "pnpm --filter backend dev",
+    "restart": "lsof -ti:3001 | xargs kill -9 2>/dev/null; launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.financial-insider.plist 2>/dev/null; launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.financial-insider.plist"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/webdevmario/command-center.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/webdevmario/command-center/issues"
+  },
+  "homepage": "https://github.com/webdevmario/command-center#readme",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
