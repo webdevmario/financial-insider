@@ -26,6 +26,12 @@ export default function BudgetView({ onToast, onDataChange }: BudgetViewProps) {
   const [targetOpen, setTargetOpen] = useState(false);
   const [targetAmt, setTargetAmt] = useState("");
 
+  // Edit expense modal
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [editDesc, setEditDesc] = useState("");
+  const [editAmt, setEditAmt] = useState("");
+  const [editDate, setEditDate] = useState("");
+
   const loadExpenses = useCallback(() => {
     api.expenses.list(selectedMonth).then(setExpenses).catch(() => {});
   }, [selectedMonth]);
@@ -60,8 +66,13 @@ export default function BudgetView({ onToast, onDataChange }: BudgetViewProps) {
   const remaining = target - spent;
   const pct = target > 0 ? (spent / target) * 100 : 0;
 
+  function capitalize(str: string): string {
+    if (!str) return str;
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  }
+
   async function quickAdd() {
-    const desc = qaDesc.trim();
+    const desc = qaDesc.trim().toUpperCase();
     const amount = parseFloat(qaAmt);
 
     if (!desc) {
@@ -82,11 +93,24 @@ export default function BudgetView({ onToast, onDataChange }: BudgetViewProps) {
     }
 
     try {
+      // Use selected month, not necessarily today
       const todayStr = today();
-      const month = todayStr.slice(0, 7);
+      const todayMonth = todayStr.slice(0, 7);
+      let date: string;
+
+      if (selectedMonth === todayMonth) {
+        // Current month: use today's date
+        date = todayStr;
+      } else {
+        // Historical month: use the last day of that month
+        const [y, m] = selectedMonth.split("-").map(Number);
+        const lastDay = new Date(y, m, 0).getDate();
+        date = `${selectedMonth}-${String(lastDay).padStart(2, "0")}`;
+      }
+
       const created = await api.expenses.create({
-        date: todayStr,
-        month,
+        date,
+        month: selectedMonth,
         description: desc,
         category: "General",
         amount,
@@ -96,15 +120,15 @@ export default function BudgetView({ onToast, onDataChange }: BudgetViewProps) {
       setQaAmt("");
       setJustAdded(created.id);
 
-      // Switch to expense's month if different
-      if (selectedMonth !== month) {
-        setSelectedMonth(month);
-      } else {
-        loadExpenses();
-      }
+      loadExpenses();
       loadMonths();
       onDataChange?.();
-      descRef.current?.focus();
+
+      // Reliable refocus to description field
+      setTimeout(() => {
+        descRef.current?.focus();
+      }, 50);
+
       onToast("Expense added");
     } catch {
       onToast("Error adding expense", true);
@@ -120,6 +144,48 @@ export default function BudgetView({ onToast, onDataChange }: BudgetViewProps) {
     } catch {
       onToast("Failed to delete", true);
     }
+  }
+
+  function openEditExpense(e: Expense) {
+    setEditingExpense(e);
+    setEditDesc(e.description);
+    setEditAmt(String(e.amount));
+    setEditDate(e.date);
+  }
+
+  async function saveEditExpense() {
+    if (!editingExpense) return;
+    const desc = editDesc.trim().toUpperCase();
+    const amount = parseFloat(editAmt);
+
+    if (!desc) { onToast("Enter description", true); return; }
+    if (!amount || isNaN(amount) || amount <= 0) { onToast("Enter amount", true); return; }
+
+    try {
+      // Delete old and create new (expenses API doesn't have PUT)
+      await api.expenses.delete(editingExpense.id);
+      await api.expenses.create({
+        date: editDate,
+        month: editDate.slice(0, 7),
+        description: desc,
+        category: editingExpense.category,
+        amount,
+      });
+
+      setEditingExpense(null);
+      loadExpenses();
+      loadMonths();
+      onDataChange?.();
+      onToast("Updated");
+    } catch {
+      onToast("Failed to update", true);
+    }
+  }
+
+  async function deleteFromEdit() {
+    if (!editingExpense) return;
+    await deleteExpense(editingExpense.id);
+    setEditingExpense(null);
   }
 
   async function saveTarget() {
@@ -156,6 +222,7 @@ export default function BudgetView({ onToast, onDataChange }: BudgetViewProps) {
               onKeyDown={handleKeyDown}
               className="!text-base !py-3 !px-3.5"
               autoComplete="off"
+              autoCapitalize="sentences"
             />
           </div>
           <div className="input-group flex-1 max-w-[140px]">
@@ -178,6 +245,12 @@ export default function BudgetView({ onToast, onDataChange }: BudgetViewProps) {
             Add
           </button>
         </div>
+        {/* Show which month expenses go to */}
+        {selectedMonth !== curMo() && (
+          <div className="text-[11px] text-amber mt-2 font-medium">
+            Adding to {moLabel(selectedMonth)}
+          </div>
+        )}
       </div>
 
       {/* Month selector + target button */}
@@ -261,11 +334,12 @@ export default function BudgetView({ onToast, onDataChange }: BudgetViewProps) {
             .map((e) => (
               <div
                 key={e.id}
-                className={`flex items-center justify-between py-3.5 px-4 my-1 rounded-[10px] gap-3 transition-colors hover:bg-white/[0.03] ${
+                className={`flex items-center justify-between py-3.5 px-4 my-1 rounded-[10px] gap-3 transition-colors hover:bg-white/[0.03] cursor-pointer ${
                   justAdded === e.id
                     ? "animate-[flashGreen_1.8s_ease-out] bg-green/[0.13] shadow-[0_0_0_1px_rgba(52,211,153,0.25)]"
                     : ""
                 }`}
+                onClick={() => openEditExpense(e)}
               >
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">{e.description}</div>
@@ -274,13 +348,7 @@ export default function BudgetView({ onToast, onDataChange }: BudgetViewProps) {
                 <span className="font-mono text-sm font-medium flex-shrink-0">
                   {fmtP(e.amount)}
                 </span>
-                <button
-                  className="bg-transparent border-none cursor-pointer text-[13px] p-1.5 px-2 rounded-md opacity-30 hover:opacity-100 hover:text-red hover:bg-red-dim transition-all flex-shrink-0 text-text-muted"
-                  onClick={() => deleteExpense(e.id)}
-                  title="Delete"
-                >
-                  ✕
-                </button>
+                <span className="text-text-muted text-lg opacity-60">›</span>
               </div>
             ))
         )}
@@ -317,6 +385,52 @@ export default function BudgetView({ onToast, onDataChange }: BudgetViewProps) {
         <div className="flex justify-end gap-2.5 mt-4 pt-4 border-t border-border">
           <button className="btn" onClick={() => setTargetOpen(false)}>Cancel</button>
           <button className="btn btn-primary" onClick={saveTarget}>Save</button>
+        </div>
+      </Modal>
+
+      {/* Edit Expense Modal */}
+      <Modal
+        open={!!editingExpense}
+        onClose={() => setEditingExpense(null)}
+        title="Edit Expense"
+      >
+        <div className="flex flex-col gap-4">
+          <div className="input-group">
+            <label>Description</label>
+            <input
+              type="text"
+              value={editDesc}
+              onChange={(e) => setEditDesc(capitalize(e.target.value))}
+              autoCapitalize="sentences"
+            />
+          </div>
+          <div className="grid grid-cols-2 max-md:grid-cols-1 gap-3">
+            <div className="input-group">
+              <label>Amount</label>
+              <input
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={editAmt}
+                onChange={(e) => setEditAmt(e.target.value)}
+              />
+            </div>
+            <div className="input-group">
+              <label>Date</label>
+              <input
+                type="date"
+                value={editDate}
+                onChange={(e) => setEditDate(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2.5 pt-4 border-t border-border max-md:pb-[env(safe-area-inset-bottom)]">
+            <button className="btn btn-danger btn-sm" onClick={deleteFromEdit}>
+              🗑️ Delete
+            </button>
+            <button className="btn" onClick={() => setEditingExpense(null)}>Cancel</button>
+            <button className="btn btn-primary" onClick={saveEditExpense}>Update</button>
+          </div>
         </div>
       </Modal>
     </div>
