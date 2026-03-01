@@ -8,8 +8,8 @@
   },
 "scripts": {
     "dev": "concurrently -n api,web -c blue,green \"pnpm --filter financial-insider-backend dev\" \"pnpm --filter financial-insider-frontend dev\"",
-    "build": "pnpm --filter frontend build",
-    "start": "pnpm --filter backend dev",
+    "build": "pnpm --filter financial-insider-frontend build",
+    "start": "pnpm --filter financial-insider-backend dev",
     "prod:start": "launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.financial-insider.plist",
     "prod:stop": "launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.financial-insider.plist 2>/dev/null; lsof -ti:3001 | xargs kill -9 2>/dev/null",
     "prod:restart": "pnpm prod:stop && sleep 1 && pnpm prod:start",
@@ -17,7 +17,7 @@
     "prod:errors": "cat /tmp/financial-insider-error.log",
     "prod:status": "launchctl list | grep financial",
     "prod:deploy": "pnpm build && pnpm prod:restart",
-    "db:push": "pnpm --filter backend db:push",
+    "db:push": "pnpm --filter financial-insider-backend db:push",
     "db:backup": "cp data/finance.db data/finance-backup-$(date +%Y%m%d).db && echo 'Backup created'"
   },
   "repository": {
