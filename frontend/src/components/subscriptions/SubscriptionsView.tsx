@@ -10,6 +10,7 @@ interface SubscriptionsViewProps {
 }
 
 export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
+  const [loading, setLoading] = useState(true);
   const [subs, setSubs] = useState<Subscription[]>([]);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Subscription | null>(null);
@@ -18,10 +19,13 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
   const [statusFilter, setStatusFilter] = useState("");
 
   const load = useCallback(() => {
-    api.subscriptions.list().then(setSubs).catch(() => {});
+    return api.subscriptions.list().then(setSubs).catch(() => {});
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    setLoading(true);
+    load().finally(() => setLoading(false));
+  }, [load]);
 
   function openNew() { setEditing(null); setFormOpen(true); }
   function openEdit(s: Subscription) { setEditing(s); setFormOpen(true); }
@@ -54,6 +58,15 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
   if (freqFilter) filtered = filtered.filter((s) => s.frequency === freqFilter);
   if (statusFilter) filtered = filtered.filter((s) => (s.status || "") === statusFilter);
   filtered = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-3">
+        <div className="w-7 h-7 border-2 border-border border-t-accent rounded-full animate-spin" />
+        <span className="text-sm text-text-muted">Loading…</span>
+      </div>
+    );
+  }
 
   return (
     <div>

@@ -31,14 +31,18 @@ function monthlyEquiv(s: Subscription): number {
 }
 
 export default function DashboardView() {
+  const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState({ netWorth: 0, income: 0, monthlyBills: 0 });
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [subs, setSubs] = useState<Subscription[]>([]);
 
   useEffect(() => {
-    api.dashboard.summary().then(setSummary).catch(() => {});
-    api.accounts.list().then(setAccounts).catch(() => {});
-    api.subscriptions.list().then(setSubs).catch(() => {});
+    setLoading(true);
+    Promise.all([
+      api.dashboard.summary().then(setSummary).catch(() => {}),
+      api.accounts.list().then(setAccounts).catch(() => {}),
+      api.subscriptions.list().then(setSubs).catch(() => {}),
+    ]).finally(() => setLoading(false));
   }, []);
 
   // Asset breakdown by group
@@ -67,6 +71,15 @@ export default function DashboardView() {
     const d = new Date(s.nextCharge + "T00:00:00");
     return d >= today && d <= future;
   });
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-3">
+        <div className="w-7 h-7 border-2 border-border border-t-accent rounded-full animate-spin" />
+        <span className="text-sm text-text-muted">Loading…</span>
+      </div>
+    );
+  }
 
   return (
     <div>

@@ -10,6 +10,7 @@ interface BudgetViewProps {
 }
 
 export default function BudgetView({ onToast }: BudgetViewProps) {
+  const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(curMo());
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [allMonths, setAllMonths] = useState<string[]>([]);
@@ -33,11 +34,11 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
   const [editDate, setEditDate] = useState("");
 
   const loadExpenses = useCallback(() => {
-    api.expenses.list(selectedMonth).then(setExpenses).catch(() => {});
+    return api.expenses.list(selectedMonth).then(setExpenses).catch(() => {});
   }, [selectedMonth]);
 
   const loadMonths = useCallback(() => {
-    api.expenses.months().then((months) => {
+    return api.expenses.months().then((months) => {
       const set = new Set([curMo(), selectedMonth, ...months]);
       Object.keys(budgetTargets).forEach((m) => set.add(m));
       setAllMonths([...set].sort().reverse());
@@ -45,14 +46,17 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
   }, [budgetTargets, selectedMonth]);
 
   const loadTargets = useCallback(() => {
-    api.settings.get<Record<string, number>>("budgetTargets").then((res) => {
+    return api.settings.get<Record<string, number>>("budgetTargets").then((res) => {
       setBudgetTargets(res.value || {});
     }).catch(() => {});
   }, []);
 
   useEffect(() => { loadTargets(); }, [loadTargets]);
-  useEffect(() => { loadExpenses(); }, [loadExpenses]);
-  useEffect(() => { loadMonths(); }, [loadMonths]);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([loadExpenses(), loadMonths()]).finally(() => setLoading(false));
+  }, [loadExpenses, loadMonths]);
 
   // Clear flash animation
   useEffect(() => {
@@ -204,6 +208,16 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
     }
   }
 
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-3">
+        <div className="w-7 h-7 border-2 border-border border-t-accent rounded-full animate-spin" />
+        <span className="text-sm text-text-muted">Loading…</span>
+      </div>
+    );
+  }
+
   return (
     <div>
       {/* Quick Add */}
@@ -327,7 +341,7 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
           </div>
         ) : (
           expenses
-            .sort((a, b) => b.date.localeCompare(a.date))
+            .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id))
             .map((e) => (
               <div
                 key={e.id}

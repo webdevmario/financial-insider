@@ -34,7 +34,7 @@ export default function App() {
   return (
     <div className="min-h-screen min-h-dvh">
       {/* Top Nav */}
-      <nav className="sticky top-0 z-50 grid grid-cols-[1fr_auto_1fr] items-center px-8 h-[60px] bg-bg/85 backdrop-blur-xl border-b border-border max-md:px-4">
+      <nav className="sticky top-0 z-50 flex items-center justify-between px-8 h-[60px] bg-bg/85 backdrop-blur-xl border-b border-border max-md:px-4">
         <div className="flex items-center gap-2.5 font-semibold text-lg tracking-tight">
           <div className="w-7 h-7 bg-accent rounded-lg flex items-center justify-center text-sm text-white shadow-[0_0_16px_rgba(74,108,247,0.3)]">
             ⬡
@@ -43,15 +43,15 @@ export default function App() {
         </div>
 
         {/* Desktop tabs */}
-        <div className="hidden md:flex gap-1 bg-bg-input rounded-[10px] p-1">
+        <div className="hidden md:flex gap-0.5">
           {NAV_ITEMS.map((item) => (
             <button
               key={item.view}
               onClick={() => setActiveView(item.view)}
-              className={`px-[18px] py-[7px] rounded-[7px] text-[13px] font-medium whitespace-nowrap transition-all ${
+              className={`px-4 py-1.5 rounded-md text-[13px] font-medium whitespace-nowrap transition-all ${
                 activeView === item.view
-                  ? "bg-bg-card text-text shadow-[0_1px_4px_rgba(0,0,0,0.2)]"
-                  : "text-text-dim hover:text-text"
+                  ? "text-accent bg-accent/[0.1]"
+                  : "text-text-dim hover:text-text hover:bg-white/[0.04]"
               }`}
             >
               {item.desktop}
@@ -59,7 +59,7 @@ export default function App() {
           ))}
         </div>
 
-        <div className="flex items-center justify-end">
+        <div className="flex items-center">
           <button
             className="p-1.5 px-2.5 border border-border rounded-lg text-text-dim hover:border-accent hover:text-text transition-all"
             onClick={() => setSettingsOpen(true)}

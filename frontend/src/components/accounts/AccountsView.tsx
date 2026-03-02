@@ -10,15 +10,19 @@ interface AccountsViewProps {
 }
 
 export default function AccountsView({ onToast }: AccountsViewProps) {
+  const [loading, setLoading] = useState(true);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Account | null>(null);
 
   const load = useCallback(() => {
-    api.accounts.list().then(setAccounts).catch(() => {});
+    return api.accounts.list().then(setAccounts).catch(() => {});
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    setLoading(true);
+    load().finally(() => setLoading(false));
+  }, [load]);
 
   function openNew() {
     setEditing(null);
@@ -41,6 +45,15 @@ export default function AccountsView({ onToast }: AccountsViewProps) {
       b[1].reduce((s, x) => s + (x.balance || 0), 0) -
       a[1].reduce((s, x) => s + (x.balance || 0), 0)
   );
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-3">
+        <div className="w-7 h-7 border-2 border-border border-t-accent rounded-full animate-spin" />
+        <span className="text-sm text-text-muted">Loading…</span>
+      </div>
+    );
+  }
 
   return (
     <div>
