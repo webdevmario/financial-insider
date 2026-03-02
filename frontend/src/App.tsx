@@ -71,7 +71,7 @@ export default function App() {
       </nav>
 
       {/* Main Content */}
-      <main className="relative z-[1] max-w-[1280px] mx-auto px-8 py-7 pb-[60px] max-md:px-4 max-md:pb-24">
+      <main className="relative max-w-[1280px] mx-auto px-8 py-7 pb-[60px] max-md:px-4 max-md:pb-24">
         <div key={refreshKey}>
           {activeView === "dashboard" && <DashboardView />}
           {activeView === "accounts" && <AccountsView onToast={showToast} />}
