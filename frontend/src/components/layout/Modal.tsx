@@ -44,7 +44,7 @@ export default function Modal({ open, onClose, title, titleExtra, children }: Mo
       <div
         ref={contentRef}
         className="bg-bg-card border border-border rounded-2xl p-8 w-[520px] max-w-[90vw] max-h-[85vh] overflow-y-auto shadow-[0_24px_48px_rgba(0,0,0,0.4)]
-          max-md:max-w-full max-md:w-full max-md:max-h-[85dvh] max-md:rounded-b-none max-md:border-x-0 max-md:border-b-0 max-md:p-5 max-md:pb-8 max-md:animate-[sheetUp_0.25s_ease-out]"
+          max-md:max-w-full max-md:w-full max-md:max-h-[85dvh] max-md:rounded-b-none max-md:border-x-0 max-md:border-b-0 max-md:p-5 max-md:animate-[sheetUp_0.25s_ease-out]"
       >
         {/* Mobile drag handle */}
         <div className="hidden max-md:block w-9 h-1 rounded-full bg-white/20 mx-auto mb-4" />
