@@ -4,6 +4,7 @@ node_modules/
 # Build output
 dist/
 backend/public/
+tsconfig.tsbuildinfo
 
 # Database (contains personal financial data — never commit)
 data/*.db
