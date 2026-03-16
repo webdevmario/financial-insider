@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import Modal from "../layout/Modal";
 import { api } from "../../lib/api";
-import { fmtP, fmtDate } from "../../lib/formatters";
+import { fmtP } from "../../lib/formatters";
 import type { Subscription } from "../../types";
 import { SUB_CATEGORIES } from "../../types";
 
@@ -60,7 +60,10 @@ export default function SubscriptionForm({
       setCategory(subscription.category);
       setFrequency(subscription.frequency);
       setAmount(String(subscription.amount || ""));
-      setNextCharge(subscription.nextCharge || "");
+      setNextCharge(
+        computeEffectiveNextCharge(subscription.nextCharge, subscription.frequency) ||
+        subscription.nextCharge || ""
+      );
       setSplitBy(subscription.splitBy || 1);
       setStatus(subscription.status || "");
       setNotes(subscription.notes || "");
@@ -184,25 +187,6 @@ export default function SubscriptionForm({
               value={nextCharge}
               onChange={(e) => setNextCharge(e.target.value)}
             />
-            {(() => {
-              if (!nextCharge) return null;
-              const effective = computeEffectiveNextCharge(nextCharge, frequency);
-              if (!effective || effective === nextCharge) return null;
-              return (
-                <div className="flex items-center gap-2 mt-1.5">
-                  <span className="text-[11px] text-amber">
-                    Past due — next charge is {fmtDate(effective)}
-                  </span>
-                  <button
-                    type="button"
-                    className="text-[11px] text-accent hover:underline"
-                    onClick={() => setNextCharge(effective)}
-                  >
-                    Update
-                  </button>
-                </div>
-              );
-            })()}
           </div>
         </div>
 
