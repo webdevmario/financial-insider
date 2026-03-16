@@ -1,9 +1,37 @@
 import { useState, useEffect } from "react";
 import Modal from "../layout/Modal";
 import { api } from "../../lib/api";
-import { fmtP } from "../../lib/formatters";
+import { fmtP, fmtDate } from "../../lib/formatters";
 import type { Subscription } from "../../types";
 import { SUB_CATEGORIES } from "../../types";
+
+/**
+ * Given a stored nextCharge date and frequency, advance forward until >= today.
+ */
+function computeEffectiveNextCharge(
+  nextCharge: string | null,
+  frequency: "monthly" | "quarterly" | "annual"
+): string | null {
+  if (!nextCharge) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const [y, m, d] = nextCharge.split("-").map(Number);
+  const charge = new Date(y, m - 1, d);
+  charge.setHours(0, 0, 0, 0);
+
+  if (charge >= today) return nextCharge; // not stale
+
+  const increment = frequency === "monthly" ? 1 : frequency === "quarterly" ? 3 : 12;
+  while (charge < today) {
+    charge.setMonth(charge.getMonth() + increment);
+  }
+
+  const ny = charge.getFullYear();
+  const nm = String(charge.getMonth() + 1).padStart(2, "0");
+  const nd = String(charge.getDate()).padStart(2, "0");
+  return `${ny}-${nm}-${nd}`;
+}
 
 interface SubscriptionFormProps {
   open: boolean;
@@ -156,6 +184,25 @@ export default function SubscriptionForm({
               value={nextCharge}
               onChange={(e) => setNextCharge(e.target.value)}
             />
+            {(() => {
+              if (!nextCharge) return null;
+              const effective = computeEffectiveNextCharge(nextCharge, frequency);
+              if (!effective || effective === nextCharge) return null;
+              return (
+                <div className="flex items-center gap-2 mt-1.5">
+                  <span className="text-[11px] text-amber">
+                    Past due — next charge is {fmtDate(effective)}
+                  </span>
+                  <button
+                    type="button"
+                    className="text-[11px] text-accent hover:underline"
+                    onClick={() => setNextCharge(effective)}
+                  >
+                    Update
+                  </button>
+                </div>
+              );
+            })()}
           </div>
         </div>
 

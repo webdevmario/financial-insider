@@ -124,21 +124,36 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
     );
   }
 
-  const renderPopoverItems = (items: { name: string; amount: number; day: number }[]) => (
-    <div className="flex flex-col gap-0.5">
-      {items.length === 0 ? (
-        <div className="text-text-muted text-xs py-1">No bills in this period</div>
-      ) : (
-        items.map((item, i) => (
-          <div key={i} className="flex items-center justify-between gap-4 py-1.5 text-xs border-b border-border/30 last:border-0">
-            <span className="flex items-center gap-2 min-w-0">
-              <span className="text-text-muted font-mono text-[10px] w-6 text-right shrink-0">{item.day}th</span>
-              <span className="truncate">{item.name}</span>
-            </span>
-            <span className="font-mono text-green shrink-0">{fmtP(item.amount)}</span>
-          </div>
-        ))
-      )}
+  const renderPopover = (label: string, items: { name: string; amount: number; day: number }[]) => (
+    <div
+      ref={popoverRef}
+      className="absolute left-0 right-0 top-full mt-2 z-50 bg-bg-card border border-border rounded-xl shadow-[0_16px_40px_rgba(0,0,0,0.5)] p-4 animate-[slideUp_0.15s_ease-out]"
+    >
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">{label}</div>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setPpPopover(null); }}
+          className="text-text-muted hover:text-text text-xs px-1.5 py-0.5 rounded hover:bg-white/[0.06] transition-colors"
+        >
+          ✕
+        </button>
+      </div>
+      <div className="flex flex-col gap-0.5">
+        {items.length === 0 ? (
+          <div className="text-text-muted text-xs py-1">No bills in this period</div>
+        ) : (
+          items.map((item, i) => (
+            <div key={i} className="flex items-center justify-between gap-4 py-1.5 text-xs border-b border-border/30 last:border-0">
+              <span className="flex items-center gap-2 min-w-0">
+                <span className="text-text-muted font-mono text-[10px] w-6 text-right shrink-0">{item.day}th</span>
+                <span className="truncate">{item.name}</span>
+              </span>
+              <span className="font-mono text-green shrink-0">{fmtP(item.amount)}</span>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 
@@ -176,15 +191,7 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
               <div className="font-mono text-xl font-semibold">{fmtP(pp1)}</div>
               <div className="text-[11px] text-text-muted mt-0.5">{pp1Items.length} item{pp1Items.length !== 1 ? "s" : ""}</div>
             </button>
-            {ppPopover === "pp1" && (
-              <div
-                ref={popoverRef}
-                className="absolute left-0 right-0 top-full mt-2 z-50 bg-bg-card border border-border rounded-xl shadow-[0_16px_40px_rgba(0,0,0,0.5)] p-4 animate-[slideUp_0.15s_ease-out]"
-              >
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted mb-2">Bills due 1st — 15th</div>
-                {renderPopoverItems(pp1Items)}
-              </div>
-            )}
+            {ppPopover === "pp1" && renderPopover("Bills due 1st — 15th", pp1Items)}
           </div>
 
           {/* 16th–31st */}
@@ -201,15 +208,7 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
               <div className="font-mono text-xl font-semibold">{fmtP(pp2)}</div>
               <div className="text-[11px] text-text-muted mt-0.5">{pp2Items.length} item{pp2Items.length !== 1 ? "s" : ""}</div>
             </button>
-            {ppPopover === "pp2" && (
-              <div
-                ref={popoverRef}
-                className="absolute left-0 right-0 top-full mt-2 z-50 bg-bg-card border border-border rounded-xl shadow-[0_16px_40px_rgba(0,0,0,0.5)] p-4 animate-[slideUp_0.15s_ease-out]"
-              >
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted mb-2">Bills due 16th — 31st</div>
-                {renderPopoverItems(pp2Items)}
-              </div>
-            )}
+            {ppPopover === "pp2" && renderPopover("Bills due 16th — 31st", pp2Items)}
           </div>
         </div>
       </div>
