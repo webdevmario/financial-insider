@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "../../lib/api";
 import { fmtP } from "../../lib/formatters";
 import StatCard from "../layout/StatCard";
@@ -9,6 +9,36 @@ interface SubscriptionsViewProps {
   onToast: (msg: string, err?: boolean) => void;
 }
 
+/**
+ * Given a stored nextCharge date (YYYY-MM-DD) and a frequency,
+ * advance the date forward until it's >= today.
+ * This keeps the "next charge" fresh without needing manual updates.
+ */
+function computeEffectiveNextCharge(
+  nextCharge: string | null,
+  frequency: "monthly" | "quarterly" | "annual"
+): string | null {
+  if (!nextCharge) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const [y, m, d] = nextCharge.split("-").map(Number);
+  const charge = new Date(y, m - 1, d);
+  charge.setHours(0, 0, 0, 0);
+
+  const increment = frequency === "monthly" ? 1 : frequency === "quarterly" ? 3 : 12;
+
+  // Advance until the charge date is today or in the future
+  while (charge < today) {
+    charge.setMonth(charge.getMonth() + increment);
+  }
+
+  const ny = charge.getFullYear();
+  const nm = String(charge.getMonth() + 1).padStart(2, "0");
+  const nd = String(charge.getDate()).padStart(2, "0");
+  return `${ny}-${nm}-${nd}`;
+}
+
 export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
   const [loading, setLoading] = useState(true);
   const [subs, setSubs] = useState<Subscription[]>([]);
@@ -17,6 +47,20 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
   const [catFilter, setCatFilter] = useState("");
   const [freqFilter, setFreqFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [ppPopover, setPpPopover] = useState<"pp1" | "pp2" | null>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  // Close popover on outside click
+  useEffect(() => {
+    if (!ppPopover) return;
+    const handler = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setPpPopover(null);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [ppPopover]);
 
   const load = useCallback(() => {
     return api.subscriptions.list().then(setSubs).catch(() => {});
@@ -39,15 +83,27 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
     else if (s.frequency === "annual") aT += my / 12;
   });
 
-  // Pay period breakdown
-  let pp1 = 0, pp2 = 0, pp1c = 0, pp2c = 0;
+  // Pay period breakdown with effective dates and itemized lists
+  let pp1 = 0, pp2 = 0;
+  const pp1Items: { name: string; amount: number; day: number }[] = [];
+  const pp2Items: { name: string; amount: number; day: number }[] = [];
   subs.forEach((s) => {
     const my = s.amount / (s.splitBy || 1);
     const me = s.frequency === "monthly" ? my : s.frequency === "quarterly" ? my / 3 : my / 12;
-    if (!s.nextCharge) return;
-    const day = parseInt(s.nextCharge.split("-")[2]);
-    if (day <= 15) { pp1 += me; pp1c++; } else { pp2 += me; pp2c++; }
+    const effective = computeEffectiveNextCharge(s.nextCharge, s.frequency);
+    if (!effective) return;
+    const day = parseInt(effective.split("-")[2]);
+    if (day <= 15) {
+      pp1 += me;
+      pp1Items.push({ name: s.name, amount: me, day });
+    } else {
+      pp2 += me;
+      pp2Items.push({ name: s.name, amount: me, day });
+    }
   });
+  // Sort items by day of month
+  pp1Items.sort((a, b) => a.day - b.day);
+  pp2Items.sort((a, b) => a.day - b.day);
 
   // Categories for filter
   const categories = [...new Set(subs.map((s) => s.category || "General"))].sort();
@@ -67,6 +123,24 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
       </div>
     );
   }
+
+  const renderPopoverItems = (items: { name: string; amount: number; day: number }[]) => (
+    <div className="flex flex-col gap-0.5">
+      {items.length === 0 ? (
+        <div className="text-text-muted text-xs py-1">No bills in this period</div>
+      ) : (
+        items.map((item, i) => (
+          <div key={i} className="flex items-center justify-between gap-4 py-1.5 text-xs border-b border-border/30 last:border-0">
+            <span className="flex items-center gap-2 min-w-0">
+              <span className="text-text-muted font-mono text-[10px] w-6 text-right shrink-0">{item.day}th</span>
+              <span className="truncate">{item.name}</span>
+            </span>
+            <span className="font-mono text-green shrink-0">{fmtP(item.amount)}</span>
+          </div>
+        ))
+      )}
+    </div>
+  );
 
   return (
     <div>
@@ -88,15 +162,54 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
           Pay Period Breakdown
         </div>
         <div className="flex gap-4 max-md:flex-col">
-          <div className="flex-1 bg-bg-input rounded-lg px-4 py-3.5">
-            <div className="text-[11px] text-text-muted mb-1">1st — 15th</div>
-            <div className="font-mono text-xl font-semibold">{fmtP(pp1)}</div>
-            <div className="text-[11px] text-text-muted mt-0.5">{pp1c} item{pp1c !== 1 ? "s" : ""}</div>
+          {/* 1st–15th */}
+          <div className="flex-1 relative">
+            <button
+              type="button"
+              className="w-full text-left bg-bg-input rounded-lg px-4 py-3.5 transition-all hover:ring-1 hover:ring-accent/40 focus:ring-1 focus:ring-accent/40 outline-none"
+              onClick={() => setPpPopover(ppPopover === "pp1" ? null : "pp1")}
+            >
+              <div className="flex items-center justify-between">
+                <div className="text-[11px] text-text-muted mb-1">1st — 15th</div>
+                <span className="text-[10px] text-accent opacity-70">{pp1Items.length > 0 ? "View items ›" : ""}</span>
+              </div>
+              <div className="font-mono text-xl font-semibold">{fmtP(pp1)}</div>
+              <div className="text-[11px] text-text-muted mt-0.5">{pp1Items.length} item{pp1Items.length !== 1 ? "s" : ""}</div>
+            </button>
+            {ppPopover === "pp1" && (
+              <div
+                ref={popoverRef}
+                className="absolute left-0 right-0 top-full mt-2 z-50 bg-bg-card border border-border rounded-xl shadow-[0_16px_40px_rgba(0,0,0,0.5)] p-4 animate-[slideUp_0.15s_ease-out]"
+              >
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted mb-2">Bills due 1st — 15th</div>
+                {renderPopoverItems(pp1Items)}
+              </div>
+            )}
           </div>
-          <div className="flex-1 bg-bg-input rounded-lg px-4 py-3.5">
-            <div className="text-[11px] text-text-muted mb-1">16th — 31st</div>
-            <div className="font-mono text-xl font-semibold">{fmtP(pp2)}</div>
-            <div className="text-[11px] text-text-muted mt-0.5">{pp2c} item{pp2c !== 1 ? "s" : ""}</div>
+
+          {/* 16th–31st */}
+          <div className="flex-1 relative">
+            <button
+              type="button"
+              className="w-full text-left bg-bg-input rounded-lg px-4 py-3.5 transition-all hover:ring-1 hover:ring-accent/40 focus:ring-1 focus:ring-accent/40 outline-none"
+              onClick={() => setPpPopover(ppPopover === "pp2" ? null : "pp2")}
+            >
+              <div className="flex items-center justify-between">
+                <div className="text-[11px] text-text-muted mb-1">16th — 31st</div>
+                <span className="text-[10px] text-accent opacity-70">{pp2Items.length > 0 ? "View items ›" : ""}</span>
+              </div>
+              <div className="font-mono text-xl font-semibold">{fmtP(pp2)}</div>
+              <div className="text-[11px] text-text-muted mt-0.5">{pp2Items.length} item{pp2Items.length !== 1 ? "s" : ""}</div>
+            </button>
+            {ppPopover === "pp2" && (
+              <div
+                ref={popoverRef}
+                className="absolute left-0 right-0 top-full mt-2 z-50 bg-bg-card border border-border rounded-xl shadow-[0_16px_40px_rgba(0,0,0,0.5)] p-4 animate-[slideUp_0.15s_ease-out]"
+              >
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted mb-2">Bills due 16th — 31st</div>
+                {renderPopoverItems(pp2Items)}
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import DashboardView from "./components/dashboard/DashboardView";
 import AccountsView from "./components/accounts/AccountsView";
 import BudgetView from "./components/budget/BudgetView";
@@ -14,6 +14,66 @@ const NAV_ITEMS: { view: View; icon: string; label: string; desktop: string }[] 
   { view: "budget", icon: "💰", label: "Budget", desktop: "Budget" },
   { view: "subscriptions", icon: "🔄", label: "Bills", desktop: "Bills" },
 ];
+
+/** Slim banner that shows when the browser goes offline / comes back */
+function ConnectionBanner() {
+  const [status, setStatus] = useState<"online" | "offline" | "reconnected">("online");
+
+  useEffect(() => {
+    let reconnectTimer: ReturnType<typeof setTimeout>;
+
+    const goOffline = () => {
+      clearTimeout(reconnectTimer);
+      setStatus("offline");
+    };
+
+    const goOnline = () => {
+      setStatus("reconnected");
+      reconnectTimer = setTimeout(() => setStatus("online"), 3000);
+    };
+
+    window.addEventListener("offline", goOffline);
+    window.addEventListener("online", goOnline);
+
+    // If already offline on mount
+    if (!navigator.onLine) setStatus("offline");
+
+    return () => {
+      window.removeEventListener("offline", goOffline);
+      window.removeEventListener("online", goOnline);
+      clearTimeout(reconnectTimer);
+    };
+  }, []);
+
+  if (status === "online") return null;
+
+  return (
+    <div
+      className={`fixed top-[60px] left-0 right-0 z-[100] flex items-center justify-center gap-2 py-2 px-4 text-xs font-medium transition-all duration-300 ${
+        status === "offline"
+          ? "bg-amber/15 text-amber border-b border-amber/20"
+          : "bg-green/15 text-green border-b border-green/20"
+      }`}
+    >
+      {status === "offline" ? (
+        <>
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber" />
+          </span>
+          Connection lost — waiting to reconnect…
+        </>
+      ) : (
+        <>
+          <span className="relative flex h-2 w-2">
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-green" />
+          </span>
+          Reconnected
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function App() {
   const [activeView, setActiveView] = useState<View>("dashboard");
@@ -69,6 +129,9 @@ export default function App() {
           </button>
         </div>
       </nav>
+
+      {/* Connection status banner */}
+      <ConnectionBanner />
 
       {/* Main Content */}
       <main className="relative max-w-[1280px] mx-auto px-8 py-7 pb-[60px] max-md:px-4 max-md:pb-24">
