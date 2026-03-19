@@ -132,9 +132,7 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
       loadMonths();
 
       // dismiss mobile keyboard
-      if (document.activeElement instanceof HTMLElement) {
-        document.activeElement.blur();
-      }
+      amtRef.current?.blur();
 
       // Reliable refocus to description field (really only for desktop)
       // setTimeout(() => {
