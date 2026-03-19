@@ -87,12 +87,14 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
       }
       return;
     }
+
     if (!amount || isNaN(amount) || amount <= 0) {
       if (amtRef.current) {
         amtRef.current.style.borderColor = "var(--red)";
         amtRef.current.focus();
         setTimeout(() => { if (amtRef.current) amtRef.current.style.borderColor = ""; }, 1500);
       }
+
       return;
     }
 
@@ -100,6 +102,7 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
       // Use selected month, not necessarily today
       const todayStr = today();
       const todayMonth = todayStr.slice(0, 7);
+
       let date: string;
 
       if (selectedMonth === todayMonth) {
@@ -109,6 +112,7 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
         // Historical month: use the last day of that month
         const [y, m] = selectedMonth.split("-").map(Number);
         const lastDay = new Date(y, m, 0).getDate();
+
         date = `${selectedMonth}-${String(lastDay).padStart(2, "0")}`;
       }
 
@@ -127,10 +131,15 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
       loadExpenses();
       loadMonths();
 
-      // Reliable refocus to description field
-      setTimeout(() => {
-        descRef.current?.focus();
-      }, 50);
+      // dismiss mobile keyboard
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+
+      // Reliable refocus to description field (really only for desktop)
+      // setTimeout(() => {
+      //   descRef.current?.focus();
+      // }, 50);
 
       onToast("Expense added");
     } catch {
