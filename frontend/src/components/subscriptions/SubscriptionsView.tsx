@@ -85,8 +85,8 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
 
   // Pay period breakdown with effective dates and itemized lists
   let pp1 = 0, pp2 = 0;
-  const pp1Items: { name: string; amount: number; day: number }[] = [];
-  const pp2Items: { name: string; amount: number; day: number }[] = [];
+  const pp1Items: { name: string; amount: number; day: number; frequency: string }[] = [];
+  const pp2Items: { name: string; amount: number; day: number; frequency: string }[] = [];
   subs.forEach((s) => {
     const my = s.amount / (s.splitBy || 1);
     const me = s.frequency === "monthly" ? my : s.frequency === "quarterly" ? my / 3 : my / 12;
@@ -95,10 +95,10 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
     const day = parseInt(effective.split("-")[2]);
     if (day <= 15) {
       pp1 += me;
-      pp1Items.push({ name: s.name, amount: me, day });
+      pp1Items.push({ name: s.name, amount: me, day, frequency: s.frequency });
     } else {
       pp2 += me;
-      pp2Items.push({ name: s.name, amount: me, day });
+      pp2Items.push({ name: s.name, amount: me, day, frequency: s.frequency });
     }
   });
   // Sort items by day of month
@@ -124,7 +124,7 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
     );
   }
 
-  const renderPopover = (label: string, items: { name: string; amount: number; day: number }[]) => (
+  const renderPopover = (label: string, items: { name: string; amount: number; day: number; frequency: string }[]) => (
     <div
       ref={popoverRef}
       className="absolute left-0 right-0 top-full mt-2 z-50 bg-bg-card border border-border rounded-xl shadow-[0_16px_40px_rgba(0,0,0,0.5)] p-4 animate-[slideUp_0.15s_ease-out]"
@@ -148,6 +148,12 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
               <span className="flex items-center gap-2 min-w-0">
                 <span className="text-text-muted font-mono text-[10px] w-6 text-right shrink-0">{item.day}th</span>
                 <span className="truncate">{item.name}</span>
+                {item.frequency === "quarterly" && (
+                  <span className="text-[9px] font-semibold text-amber bg-amber-dim px-1.5 py-0.5 rounded-md shrink-0">Q</span>
+                )}
+                {item.frequency === "annual" && (
+                  <span className="text-[9px] font-semibold text-green bg-green-dim px-1.5 py-0.5 rounded-md shrink-0">A</span>
+                )}
               </span>
               <span className="font-mono text-green shrink-0">{fmtP(item.amount)}</span>
             </div>
