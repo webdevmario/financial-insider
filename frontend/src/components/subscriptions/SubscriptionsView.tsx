@@ -84,21 +84,23 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
   });
 
   // Pay period breakdown with effective dates and itemized lists
+  const currentMonth = new Date().toISOString().slice(0, 7);
   let pp1 = 0, pp2 = 0;
-  const pp1Items: { name: string; amount: number; day: number; frequency: string }[] = [];
-  const pp2Items: { name: string; amount: number; day: number; frequency: string }[] = [];
+  const pp1Items: { name: string; amount: number; actualAmount: number; day: number; frequency: string; thisMonth: boolean }[] = [];
+  const pp2Items: { name: string; amount: number; actualAmount: number; day: number; frequency: string; thisMonth: boolean }[] = [];
   subs.forEach((s) => {
     const my = s.amount / (s.splitBy || 1);
     const me = s.frequency === "monthly" ? my : s.frequency === "quarterly" ? my / 3 : my / 12;
     const effective = computeEffectiveNextCharge(s.nextCharge, s.frequency);
     if (!effective) return;
     const day = parseInt(effective.split("-")[2]);
+    const thisMonth = s.frequency === "monthly" || effective.slice(0, 7) === currentMonth;
     if (day <= 15) {
       pp1 += me;
-      pp1Items.push({ name: s.name, amount: me, day, frequency: s.frequency });
+      pp1Items.push({ name: s.name, amount: me, actualAmount: my, day, frequency: s.frequency, thisMonth });
     } else {
       pp2 += me;
-      pp2Items.push({ name: s.name, amount: me, day, frequency: s.frequency });
+      pp2Items.push({ name: s.name, amount: me, actualAmount: my, day, frequency: s.frequency, thisMonth });
     }
   });
   // Sort items by day of month
@@ -124,7 +126,7 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
     );
   }
 
-  const renderPopover = (label: string, items: { name: string; amount: number; day: number; frequency: string }[]) => (
+  const renderPopover = (label: string, items: { name: string; amount: number; actualAmount: number; day: number; frequency: string; thisMonth: boolean }[]) => (
     <div
       ref={popoverRef}
       className="absolute left-0 right-0 top-full mt-2 z-50 bg-bg-card border border-border rounded-xl shadow-[0_16px_40px_rgba(0,0,0,0.5)] p-4 animate-[slideUp_0.15s_ease-out]"
@@ -144,7 +146,7 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
           <div className="text-text-muted text-xs py-1">No bills in this period</div>
         ) : (
           items.map((item, i) => (
-            <div key={i} className="flex items-center justify-between gap-4 py-1.5 text-xs border-b border-border/30 last:border-0">
+            <div key={i} className={`flex items-center justify-between gap-4 py-1.5 text-xs border-b border-border/30 last:border-0 ${!item.thisMonth ? "opacity-50" : ""}`}>
               <span className="flex items-center gap-2 min-w-0">
                 <span className="text-text-muted font-mono text-[10px] w-6 text-right shrink-0">{item.day}th</span>
                 <span className="truncate">{item.name}</span>
@@ -154,12 +156,23 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
                 {item.frequency === "annual" && (
                   <span className="text-[9px] font-semibold text-green bg-green-dim px-1.5 py-0.5 rounded-md shrink-0">A</span>
                 )}
+                {!item.thisMonth && (
+                  <span className="text-[9px] italic text-text-dim bg-white/[0.06] px-1.5 py-0.5 rounded shrink-0">skip</span>
+                )}
               </span>
-              <span className="font-mono text-green shrink-0">{fmtP(item.amount)}</span>
+              <span className="font-mono text-green shrink-0">{fmtP(item.actualAmount)}</span>
             </div>
           ))
         )}
       </div>
+      {/* Legend */}
+      {items.some((i) => i.frequency !== "monthly") && (
+        <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 pt-3 border-t border-border/30 text-[9px] text-text-muted">
+          <span className="flex items-center gap-1"><span className="text-amber bg-amber-dim px-1.5 py-0.5 rounded font-semibold">Q</span>Quarterly</span>
+          <span className="flex items-center gap-1"><span className="text-green bg-green-dim px-1.5 py-0.5 rounded font-semibold">A</span>Annual</span>
+          <span className="flex items-center gap-1"><span className="text-text-dim bg-white/[0.06] px-1.5 py-0.5 rounded italic">skip</span>Not due this month</span>
+        </div>
+      )}
     </div>
   );
 
