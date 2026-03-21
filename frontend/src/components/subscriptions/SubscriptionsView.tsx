@@ -97,10 +97,10 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
     const thisMonth = s.frequency === "monthly" || effective.slice(0, 7) === currentMonth;
     if (day <= 15) {
       pp1 += me;
-      pp1Items.push({ name: s.name, amount: me, actualAmount: my, day, frequency: s.frequency, thisMonth });
+      pp1Items.push({ name: s.name, amount: me, actualAmount: s.amount, day, frequency: s.frequency, thisMonth });
     } else {
       pp2 += me;
-      pp2Items.push({ name: s.name, amount: me, actualAmount: my, day, frequency: s.frequency, thisMonth });
+      pp2Items.push({ name: s.name, amount: me, actualAmount: s.amount, day, frequency: s.frequency, thisMonth });
     }
   });
   // Sort items by day of month

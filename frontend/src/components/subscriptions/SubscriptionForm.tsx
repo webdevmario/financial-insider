@@ -229,7 +229,7 @@ export default function SubscriptionForm({
 
         <div className="flex justify-end gap-2.5 pt-4 border-t border-border max-md:pb-[env(safe-area-inset-bottom)]">
           {subscription && (
-            <button className="btn btn-danger btn-sm" onClick={() => setShowConfirm(true)}>
+            <button className="btn btn-danger btn-sm mr-auto" onClick={() => setShowConfirm(true)}>
               🗑️ Delete
             </button>
           )}

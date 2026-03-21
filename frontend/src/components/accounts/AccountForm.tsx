@@ -223,7 +223,7 @@ export default function AccountForm({ open, onClose, onSaved, onToast, account }
         {/* Actions */}
         <div className="flex justify-end gap-2.5 pt-4 border-t border-border max-md:pb-[env(safe-area-inset-bottom)]">
           {account && (
-            <button className="btn btn-danger btn-sm" onClick={() => setShowConfirm(true)}>
+            <button className="btn btn-danger btn-sm mr-auto" onClick={() => setShowConfirm(true)}>
               🗑️ Delete
             </button>
           )}
