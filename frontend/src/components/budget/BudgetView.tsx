@@ -33,6 +33,12 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
   const [editAmt, setEditAmt] = useState("");
   const [editDate, setEditDate] = useState("");
 
+  // Monthly notes
+  const [budgetNotes, setBudgetNotes] = useState<Record<string, string>>({});
+  const [noteText, setNoteText] = useState("");
+  const [noteOpen, setNoteOpen] = useState(false);
+  const noteSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const loadExpenses = useCallback(() => {
     return api.expenses.list(selectedMonth).then(setExpenses).catch(() => {});
   }, [selectedMonth]);
@@ -51,12 +57,27 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
     }).catch(() => {});
   }, []);
 
+  const loadNotes = useCallback(() => {
+    return api.settings.get<Record<string, string>>("budgetNotes").then((res) => {
+      const notes = res.value || {};
+      setBudgetNotes(notes);
+      setNoteText(notes[selectedMonth] || "");
+      if (notes[selectedMonth]) setNoteOpen(true);
+    }).catch(() => {});
+  }, [selectedMonth]);
+
   useEffect(() => { loadTargets(); }, [loadTargets]);
+
+  // Sync noteText when month changes
+  useEffect(() => {
+    setNoteText(budgetNotes[selectedMonth] || "");
+    setNoteOpen(!!budgetNotes[selectedMonth]);
+  }, [selectedMonth, budgetNotes]);
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([loadExpenses(), loadMonths()]).finally(() => setLoading(false));
-  }, [loadExpenses, loadMonths]);
+    Promise.all([loadExpenses(), loadMonths(), loadNotes()]).finally(() => setLoading(false));
+  }, [loadExpenses, loadMonths, loadNotes]);
 
   // Clear flash animation
   useEffect(() => {
@@ -208,6 +229,26 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
     }
   }
 
+  function saveNote(text: string) {
+    const trimmed = text.trim();
+    const updated = { ...budgetNotes };
+    if (trimmed) {
+      updated[selectedMonth] = trimmed;
+    } else {
+      delete updated[selectedMonth];
+    }
+    setBudgetNotes(updated);
+    api.settings.set("budgetNotes", updated).catch(() => {
+      onToast("Failed to save note", true);
+    });
+  }
+
+  function onNoteChange(text: string) {
+    setNoteText(text);
+    if (noteSaveTimer.current) clearTimeout(noteSaveTimer.current);
+    noteSaveTimer.current = setTimeout(() => saveNote(text), 1000);
+  }
+
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -331,6 +372,39 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
           <div className="text-center py-5">
             <div className="font-mono text-[28px] font-semibold text-text-dim">{fmt(spent)}</div>
             <div className="text-[13px] text-text-muted mt-1">spent this month</div>
+          </div>
+        )}
+      </div>
+
+      {/* Monthly Notes */}
+      <div className="mb-5">
+        <button
+          className="flex items-center gap-2 text-xs text-text-muted hover:text-text transition-colors"
+          onClick={() => setNoteOpen(!noteOpen)}
+        >
+          <span className="transition-transform" style={{ display: "inline-block", transform: noteOpen ? "rotate(90deg)" : "rotate(0deg)" }}>
+            ›
+          </span>
+          <span>
+            {budgetNotes[selectedMonth] ? "Note" : "Add note"}
+          </span>
+        </button>
+        {noteOpen && (
+          <div className="mt-2">
+            <textarea
+              className="w-full bg-bg-card border border-border rounded-lg p-3 text-sm text-text resize-none focus:outline-none focus:border-accent transition-colors"
+              rows={3}
+              placeholder={`Notes for ${moLabel(selectedMonth)}...`}
+              value={noteText}
+              onChange={(e) => onNoteChange(e.target.value)}
+              onBlur={() => {
+                if (noteSaveTimer.current) {
+                  clearTimeout(noteSaveTimer.current);
+                  noteSaveTimer.current = null;
+                }
+                saveNote(noteText);
+              }}
+            />
           </div>
         )}
       </div>
