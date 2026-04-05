@@ -37,6 +37,7 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
   const [budgetNotes, setBudgetNotes] = useState<Record<string, string>>({});
   const [noteText, setNoteText] = useState("");
   const [noteOpen, setNoteOpen] = useState(false);
+  const [notesIndexOpen, setNotesIndexOpen] = useState(false);
   const noteSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadExpenses = useCallback(() => {
@@ -59,16 +60,13 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
 
   const loadNotes = useCallback(() => {
     return api.settings.get<Record<string, string>>("budgetNotes").then((res) => {
-      const notes = res.value || {};
-      setBudgetNotes(notes);
-      setNoteText(notes[selectedMonth] || "");
-      if (notes[selectedMonth]) setNoteOpen(true);
+      setBudgetNotes(res.value || {});
     }).catch(() => {});
-  }, [selectedMonth]);
+  }, []);
 
-  useEffect(() => { loadTargets(); }, [loadTargets]);
+  useEffect(() => { loadTargets(); loadNotes(); }, [loadTargets, loadNotes]);
 
-  // Sync noteText when month changes
+  // Sync noteText when month or notes data changes
   useEffect(() => {
     setNoteText(budgetNotes[selectedMonth] || "");
     setNoteOpen(!!budgetNotes[selectedMonth]);
@@ -76,8 +74,8 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([loadExpenses(), loadMonths(), loadNotes()]).finally(() => setLoading(false));
-  }, [loadExpenses, loadMonths, loadNotes]);
+    Promise.all([loadExpenses(), loadMonths()]).finally(() => setLoading(false));
+  }, [loadExpenses, loadMonths]);
 
   // Clear flash animation
   useEffect(() => {
@@ -249,6 +247,8 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
     noteSaveTimer.current = setTimeout(() => saveNote(text), 1000);
   }
 
+  const monthsWithNotes = Object.keys(budgetNotes).sort().reverse();
+
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -376,19 +376,32 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
         )}
       </div>
 
-      {/* Monthly Notes */}
+      {/* Monthly Note */}
       <div className="mb-5">
-        <button
-          className="flex items-center gap-2 text-xs text-text-muted hover:text-text transition-colors"
-          onClick={() => setNoteOpen(!noteOpen)}
-        >
-          <span className="transition-transform" style={{ display: "inline-block", transform: noteOpen ? "rotate(90deg)" : "rotate(0deg)" }}>
-            ›
-          </span>
-          <span>
-            {budgetNotes[selectedMonth] ? "Note" : "Add note"}
-          </span>
-        </button>
+        <div className="flex items-center justify-between">
+          <button
+            className="flex items-center gap-2 text-xs text-text-muted hover:text-text transition-colors"
+            onClick={() => setNoteOpen(!noteOpen)}
+          >
+            <span
+              className="transition-transform duration-150"
+              style={{ display: "inline-block", transform: noteOpen ? "rotate(90deg)" : "rotate(0deg)" }}
+            >
+              ›
+            </span>
+            <span>{budgetNotes[selectedMonth] ? "Note" : "Add note"}</span>
+          </button>
+          {monthsWithNotes.length > 0 && (
+            <button
+              className="text-xs text-text-muted hover:text-accent transition-colors"
+              onClick={() => setNotesIndexOpen(!notesIndexOpen)}
+            >
+              {monthsWithNotes.length} note{monthsWithNotes.length !== 1 ? "s" : ""} total
+            </button>
+          )}
+        </div>
+
+        {/* Note editor for current month */}
         {noteOpen && (
           <div className="mt-2">
             <textarea
@@ -405,6 +418,37 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
                 saveNote(noteText);
               }}
             />
+          </div>
+        )}
+
+        {/* Notes index — all months with notes */}
+        {notesIndexOpen && monthsWithNotes.length > 0 && (
+          <div className="mt-2 bg-bg-card border border-border rounded-xl p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-text-dim mb-3">
+              All Notes
+            </div>
+            <div className="flex flex-col gap-1.5">
+              {monthsWithNotes.map((m) => (
+                <button
+                  key={m}
+                  className={`text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                    m === selectedMonth
+                      ? "bg-accent/10 text-accent"
+                      : "hover:bg-white/[0.04] text-text"
+                  }`}
+                  onClick={() => {
+                    setSelectedMonth(m);
+                    setNotesIndexOpen(false);
+                    setNoteOpen(true);
+                  }}
+                >
+                  <div className="font-medium">{moLabel(m)}</div>
+                  <div className="text-xs text-text-muted mt-0.5 truncate">
+                    {budgetNotes[m]}
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
