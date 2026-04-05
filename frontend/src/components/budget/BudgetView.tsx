@@ -332,6 +332,14 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
         >
           Set Target
         </button>
+        {selectedMonth !== curMo() && (
+          <button
+            className="btn btn-sm"
+            onClick={() => setSelectedMonth(curMo())}
+          >
+            Today
+          </button>
+        )}
       </div>
 
       {/* Budget Summary */}
@@ -421,36 +429,6 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
           </div>
         )}
 
-        {/* Notes index — all months with notes */}
-        {notesIndexOpen && monthsWithNotes.length > 0 && (
-          <div className="mt-2 bg-bg-card border border-border rounded-xl p-4">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-text-dim mb-3">
-              All Notes
-            </div>
-            <div className="flex flex-col gap-1.5">
-              {monthsWithNotes.map((m) => (
-                <button
-                  key={m}
-                  className={`text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                    m === selectedMonth
-                      ? "bg-accent/10 text-accent"
-                      : "hover:bg-white/[0.04] text-text"
-                  }`}
-                  onClick={() => {
-                    setSelectedMonth(m);
-                    setNotesIndexOpen(false);
-                    setNoteOpen(true);
-                  }}
-                >
-                  <div className="font-medium">{moLabel(m)}</div>
-                  <div className="text-xs text-text-muted mt-0.5 truncate">
-                    {budgetNotes[m]}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Expenses Card */}
@@ -521,6 +499,36 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
         <div className="flex justify-end gap-2.5 mt-4 pt-4 border-t border-border">
           <button className="btn" onClick={() => setTargetOpen(false)}>Cancel</button>
           <button className="btn btn-primary" onClick={saveTarget}>Save</button>
+        </div>
+      </Modal>
+
+      {/* All Notes Modal */}
+      <Modal
+        open={notesIndexOpen}
+        onClose={() => setNotesIndexOpen(false)}
+        title="All Notes"
+      >
+        <div className="flex flex-col gap-1.5">
+          {monthsWithNotes.map((m) => (
+            <button
+              key={m}
+              className={`text-left px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                m === selectedMonth
+                  ? "bg-accent/10 text-accent"
+                  : "hover:bg-white/[0.04] text-text"
+              }`}
+              onClick={() => {
+                setSelectedMonth(m);
+                setNotesIndexOpen(false);
+                setNoteOpen(true);
+              }}
+            >
+              <div className="font-medium">{moLabel(m)}</div>
+              <div className="text-xs text-text-muted mt-0.5 line-clamp-2 whitespace-pre-line">
+                {budgetNotes[m]}
+              </div>
+            </button>
+          ))}
         </div>
       </Modal>
 
