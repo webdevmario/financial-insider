@@ -2,36 +2,9 @@ import { useState, useEffect } from "react";
 import Modal from "../layout/Modal";
 import { api } from "../../lib/api";
 import { fmtP } from "../../lib/formatters";
+import { computeEffectiveNextCharge } from "../../lib/billing";
 import type { Subscription } from "../../types";
 import { SUB_CATEGORIES } from "../../types";
-
-/**
- * Given a stored nextCharge date and frequency, advance forward until >= today.
- */
-function computeEffectiveNextCharge(
-  nextCharge: string | null,
-  frequency: "monthly" | "quarterly" | "annual"
-): string | null {
-  if (!nextCharge) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const [y, m, d] = nextCharge.split("-").map(Number);
-  const charge = new Date(y, m - 1, d);
-  charge.setHours(0, 0, 0, 0);
-
-  if (charge >= today) return nextCharge; // not stale
-
-  const increment = frequency === "monthly" ? 1 : frequency === "quarterly" ? 3 : 12;
-  while (charge < today) {
-    charge.setMonth(charge.getMonth() + increment);
-  }
-
-  const ny = charge.getFullYear();
-  const nm = String(charge.getMonth() + 1).padStart(2, "0");
-  const nd = String(charge.getDate()).padStart(2, "0");
-  return `${ny}-${nm}-${nd}`;
-}
 
 interface SubscriptionFormProps {
   open: boolean;

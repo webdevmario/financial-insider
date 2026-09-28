@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import { fmt, fmtP, fmtDate } from "../../lib/formatters";
+import { computeEffectiveNextCharge } from "../../lib/billing";
 import StatCard from "../layout/StatCard";
 import type { Account, Subscription } from "../../types";
 
@@ -62,15 +63,20 @@ export default function DashboardView() {
     .sort((a, b) => b.me - a.me)
     .slice(0, 6);
 
-  // Upcoming non-monthly charges (next 30 days)
+  // Upcoming non-monthly charges (next 30 days, including today)
   const today = new Date();
+  today.setHours(0, 0, 0, 0);
   const future = new Date(today);
   future.setDate(future.getDate() + 30);
-  const upcoming = subs.filter((s) => {
-    if (!s.nextCharge || s.frequency === "monthly") return false;
-    const d = new Date(s.nextCharge + "T00:00:00");
-    return d >= today && d <= future;
-  });
+  const upcoming = subs
+    .filter((s) => s.frequency !== "monthly")
+    .map((s) => ({ ...s, due: computeEffectiveNextCharge(s.nextCharge, s.frequency) }))
+    .filter((s) => {
+      if (!s.due) return false;
+      const d = new Date(s.due + "T00:00:00");
+      return d >= today && d <= future;
+    })
+    .sort((a, b) => a.due!.localeCompare(b.due!));
 
   if (loading) {
     return (
@@ -101,7 +107,7 @@ export default function DashboardView() {
             <div className="text-[13px] text-text-dim leading-relaxed">
               {upcoming.map((s, i) => (
                 <span key={s.id}>
-                  <strong>{s.name}</strong> — {fmtP(s.amount)} on {fmtDate(s.nextCharge)}
+                  <strong>{s.name}</strong> — {fmtP(s.amount)} on {fmtDate(s.due)}
                   {i < upcoming.length - 1 && <br />}
                 </span>
               ))}

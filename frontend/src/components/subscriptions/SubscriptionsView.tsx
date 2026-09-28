@@ -1,42 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "../../lib/api";
 import { fmtP, curMo } from "../../lib/formatters";
+import { computeEffectiveNextCharge } from "../../lib/billing";
 import StatCard from "../layout/StatCard";
 import SubscriptionForm from "./SubscriptionForm";
 import type { Subscription } from "../../types";
 
 interface SubscriptionsViewProps {
   onToast: (msg: string, err?: boolean) => void;
-}
-
-/**
- * Given a stored nextCharge date (YYYY-MM-DD) and a frequency,
- * advance the date forward until it's >= today.
- * This keeps the "next charge" fresh without needing manual updates.
- */
-function computeEffectiveNextCharge(
-  nextCharge: string | null,
-  frequency: "monthly" | "quarterly" | "annual"
-): string | null {
-  if (!nextCharge) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const [y, m, d] = nextCharge.split("-").map(Number);
-  const charge = new Date(y, m - 1, d);
-  charge.setHours(0, 0, 0, 0);
-
-  const increment = frequency === "monthly" ? 1 : frequency === "quarterly" ? 3 : 12;
-
-  // Advance until the charge date is today or in the future
-  while (charge < today) {
-    charge.setMonth(charge.getMonth() + increment);
-  }
-
-  const ny = charge.getFullYear();
-  const nm = String(charge.getMonth() + 1).padStart(2, "0");
-  const nd = String(charge.getDate()).padStart(2, "0");
-  return `${ny}-${nm}-${nd}`;
 }
 
 export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
