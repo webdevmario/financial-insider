@@ -214,15 +214,17 @@ This single file IS your entire database. It contains all accounts, bills, expen
 **File-level backup** (more thorough):
 
 ```bash
-cp data/finance.db data/finance-backup-$(date +%Y%m%d).db
+pnpm db:backup    # → data/backups/finance-YYYYMMDD.db
 ```
+
+This uses SQLite's `.backup` command rather than `cp`. The database runs in WAL mode, so recent writes can live in `finance.db-wal` until they're checkpointed — a plain `cp` of `finance.db` can silently miss them. `.backup` produces a consistent snapshot even while the server is running.
 
 Consider a weekly cron job:
 
 ```bash
 crontab -e
 # Add this line:
-0 3 * * 0 cp ~/Documents/development/projects/financial-insider/data/finance.db ~/Documents/development/projects/financial-insider/data/backups/finance-$(date +\%Y\%m\%d).db
+0 3 * * 0 cd ~/Documents/development/projects/financial-insider && /usr/bin/sqlite3 data/finance.db ".backup data/backups/finance-$(date +\%Y\%m\%d).db"
 ```
 
 (Create `data/backups/` first: `mkdir -p data/backups`)
@@ -237,7 +239,8 @@ crontab -e
 # Stop the server first
 launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.financial-insider.plist
 
-# Replace the database
+# Replace the database (remove stale WAL files so they aren't replayed onto the restored copy)
+rm -f data/finance.db-wal data/finance.db-shm
 cp data/backups/finance-20260301.db data/finance.db
 
 # Restart
@@ -292,7 +295,7 @@ cat /tmp/financial-insider.log
 | View errors | `cat /tmp/financial-insider-error.log` |
 | Kill port 3001 | `lsof -ti:3001 \| xargs kill -9` |
 | Get Tailscale IP | `tailscale ip` |
-| Backup database | `cp data/finance.db data/finance-backup-$(date +%Y%m%d).db` |
+| Backup database | `pnpm db:backup` |
 | Rebuild frontend | `cd frontend && pnpm build` |
 | Push schema changes | `cd backend && pnpm db:push` |
 | Start dev (backend) | `cd backend && pnpm dev` |
