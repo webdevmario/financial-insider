@@ -115,18 +115,18 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
 
     if (!desc) {
       if (descRef.current) {
-        descRef.current.style.borderColor = "var(--red)";
+        descRef.current.classList.add("!border-red");
         descRef.current.focus();
-        setTimeout(() => { if (descRef.current) descRef.current.style.borderColor = ""; }, 1500);
+        setTimeout(() => descRef.current?.classList.remove("!border-red"), 1500);
       }
       return;
     }
 
     if (!amount || isNaN(amount) || amount <= 0) {
       if (amtRef.current) {
-        amtRef.current.style.borderColor = "var(--red)";
+        amtRef.current.classList.add("!border-red");
         amtRef.current.focus();
-        setTimeout(() => { if (amtRef.current) amtRef.current.style.borderColor = ""; }, 1500);
+        setTimeout(() => amtRef.current?.classList.remove("!border-red"), 1500);
       }
 
       return;
@@ -205,13 +205,10 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
     if (!amount || isNaN(amount) || amount <= 0) { onToast("Enter amount", true); return; }
 
     try {
-      // Delete old and create new (expenses API doesn't have PUT)
-      await api.expenses.delete(editingExpense.id);
-      await api.expenses.create({
+      await api.expenses.update(editingExpense.id, {
         date: editDate,
         month: editDate.slice(0, 7),
         description: desc,
-        category: editingExpense.category,
         amount,
       });
 
@@ -405,8 +402,9 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
           <>
             <div className="text-center pb-4">
               <div
-                className="font-mono text-[44px] font-semibold tracking-tight"
-                style={{ color: remaining >= 0 ? "var(--green)" : "var(--red)" }}
+                className={`font-mono text-[44px] font-semibold tracking-tight ${
+                  remaining >= 0 ? "text-green" : "text-red"
+                }`}
               >
                 {fmt(remaining)}
               </div>

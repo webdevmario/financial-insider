@@ -59,6 +59,37 @@ router.post("/", (req, res) => {
   res.status(201).json(row);
 });
 
+// PUT /api/expenses/:id — update expense in place
+router.put("/:id", (req, res) => {
+  const existing = db
+    .select()
+    .from(expenses)
+    .where(eq(expenses.id, req.params.id))
+    .get();
+  if (!existing) return res.status(404).json({ error: "Not found" });
+
+  const body = req.body;
+  const date = body.date || existing.date;
+
+  db.update(expenses)
+    .set({
+      date,
+      month: body.month || date.slice(0, 7),
+      description: body.description ?? existing.description,
+      category: body.category ?? existing.category,
+      amount: body.amount ?? existing.amount,
+    })
+    .where(eq(expenses.id, req.params.id))
+    .run();
+
+  const updated = db
+    .select()
+    .from(expenses)
+    .where(eq(expenses.id, req.params.id))
+    .get();
+  res.json(updated);
+});
+
 // DELETE /api/expenses/:id
 router.delete("/:id", (req, res) => {
   const existing = db
