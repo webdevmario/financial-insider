@@ -112,90 +112,93 @@ router.post("/data/import", (req, res) => {
   const today = todayStr();
 
   try {
-    // Clear existing data
-    db.delete(accounts).run();
-    db.delete(subscriptions).run();
-    db.delete(expenses).run();
-    db.delete(settings).run();
+    // All-or-nothing: a bad row rolls back the wipe instead of leaving an empty DB
+    db.transaction((tx) => {
+      // Clear existing data
+      tx.delete(accounts).run();
+      tx.delete(subscriptions).run();
+      tx.delete(expenses).run();
+      tx.delete(settings).run();
 
-    // Import accounts
-    if (data.accounts?.length) {
-      for (const a of data.accounts) {
-        db.insert(accounts)
-          .values({
-            id: a.id,
-            type: a.type || "Other",
-            balance: a.balance || 0,
-            owner: a.owner || null,
-            institution: a.institution || null,
-            notes: a.notes || null,
-            homeValue: a.homeValue ?? null,
-            mortgageBalance: a.mortgageBalance ?? null,
-            lastUpdated: a.lastUpdated || today,
-            createdAt: a.createdAt || today,
-          })
+      // Import accounts
+      if (data.accounts?.length) {
+        for (const a of data.accounts) {
+          tx.insert(accounts)
+            .values({
+              id: a.id,
+              type: a.type || "Other",
+              balance: a.balance || 0,
+              owner: a.owner || null,
+              institution: a.institution || null,
+              notes: a.notes || null,
+              homeValue: a.homeValue ?? null,
+              mortgageBalance: a.mortgageBalance ?? null,
+              lastUpdated: a.lastUpdated || today,
+              createdAt: a.createdAt || today,
+            })
+            .run();
+        }
+      }
+
+      // Import subscriptions
+      if (data.subscriptions?.length) {
+        for (const s of data.subscriptions) {
+          tx.insert(subscriptions)
+            .values({
+              id: s.id,
+              name: s.name,
+              category: s.category || "Other",
+              frequency: s.frequency || "monthly",
+              amount: s.amount || 0,
+              nextCharge: s.nextCharge || null,
+              splitBy: s.splitBy || 1,
+              status: s.status || null,
+              notes: s.notes || null,
+              priceHistory: s.priceHistory
+                ? JSON.stringify(s.priceHistory)
+                : null,
+              createdAt: s.createdAt || today,
+            })
+            .run();
+        }
+      }
+
+      // Import expenses
+      if (data.expenses?.length) {
+        for (const e of data.expenses) {
+          tx.insert(expenses)
+            .values({
+              id: e.id,
+              date: e.date,
+              month: e.month || e.date?.slice(0, 7),
+              description: e.desc || e.description || "",
+              category: e.category || "General",
+              amount: e.amount || 0,
+            })
+            .run();
+        }
+      }
+
+      // Import settings
+      const settingsToImport: [string, any][] = [];
+      if (data.paycheck != null)
+        settingsToImport.push(["paycheck", data.paycheck]);
+      if (data.income != null) settingsToImport.push(["income", data.income]);
+      if (data.paycheckHistory)
+        settingsToImport.push(["paycheckHistory", data.paycheckHistory]);
+      if (data.budgetTargets)
+        settingsToImport.push(["budgetTargets", data.budgetTargets]);
+      if (data.budgetReimbursements)
+        settingsToImport.push(["budgetReimbursements", data.budgetReimbursements]);
+      if (data.budgetNotes)
+        settingsToImport.push(["budgetNotes", data.budgetNotes]);
+
+      for (const [key, value] of settingsToImport) {
+        tx.insert(settings)
+          .values({ key, value: JSON.stringify(value) })
           .run();
       }
-    }
-
-    // Import subscriptions
-    if (data.subscriptions?.length) {
-      for (const s of data.subscriptions) {
-        db.insert(subscriptions)
-          .values({
-            id: s.id,
-            name: s.name,
-            category: s.category || "Other",
-            frequency: s.frequency || "monthly",
-            amount: s.amount || 0,
-            nextCharge: s.nextCharge || null,
-            splitBy: s.splitBy || 1,
-            status: s.status || null,
-            notes: s.notes || null,
-            priceHistory: s.priceHistory
-              ? JSON.stringify(s.priceHistory)
-              : null,
-            createdAt: s.createdAt || today,
-          })
-          .run();
-      }
-    }
-
-    // Import expenses
-    if (data.expenses?.length) {
-      for (const e of data.expenses) {
-        db.insert(expenses)
-          .values({
-            id: e.id,
-            date: e.date,
-            month: e.month || e.date?.slice(0, 7),
-            description: e.desc || e.description || "",
-            category: e.category || "General",
-            amount: e.amount || 0,
-          })
-          .run();
-      }
-    }
-
-    // Import settings
-    const settingsToImport: [string, any][] = [];
-    if (data.paycheck != null)
-      settingsToImport.push(["paycheck", data.paycheck]);
-    if (data.income != null) settingsToImport.push(["income", data.income]);
-    if (data.paycheckHistory)
-      settingsToImport.push(["paycheckHistory", data.paycheckHistory]);
-    if (data.budgetTargets)
-      settingsToImport.push(["budgetTargets", data.budgetTargets]);
-    if (data.budgetReimbursements)
-      settingsToImport.push(["budgetReimbursements", data.budgetReimbursements]);
-    if (data.budgetNotes)
-      settingsToImport.push(["budgetNotes", data.budgetNotes]);
-
-    for (const [key, value] of settingsToImport) {
-      db.insert(settings)
-        .values({ key, value: JSON.stringify(value) })
-        .run();
-    }
+    });
 
     res.json({ success: true });
   } catch (err) {

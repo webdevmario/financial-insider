@@ -18,7 +18,7 @@
     "prod:status": "launchctl list | grep financial",
     "prod:deploy": "pnpm build && pnpm prod:restart",
     "db:push": "pnpm --filter financial-insider-backend db:push",
-    "db:backup": "cp data/finance.db data/finance-backup-$(date +%Y%m%d).db && echo 'Backup created'"
+    "db:backup": "mkdir -p data/backups && sqlite3 data/finance.db \".backup data/backups/finance-$(date +%Y%m%d).db\" && echo 'Backup created'"
   },
   "repository": {
     "type": "git",

@@ -1,5 +1,4 @@
 import express from "express";
-import cors from "cors";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import { existsSync, mkdirSync } from "fs";
@@ -21,7 +20,6 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
-app.use(cors()); // In production behind Tailscale, this is fine
 app.use(express.json({ limit: "10mb" })); // Large enough for data imports
 
 // API routes
