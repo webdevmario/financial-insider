@@ -21,15 +21,15 @@ A self-hosted personal finance tracker. Tracks net worth, assets, monthly bills,
 ### Development
 
 ```bash
+pnpm install          # From the repo root: installs backend + frontend
+
 # Terminal 1 — Backend
 cd backend
-pnpm install
 pnpm db:push          # First time only: creates database tables
 pnpm dev              # API on http://localhost:3001
 
 # Terminal 2 — Frontend
 cd frontend
-pnpm install
 pnpm dev              # Dev server on http://localhost:5173 (proxies /api → :3001)
 ```
 

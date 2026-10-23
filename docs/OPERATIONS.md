@@ -154,7 +154,7 @@ Common causes:
 2. **nvm path wrong** — check `echo $NVM_DIR` and make sure the plist matches
 3. **Node version changed** — the service runs nvm's *default* Node. The SQLite driver is a native module built for one Node version, so after changing the default (`nvm alias default …`) reinstall it, then restart:
    ```bash
-   cd backend && pnpm rebuild better-sqlite3
+   pnpm rebuild better-sqlite3   # from the repo root
    ```
    The error log (`pnpm prod:errors`) shows `NODE_MODULE_VERSION` mismatches when this is the problem.
 4. **Plist syntax error** — validate with `plutil ~/Library/LaunchAgents/com.financial-insider.plist`
@@ -314,14 +314,18 @@ Drizzle will apply the changes to your existing database without losing data (fo
 After making code changes:
 
 ```bash
+# If any package.json changed: install from the repo root. The root workspace
+# owns node_modules for both packages, and it downloads native modules
+# (better-sqlite3) built for the current Node version.
+pnpm install
+
 # If you changed frontend code
 cd frontend
 pnpm build
 
-# If you changed backend code, dependencies, or schema
+# If you changed the schema
 cd backend
-pnpm install          # Only if package.json changed (rebuilds native modules)
-pnpm db:push          # Only if schema changed
+pnpm db:push
 
 # Restart production
 launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.financial-insider.plist 2>/dev/null
