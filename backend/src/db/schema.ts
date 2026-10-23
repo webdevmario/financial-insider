@@ -37,6 +37,7 @@ export const expenses = sqliteTable("expenses", {
   description: text("description").notNull(),
   category: text("category").notNull().default("General"),
   amount: real("amount").notNull(),
+  updatedAt: text("updated_at"), // ISO timestamp of the last edit, for last-write-wins sync
 });
 
 // ── Settings (key-value store) ─────────────────────────────────────

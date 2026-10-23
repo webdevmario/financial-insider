@@ -22,6 +22,11 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(express.json({ limit: "10mb" })); // Large enough for data imports
 
+// Health check — the frontend pings this to decide whether the network is good enough to sync
+app.get("/api/health", (_req, res) => {
+  res.set("Cache-Control", "no-store").json({ ok: true });
+});
+
 // API routes
 app.use("/api/accounts", accountsRouter);
 app.use("/api/expenses", expensesRouter);

@@ -42,7 +42,7 @@ export default {
         },
       },
       fontFamily: {
-        sans: ["DM Sans", "sans-serif"],
+        sans: ["DM Sans Variable", "DM Sans", "sans-serif"],
         mono: ["JetBrains Mono", "monospace"],
       },
     },

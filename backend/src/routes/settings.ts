@@ -174,6 +174,7 @@ router.post("/data/import", (req, res) => {
               description: e.desc || e.description || "",
               category: e.category || "General",
               amount: e.amount || 0,
+              updatedAt: e.updatedAt || null,
             })
             .run();
         }

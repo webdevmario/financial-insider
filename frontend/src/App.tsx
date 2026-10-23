@@ -1,10 +1,11 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import DashboardView from "./components/dashboard/DashboardView";
 import AccountsView from "./components/accounts/AccountsView";
 import BudgetView from "./components/budget/BudgetView";
 import SubscriptionsView from "./components/subscriptions/SubscriptionsView";
 import SettingsModal from "./components/layout/SettingsModal";
 import Toast from "./components/layout/Toast";
+import { useSyncStatus } from "./lib/offline/status";
 
 type View = "dashboard" | "accounts" | "budget" | "subscriptions";
 
@@ -15,63 +16,109 @@ const NAV_ITEMS: { view: View; icon: string; label: string; desktop: string }[] 
   { view: "subscriptions", icon: "🔄", label: "Bills", desktop: "Bills" },
 ];
 
-/** Slim banner that shows when the browser goes offline / comes back */
+/** "3m ago" style label for the last time the server answered */
+function sinceLabel(iso: string | null): string {
+  if (!iso) return "earlier";
+  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+}
+
+/** Slim banner for offline mode, queued changes, and syncing */
 function ConnectionBanner() {
-  const [status, setStatus] = useState<"online" | "offline" | "reconnected">("online");
+  const { reachable, pending, syncing, lastOnline } = useSyncStatus();
+  const [justSynced, setJustSynced] = useState(false);
+  const wasOffline = useRef(false);
 
+  // After an outage, confirm once everything queued has reached the server.
+  // Normal online saves sync in the background without a banner.
   useEffect(() => {
-    let reconnectTimer: ReturnType<typeof setTimeout>;
+    if (reachable === false) {
+      wasOffline.current = true;
+      setJustSynced(false);
+    } else if (reachable && pending === 0 && wasOffline.current) {
+      wasOffline.current = false;
+      setJustSynced(true);
+      const t = setTimeout(() => setJustSynced(false), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [reachable, pending]);
 
-    const goOffline = () => {
-      clearTimeout(reconnectTimer);
-      setStatus("offline");
-    };
+  const changes = `${pending} change${pending === 1 ? "" : "s"}`;
+  let tone: "amber" | "accent" | "green" | null = null;
+  let text = "";
 
-    const goOnline = () => {
-      setStatus("reconnected");
-      reconnectTimer = setTimeout(() => setStatus("online"), 3000);
-    };
+  if (reachable === false) {
+    tone = "amber";
+    text = pending > 0
+      ? `Offline · ${changes} saved on this device, will sync when you're back`
+      : `Offline · showing data from ${sinceLabel(lastOnline)}`;
+  } else if (reachable && pending > 0 && (wasOffline.current || !syncing)) {
+    // Catching up after an outage, or stuck retrying (e.g. the server is erroring)
+    tone = "accent";
+    text = syncing ? `Syncing ${changes}…` : `${changes} waiting to sync`;
+  } else if (justSynced) {
+    tone = "green";
+    text = "Back online · all changes synced";
+  }
 
-    window.addEventListener("offline", goOffline);
-    window.addEventListener("online", goOnline);
+  if (!tone) return null;
 
-    // If already offline on mount
-    if (!navigator.onLine) setStatus("offline");
-
-    return () => {
-      window.removeEventListener("offline", goOffline);
-      window.removeEventListener("online", goOnline);
-      clearTimeout(reconnectTimer);
-    };
-  }, []);
-
-  if (status === "online") return null;
+  const styles = {
+    amber: "bg-amber/15 text-amber border-amber/20",
+    accent: "bg-accent/15 text-accent border-accent/20",
+    green: "bg-green/15 text-green border-green/20",
+  }[tone];
+  const dot = { amber: "bg-amber", accent: "bg-accent", green: "bg-green" }[tone];
 
   return (
     <div
-      className={`fixed top-[60px] left-0 right-0 z-[100] flex items-center justify-center gap-2 py-2 px-4 text-xs font-medium transition-all duration-300 ${
-        status === "offline"
-          ? "bg-amber/15 text-amber border-b border-amber/20"
-          : "bg-green/15 text-green border-b border-green/20"
-      }`}
+      className={`fixed top-[60px] left-0 right-0 z-[100] flex items-center justify-center gap-2 py-2 px-4 text-xs font-medium border-b transition-all duration-300 ${styles}`}
     >
-      {status === "offline" ? (
-        <>
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber" />
-          </span>
-          Connection lost — waiting to reconnect…
-        </>
-      ) : (
-        <>
-          <span className="relative flex h-2 w-2">
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-green" />
-          </span>
-          Reconnected
-        </>
-      )}
+      <span className="relative flex h-2 w-2 flex-shrink-0">
+        {tone !== "green" && (
+          <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${dot}`} />
+        )}
+        <span className={`relative inline-flex rounded-full h-2 w-2 ${dot}`} />
+      </span>
+      {text}
     </div>
+  );
+}
+
+/** Chrome/Android only: offer to install the app when the browser allows it */
+function InstallButton() {
+  const [prompt, setPrompt] = useState<(Event & { prompt: () => Promise<void> }) | null>(null);
+
+  useEffect(() => {
+    const onPrompt = (e: Event) => {
+      e.preventDefault();
+      setPrompt(e as Event & { prompt: () => Promise<void> });
+    };
+    const onInstalled = () => setPrompt(null);
+    window.addEventListener("beforeinstallprompt", onPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
+  }, []);
+
+  if (!prompt) return null;
+
+  return (
+    <button
+      className="mr-2 p-1.5 px-2.5 border border-accent/40 rounded-lg text-xs font-medium text-accent hover:bg-accent/10 transition-all"
+      onClick={async () => {
+        await prompt.prompt();
+        setPrompt(null);
+      }}
+    >
+      Install app
+    </button>
   );
 }
 
@@ -120,6 +167,7 @@ export default function App() {
         </div>
 
         <div className="flex items-center">
+          <InstallButton />
           <button
             className="p-1.5 px-2.5 border border-border rounded-lg text-text-dim hover:border-accent hover:text-text transition-all"
             onClick={() => setSettingsOpen(true)}

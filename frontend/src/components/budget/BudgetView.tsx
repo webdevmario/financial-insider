@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "../../lib/api";
 import { fmt, fmtP, fmtDate, curMo, moLabel, today } from "../../lib/formatters";
 import Modal from "../layout/Modal";
+import { useOnRefresh } from "../../lib/offline/status";
 import type { Expense } from "../../types";
 
 interface BudgetViewProps {
@@ -77,6 +78,13 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
   }, []);
 
   useEffect(() => { loadTargets(); loadNotes(); loadReimbursements(); }, [loadTargets, loadNotes, loadReimbursements]);
+
+  // Pull in synced changes (ours and anyone else's) once the connection is back
+  const refreshFromServer = useCallback(() => {
+    loadExpenses();
+    loadMonths();
+  }, [loadExpenses, loadMonths]);
+  useOnRefresh(refreshFromServer);
 
   // Sync noteText when month or notes data changes
   useEffect(() => {
@@ -515,7 +523,10 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
               >
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">{e.description}</div>
-                  <div className="text-xs text-text-muted mt-0.5">{fmtDate(e.date)}</div>
+                  <div className="text-xs text-text-muted mt-0.5">
+                    {fmtDate(e.date)}
+                    {e.pending && <span className="ml-2 text-amber" title="Saved on this device, not synced yet">· not synced</span>}
+                  </div>
                 </div>
                 <span className="font-mono text-sm font-medium flex-shrink-0">
                   {fmtP(e.amount)}
