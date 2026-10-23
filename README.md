@@ -7,7 +7,8 @@ A self-hosted personal finance tracker. Tracks net worth, assets, monthly bills,
 - **Frontend:** React 19 · TypeScript · Vite · Tailwind CSS
 - **Backend:** Node.js · Express · Drizzle ORM
 - **Database:** SQLite (via better-sqlite3)
-- **Networking:** Tailscale (private mesh VPN)
+- **Networking:** Tailscale (private mesh VPN) + Tailscale Serve for HTTPS
+- **Offline:** installable PWA; expenses queue on the device and sync when the Mac is reachable
 - **Hosting:** Mac Mini with launchd auto-start
 
 ## Quick Start
@@ -95,4 +96,5 @@ See **[docs/OPERATIONS.md](docs/OPERATIONS.md)** for:
 - How to switch between development and production
 - Database backups
 - Tailscale management
+- Offline mode and installing on phones
 - Troubleshooting

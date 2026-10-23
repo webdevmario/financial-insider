@@ -51,6 +51,9 @@ export interface Expense {
   description: string;
   category: string;
   amount: number;
+  updatedAt?: string | null;
+  /** Client-only: saved on this device but not yet synced to the server */
+  pending?: boolean;
 }
 
 // ── Settings ───────────────────────────────────────────────────

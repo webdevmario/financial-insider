@@ -1,2 +1,5 @@
-ignoredBuiltDependencies:
-  - better-sqlite3
+allowBuilds:
+  # Native SQLite binding: the install script downloads the prebuilt binary for
+  # the current Node version, so it must be allowed to run
+  better-sqlite3: true
+  esbuild: true

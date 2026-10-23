@@ -152,7 +152,11 @@ Common causes:
 
 1. **Port in use** — something else is on 3001. Run `lsof -ti:3001 | xargs kill -9`
 2. **nvm path wrong** — check `echo $NVM_DIR` and make sure the plist matches
-3. **Node version changed** — if you switched Node versions via nvm, the service may need a restart
+3. **Node version changed** — the service runs nvm's *default* Node. The SQLite driver is a native module built for one Node version, so after changing the default (`nvm alias default …`) reinstall it, then restart:
+   ```bash
+   cd backend && pnpm rebuild better-sqlite3
+   ```
+   The error log (`pnpm prod:errors`) shows `NODE_MODULE_VERSION` mismatches when this is the problem.
 4. **Plist syntax error** — validate with `plutil ~/Library/LaunchAgents/com.financial-insider.plist`
 
 ---
@@ -194,6 +198,51 @@ Manage devices, see who's connected: https://login.tailscale.com/admin
 2. Try pinging the Mac Mini: `ping 100.x.x.x`
 3. Check the server is running: `curl http://100.x.x.x:3001/api/dashboard/summary`
 4. If the server isn't responding, check launchd (see section above)
+
+---
+
+## Offline Mode (Phone App)
+
+The app installs on a phone's home screen and keeps working when the Mac Mini can't be reached (bad cell signal, Tailscale disconnected, Mac asleep).
+
+### What works offline
+
+- **Opens normally:** the app itself is cached on the phone by a service worker
+- **Every screen shows its last-loaded data:** a banner says it's offline and when it last connected
+- **Expenses can be added, edited, and deleted:** changes are saved on the phone, marked "not synced", and sent to the Mac in order once it answers
+- **Needs a connection:** accounts, bills, settings, budget targets, notes, reimbursements, import/export
+
+### How syncing works
+
+- The app pings `/api/health` (4s timeout) to decide if the connection is good enough. The phone's own "online" status isn't trusted: one bar of signal still counts as online.
+- It tries to sync when the app opens, comes back to the foreground, or regains network, and every 20s while changes are waiting.
+- **Android (Chrome):** Background Sync also sends queued changes when the network comes back, even if the app is closed.
+- **iPhone:** iOS has no Background Sync, so changes go out the next time the app is open with a connection.
+- If two people edit the same expense, the more recent edit wins (by `updated_at`). Re-sending an expense never creates a duplicate.
+
+### HTTPS is required
+
+Service workers only run on HTTPS (or localhost), so the plain `http://100.x.x.x:3001` address has **no offline mode**. Tailscale Serve provides HTTPS with a real certificate, still visible only to your tailnet. `/` on this Mac is already used by another app (port 5530), so Financial Insider gets port 8443:
+
+```bash
+tailscale serve --bg --https=8443 http://127.0.0.1:3001
+tailscale serve status
+```
+
+The app is then at **https://shady-mac-mini.taila545c3.ts.net:8443**. This setting persists across reboots. To remove it: `tailscale serve --https=8443 off`.
+
+### Installing on the phones
+
+Use the HTTPS address above on each phone, not the old `100.x` one. Offline storage is tied to the address.
+
+- **Pixel (Chrome):** open the address, tap **Install app** in the top bar (or ⋮ → *Install app*). In the Tailscale app, turn on **Always-on VPN** (Android Settings → Network → VPN → Tailscale ⚙️) so syncing doesn't depend on opening Tailscale.
+- **iPhone (Safari):** open the address → Share → **Add to Home Screen**. Use the home-screen icon, not a Safari tab: Safari can clear a website's saved data after 7 days without a visit, but installed apps are exempt.
+
+The phone needs to load the app once on a good connection, and visit each screen once, before those screens work offline.
+
+### Updates
+
+After `pnpm prod:deploy`, phones download the new version in the background and switch to it the next time the app is opened.
 
 ---
 
@@ -269,8 +318,9 @@ After making code changes:
 cd frontend
 pnpm build
 
-# If you changed backend code or schema
+# If you changed backend code, dependencies, or schema
 cd backend
+pnpm install          # Only if package.json changed (rebuilds native modules)
 pnpm db:push          # Only if schema changed
 
 # Restart production
