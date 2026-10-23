@@ -1,3 +1,8 @@
 packages:
   - backend
   - frontend
+allowBuilds:
+  # Native SQLite binding: its install script downloads the prebuilt binary for
+  # the current Node version. Without it the server can't open the database.
+  better-sqlite3: true
+  esbuild: true
