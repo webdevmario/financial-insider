@@ -152,7 +152,11 @@ Common causes:
 
 1. **Port in use** — something else is on 3001. Run `lsof -ti:3001 | xargs kill -9`
 2. **nvm path wrong** — check `echo $NVM_DIR` and make sure the plist matches
-3. **Node version changed** — if you switched Node versions via nvm, the service may need a restart
+3. **Node version changed** — the service runs nvm's *default* Node. The SQLite driver is a native module built for one Node version, so after changing the default (`nvm alias default …`) reinstall it, then restart:
+   ```bash
+   cd backend && pnpm rebuild better-sqlite3
+   ```
+   The error log (`pnpm prod:errors`) shows `NODE_MODULE_VERSION` mismatches when this is the problem.
 4. **Plist syntax error** — validate with `plutil ~/Library/LaunchAgents/com.financial-insider.plist`
 
 ---
@@ -314,8 +318,9 @@ After making code changes:
 cd frontend
 pnpm build
 
-# If you changed backend code or schema
+# If you changed backend code, dependencies, or schema
 cd backend
+pnpm install          # Only if package.json changed (rebuilds native modules)
 pnpm db:push          # Only if schema changed
 
 # Restart production
