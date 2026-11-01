@@ -19,6 +19,21 @@ if (!existsSync(dataDir)) {
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Tailscale Serve proxies from loopback; trust its X-Forwarded-For so req.ip is the device's tailnet IP
+app.set("trust proxy", "loopback");
+
+// Request log: one line per request. Successful static asset hits are skipped to keep the log small.
+app.use((req, res, next) => {
+  const start = process.hrtime.bigint();
+  res.on("finish", () => {
+    const isAsset = !req.path.startsWith("/api/") && /\.\w+$/.test(req.path);
+    if (isAsset && res.statusCode < 400) return;
+    const ms = Number(process.hrtime.bigint() - start) / 1e6;
+    console.log(`${new Date().toISOString()} ${req.method} ${req.originalUrl} ${res.statusCode} ${ms.toFixed(1)}ms ${req.ip}`);
+  });
+  next();
+});
+
 // Middleware
 app.use(express.json({ limit: "10mb" })); // Large enough for data imports
 
