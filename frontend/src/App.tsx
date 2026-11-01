@@ -1,11 +1,11 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect } from "react";
 import DashboardView from "./components/dashboard/DashboardView";
 import AccountsView from "./components/accounts/AccountsView";
 import BudgetView from "./components/budget/BudgetView";
 import SubscriptionsView from "./components/subscriptions/SubscriptionsView";
 import SettingsModal from "./components/layout/SettingsModal";
 import Toast from "./components/layout/Toast";
-import { useSyncStatus } from "./lib/offline/status";
+import { ConnectionDot, ConnectionPill, useConnectionNotice } from "./components/layout/ConnectionNotice";
 
 type View = "dashboard" | "accounts" | "budget" | "subscriptions";
 
@@ -15,79 +15,6 @@ const NAV_ITEMS: { view: View; icon: string; label: string; desktop: string }[] 
   { view: "budget", icon: "💰", label: "Budget", desktop: "Budget" },
   { view: "subscriptions", icon: "🔄", label: "Bills", desktop: "Bills" },
 ];
-
-/** "3m ago" style label for the last time the server answered */
-function sinceLabel(iso: string | null): string {
-  if (!iso) return "earlier";
-  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.round(hours / 24)}d ago`;
-}
-
-/** Slim banner for offline mode, queued changes, and syncing */
-function ConnectionBanner() {
-  const { reachable, pending, syncing, lastOnline } = useSyncStatus();
-  const [justSynced, setJustSynced] = useState(false);
-  const wasOffline = useRef(false);
-
-  // After an outage, confirm once everything queued has reached the server.
-  // Normal online saves sync in the background without a banner.
-  useEffect(() => {
-    if (reachable === false) {
-      wasOffline.current = true;
-      setJustSynced(false);
-    } else if (reachable && pending === 0 && wasOffline.current) {
-      wasOffline.current = false;
-      setJustSynced(true);
-      const t = setTimeout(() => setJustSynced(false), 3000);
-      return () => clearTimeout(t);
-    }
-  }, [reachable, pending]);
-
-  const changes = `${pending} change${pending === 1 ? "" : "s"}`;
-  let tone: "amber" | "accent" | "green" | null = null;
-  let text = "";
-
-  if (reachable === false) {
-    tone = "amber";
-    text = pending > 0
-      ? `Offline · ${changes} saved on this device, will sync when you're back`
-      : `Offline · showing data from ${sinceLabel(lastOnline)}`;
-  } else if (reachable && pending > 0 && (wasOffline.current || !syncing)) {
-    // Catching up after an outage, or stuck retrying (e.g. the server is erroring)
-    tone = "accent";
-    text = syncing ? `Syncing ${changes}…` : `${changes} waiting to sync`;
-  } else if (justSynced) {
-    tone = "green";
-    text = "Back online · all changes synced";
-  }
-
-  if (!tone) return null;
-
-  const styles = {
-    amber: "bg-amber/15 text-amber border-amber/20",
-    accent: "bg-accent/15 text-accent border-accent/20",
-    green: "bg-green/15 text-green border-green/20",
-  }[tone];
-  const dot = { amber: "bg-amber", accent: "bg-accent", green: "bg-green" }[tone];
-
-  return (
-    <div
-      className={`fixed top-[60px] left-0 right-0 z-[100] flex items-center justify-center gap-2 py-2 px-4 text-xs font-medium border-b transition-all duration-300 ${styles}`}
-    >
-      <span className="relative flex h-2 w-2 flex-shrink-0">
-        {tone !== "green" && (
-          <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${dot}`} />
-        )}
-        <span className={`relative inline-flex rounded-full h-2 w-2 ${dot}`} />
-      </span>
-      {text}
-    </div>
-  );
-}
 
 /** Chrome/Android only: offer to install the app when the browser allows it */
 function InstallButton() {
@@ -126,6 +53,7 @@ export default function App() {
   const [activeView, setActiveView] = useState<View>("dashboard");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [toast, setToast] = useState<{ msg: string; err?: boolean } | null>(null);
+  const connection = useConnectionNotice();
 
   // Refresh key - increment to force re-mount of views after global data changes
   const [refreshKey, setRefreshKey] = useState(0);
@@ -143,8 +71,9 @@ export default function App() {
       {/* Top Nav */}
       <nav className="sticky top-0 z-50 flex items-center justify-between px-8 h-[60px] bg-bg/85 backdrop-blur-xl border-b border-border max-md:px-4">
         <div className="flex items-center gap-2.5 font-semibold text-lg tracking-tight">
-          <div className="w-7 h-7 bg-accent rounded-lg flex items-center justify-center text-sm text-white shadow-[0_0_16px_rgba(74,108,247,0.3)]">
+          <div className="relative w-7 h-7 bg-accent rounded-lg flex items-center justify-center text-sm text-white shadow-[0_0_16px_rgba(74,108,247,0.3)]">
             ⬡
+            <ConnectionDot notice={connection} />
           </div>
           <span className="max-md:hidden">Financial Insider</span>
         </div>
@@ -178,8 +107,8 @@ export default function App() {
         </div>
       </nav>
 
-      {/* Connection status banner */}
-      <ConnectionBanner />
+      {/* Connection status */}
+      <ConnectionPill notice={connection} />
 
       {/* Main Content */}
       <main className="relative max-w-[1280px] mx-auto px-8 py-7 pb-[60px] max-md:px-4 max-md:pb-24">
