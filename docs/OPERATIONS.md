@@ -88,7 +88,7 @@ lsof -ti:3001 | xargs kill -9 2>/dev/null
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.financial-insider.plist
 
 # Verify it's running
-cat /tmp/financial-insider.log
+pnpm prod:logs
 ```
 
 **Key rule:** Always rebuild the frontend (`pnpm build`) before restarting production if you changed any frontend code. The production server serves the built files from `backend/public/`, not the source files.
@@ -103,12 +103,14 @@ launchd is macOS's system for running background services. The config file (call
 ~/Library/LaunchAgents/com.financial-insider.plist
 ```
 
+The source of truth is `scripts/launchd/com.financial-insider.plist` in the repo. `pnpm prod:install` copies it into place (filling in the log directory) and reloads it.
+
 ### What the plist does
 
 - **RunAtLoad: true** — starts the server when you log in (or when the plist is loaded)
 - **KeepAlive: true** — restarts the server automatically if it crashes
 - **ProgramArguments** — the actual command: loads nvm, cd's to the backend, runs the server
-- **StandardOutPath / StandardErrorPath** — logs go to `/tmp/financial-insider.log` and `/tmp/financial-insider-error.log`
+- **StandardOutPath / StandardErrorPath** — logs go to `~/Library/Logs/financial-insider/server.log` and `~/Library/Logs/financial-insider/error.log`. `server.log` has one line per request (time, method, path, status, duration, device IP); successful static asset loads are skipped.
 
 ### Common Commands
 
@@ -125,26 +127,26 @@ launchctl list | grep financial
 # If it shows a PID (number), it's running. If status is non-zero, something's wrong.
 
 # View logs
-cat /tmp/financial-insider.log
-cat /tmp/financial-insider-error.log
+pnpm prod:logs      # last 200 lines of ~/Library/Logs/financial-insider/server.log
+pnpm prod:errors    # last 200 lines of ~/Library/Logs/financial-insider/error.log
 
 # Full restart (stop + clear logs + start)
 launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.financial-insider.plist 2>/dev/null
 lsof -ti:3001 | xargs kill -9 2>/dev/null
-> /tmp/financial-insider.log
-> /tmp/financial-insider-error.log
+> ~/Library/Logs/financial-insider/server.log
+> ~/Library/Logs/financial-insider/error.log
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.financial-insider.plist
 ```
 
 ### If you need to edit the plist
 
-The plist is at `~/Library/LaunchAgents/com.financial-insider.plist`. If you move the project folder, update the nvm path, or change the port, edit it:
+If you move the project folder, update the nvm path, or change the port, edit `scripts/launchd/com.financial-insider.plist` and reinstall:
 
 ```bash
-nano ~/Library/LaunchAgents/com.financial-insider.plist
+pnpm prod:install   # copies it to ~/Library/LaunchAgents and restarts the service
 ```
 
-After editing, do a full restart (bootout then bootstrap).
+Plists are XML, so `&&` inside a command must be written `&amp;&amp;`.
 
 ### If launchd won't start the service
 
@@ -260,23 +262,20 @@ This single file IS your entire database. It contains all accounts, bills, expen
 
 **From the app:** Settings → Export gives you a JSON backup you can re-import later.
 
-**File-level backup** (more thorough):
+**Automatic daily backups:** the `com.financial-insider-backup` LaunchAgent runs at 3 AM and writes `data/backups/finance-YYYYMMDD.db`, keeping the newest 30 daily files. Named snapshots (e.g. `finance-predeploy-*.db`) are never pruned. Results go to `~/Library/Logs/financial-insider/backup.log` and `backup-error.log`.
 
 ```bash
-pnpm db:backup    # → data/backups/finance-YYYYMMDD.db
+pnpm backup:now        # take a backup right now (re-running the same day replaces that day's file)
+pnpm backup:list       # see what's in data/backups/
+pnpm backup:install    # install/reload the daily LaunchAgent
+pnpm backup:uninstall  # remove it
 ```
 
-This uses SQLite's `.backup` command rather than `cp`. The database runs in WAL mode, so recent writes can live in `finance.db-wal` until they're checkpointed — a plain `cp` of `finance.db` can silently miss them. `.backup` produces a consistent snapshot even while the server is running.
+This uses SQLite's online backup API rather than `cp`. The database runs in WAL mode, so recent writes can live in `finance.db-wal` until they're checkpointed — a plain `cp` of `finance.db` can silently miss them. The backup is a consistent snapshot even while the server is running, and each one is integrity-checked before it replaces the previous file.
 
-Consider a weekly cron job:
+The backup runs in Node (`backend/src/db/backup.ts`) rather than `sqlite3` in a shell script because macOS blocks launchd jobs run by `/bin/bash` or `/usr/bin/sqlite3` from reading `~/Documents`. Node already has that access for the server.
 
-```bash
-crontab -e
-# Add this line:
-0 3 * * 0 cd ~/Documents/development/projects/financial-insider && /usr/bin/sqlite3 data/finance.db ".backup data/backups/finance-$(date +\%Y\%m\%d).db"
-```
-
-(Create `data/backups/` first: `mkdir -p data/backups`)
+Database files and everything under `data/backups/` are gitignored.
 
 ### Restoring from backup
 
@@ -333,7 +332,7 @@ lsof -ti:3001 | xargs kill -9 2>/dev/null
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.financial-insider.plist
 
 # Verify
-cat /tmp/financial-insider.log
+pnpm prod:logs
 ```
 
 ---
@@ -345,11 +344,11 @@ cat /tmp/financial-insider.log
 | Start production | `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.financial-insider.plist` |
 | Stop production | `launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.financial-insider.plist` |
 | Check if running | `launchctl list \| grep financial` |
-| View logs | `cat /tmp/financial-insider.log` |
-| View errors | `cat /tmp/financial-insider-error.log` |
+| View logs | `pnpm prod:logs` |
+| View errors | `pnpm prod:errors` |
 | Kill port 3001 | `lsof -ti:3001 \| xargs kill -9` |
 | Get Tailscale IP | `tailscale ip` |
-| Backup database | `pnpm db:backup` |
+| Backup database | `pnpm backup:now` |
 | Rebuild frontend | `cd frontend && pnpm build` |
 | Push schema changes | `cd backend && pnpm db:push` |
 | Start dev (backend) | `cd backend && pnpm dev` |

@@ -13,12 +13,17 @@
     "prod:start": "launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.financial-insider.plist",
     "prod:stop": "launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.financial-insider.plist 2>/dev/null; lsof -ti:3001 | xargs kill -9 2>/dev/null",
     "prod:restart": "pnpm prod:stop && sleep 1 && pnpm prod:start",
-    "prod:logs": "cat /tmp/financial-insider.log",
-    "prod:errors": "cat /tmp/financial-insider-error.log",
+    "prod:install": "bash scripts/install-agent.sh com.financial-insider",
+    "prod:logs": "tail -n 200 ~/Library/Logs/financial-insider/server.log",
+    "prod:errors": "tail -n 200 ~/Library/Logs/financial-insider/error.log",
     "prod:status": "launchctl list | grep financial",
     "prod:deploy": "pnpm build && pnpm prod:restart",
     "db:push": "pnpm --filter financial-insider-backend db:push",
-    "db:backup": "mkdir -p data/backups && sqlite3 data/finance.db \".backup data/backups/finance-$(date +%Y%m%d).db\" && echo 'Backup created'"
+    "db:backup": "bash scripts/backup-db.sh",
+    "backup:now": "bash scripts/backup-db.sh",
+    "backup:install": "bash scripts/install-agent.sh com.financial-insider-backup",
+    "backup:uninstall": "bash scripts/install-agent.sh com.financial-insider-backup --uninstall",
+    "backup:list": "ls -lh data/backups/"
   },
   "repository": {
     "type": "git",

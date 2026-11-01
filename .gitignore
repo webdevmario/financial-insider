@@ -12,6 +12,9 @@ data/*.db-journal
 data/*.db-wal
 data/*.db-shm
 data/export.json
+data/backups/*.db
+data/backups/*.db-*
+data/backups/*.tmp*
 
 # Drizzle migration artifacts
 backend/drizzle/
