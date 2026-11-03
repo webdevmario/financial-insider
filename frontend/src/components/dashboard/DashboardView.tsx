@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import { fmt, fmtP, fmtDate } from "../../lib/formatters";
 import { computeEffectiveNextCharge } from "../../lib/billing";
+import { goalProgress, sortGoals } from "../../lib/goals";
 import StatCard from "../layout/StatCard";
-import type { Account, Subscription } from "../../types";
+import type { Account, Goal, Subscription } from "../../types";
 
 const ASSET_GROUPS: Record<string, string[]> = {
   Investments: ["401k", "Roth 401k", "IRA", "Roth IRA", "Rollover IRA", "Brokerage", "Crypto", "IUL"],
@@ -31,11 +32,12 @@ function monthlyEquiv(s: Subscription): number {
   return my / 12;
 }
 
-export default function DashboardView() {
+export default function DashboardView({ onOpenGoals }: { onOpenGoals: () => void }) {
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState({ netWorth: 0, income: 0, monthlyBills: 0 });
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [subs, setSubs] = useState<Subscription[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
 
   useEffect(() => {
     setLoading(true);
@@ -43,6 +45,7 @@ export default function DashboardView() {
       api.dashboard.summary().then(setSummary).catch(() => {}),
       api.accounts.list().then(setAccounts).catch(() => {}),
       api.subscriptions.list().then(setSubs).catch(() => {}),
+      api.goals.list().then(setGoals).catch(() => {}),
     ]).finally(() => setLoading(false));
   }, []);
 
@@ -62,6 +65,9 @@ export default function DashboardView() {
     .map((s) => ({ ...s, me: monthlyEquiv(s) }))
     .sort((a, b) => b.me - a.me)
     .slice(0, 6);
+
+  // Top in-progress goals, by priority
+  const topGoals = sortGoals(goals.filter((g) => !goalProgress(g).done), "priority").slice(0, 4);
 
   // Upcoming non-monthly charges (next 30 days, including today)
   const today = new Date();
@@ -171,6 +177,47 @@ export default function DashboardView() {
           )}
         </div>
       </div>
+
+      {/* Goals */}
+      {topGoals.length > 0 && (
+        <button
+          type="button"
+          onClick={onOpenGoals}
+          className="block w-full text-left mt-5 bg-bg-card border border-border rounded-xl p-6 hover:border-[#363a50] transition-colors"
+        >
+          <div className="flex items-center justify-between mb-5">
+            <span className="text-[14px] font-semibold uppercase tracking-wider text-text-dim">Goals</span>
+            <span className="text-[11px] text-accent opacity-70">View all ›</span>
+          </div>
+          <div className="grid grid-cols-2 max-md:grid-cols-1 gap-x-8 gap-y-4">
+            {topGoals.map((g) => {
+              const p = goalProgress(g);
+              return (
+                <div key={g.id}>
+                  <div className="flex items-center justify-between gap-3 text-sm mb-1.5">
+                    <span className="truncate">{g.name}</span>
+                    <span className="font-mono text-[13px] shrink-0">
+                      {p.pct.toFixed(0)}%
+                      <span className="text-text-muted"> of {fmt(g.targetAmount)}</span>
+                    </span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${
+                        p.status === "overdue" ? "bg-red" : p.status === "behind" ? "bg-amber" : "bg-accent"
+                      }`}
+                      style={{ width: `${p.pct}%` }}
+                    />
+                  </div>
+                  {g.deadline && (
+                    <div className="text-[11px] text-text-muted mt-1">Due {fmtDate(g.deadline)}</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </button>
+      )}
     </div>
   );
 }

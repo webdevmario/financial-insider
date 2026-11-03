@@ -1,4 +1,4 @@
-import type { Account, Subscription, Expense, AppSettings } from "../types";
+import type { Account, Subscription, Expense, Goal, AppSettings } from "../types";
 import { today } from "./formatters";
 import { offlineDb } from "./offline/db";
 import { enqueue, pendingOps } from "./offline/outbox";
@@ -206,6 +206,30 @@ export const api = {
       }),
     delete: (id: string) =>
       request<{ success: boolean }>(`/subscriptions/${id}`, {
+        method: "DELETE",
+      }),
+  },
+
+  // ── Goals ────────────────────────────────────────────────────
+  goals: {
+    list: () => cachedGet<Goal[]>("/goals"),
+    create: (data: Partial<Goal>) =>
+      request<Goal>("/goals", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: Partial<Goal>) =>
+      request<Goal>(`/goals/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    contribute: (id: string, data: { amount: number; date?: string; note?: string }) =>
+      request<Goal>(`/goals/${id}/contributions`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      request<{ success: boolean }>(`/goals/${id}`, {
         method: "DELETE",
       }),
   },

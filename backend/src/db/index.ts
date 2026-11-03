@@ -22,5 +22,21 @@ if (expenseCols.length && !expenseCols.some((c) => c.name === "updated_at")) {
   sqlite.exec("ALTER TABLE expenses ADD COLUMN updated_at TEXT");
 }
 
+// Tables added after the initial `db:push`
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS goals (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    target_amount REAL DEFAULT 0 NOT NULL,
+    saved_amount REAL DEFAULT 0 NOT NULL,
+    deadline TEXT,
+    priority TEXT DEFAULT 'medium' NOT NULL,
+    notes TEXT,
+    history TEXT,
+    completed_at TEXT,
+    created_at TEXT NOT NULL
+  )
+`);
+
 export const db = drizzle(sqlite, { schema });
 export { sqlite };

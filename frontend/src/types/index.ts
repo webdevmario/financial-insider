@@ -56,6 +56,29 @@ export interface Expense {
   pending?: boolean;
 }
 
+// ── Goal (Savings target) ──────────────────────────────────────
+export type GoalPriority = "high" | "medium" | "low";
+
+export interface GoalHistoryEntry {
+  date: string;
+  /** Change to the saved amount: positive for a contribution, negative for a withdrawal */
+  amount: number;
+  note?: string;
+}
+
+export interface Goal {
+  id: string;
+  name: string;
+  targetAmount: number;
+  savedAmount: number;
+  deadline: string | null;
+  priority: GoalPriority;
+  notes: string | null;
+  history: GoalHistoryEntry[];
+  completedAt: string | null;
+  createdAt: string;
+}
+
 // ── Settings ───────────────────────────────────────────────────
 export interface AppSettings {
   paycheck: number;

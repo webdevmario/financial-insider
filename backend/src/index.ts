@@ -6,6 +6,7 @@ import { existsSync, mkdirSync } from "fs";
 import accountsRouter from "./routes/accounts.js";
 import expensesRouter from "./routes/expenses.js";
 import subscriptionsRouter from "./routes/subscriptions.js";
+import goalsRouter from "./routes/goals.js";
 import settingsRouter from "./routes/settings.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -46,6 +47,7 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/accounts", accountsRouter);
 app.use("/api/expenses", expensesRouter);
 app.use("/api/subscriptions", subscriptionsRouter);
+app.use("/api/goals", goalsRouter);
 app.use("/api", settingsRouter); // settings, dashboard, data routes
 
 // Serve frontend in production

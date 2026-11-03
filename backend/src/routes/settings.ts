@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "../db/index.js";
-import { settings, accounts, subscriptions, expenses } from "../db/schema.js";
+import { settings, accounts, subscriptions, expenses, goals } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 import { today as todayStr } from "../lib/date.js";
 
@@ -79,6 +79,7 @@ router.get("/data/export", (_req, res) => {
   const allSubs = db.select().from(subscriptions).all();
   const allExpenses = db.select().from(expenses).all();
   const allSettings = db.select().from(settings).all();
+  const allGoals = db.select().from(goals).all();
 
   const settingsMap: Record<string, any> = {};
   for (const row of allSettings) {
@@ -94,6 +95,10 @@ router.get("/data/export", (_req, res) => {
     expenses: allExpenses.map((e) => ({
       ...e,
       desc: e.description, // backward compat with old app
+    })),
+    goals: allGoals.map((g) => ({
+      ...g,
+      history: g.history ? JSON.parse(g.history) : [],
     })),
     income: settingsMap.income || 0,
     paycheck: settingsMap.paycheck || 0,
@@ -119,6 +124,8 @@ router.post("/data/import", (req, res) => {
       tx.delete(subscriptions).run();
       tx.delete(expenses).run();
       tx.delete(settings).run();
+      // Older backups predate goals: leave existing goals alone rather than wiping them
+      if (Array.isArray(data.goals)) tx.delete(goals).run();
 
       // Import accounts
       if (data.accounts?.length) {
@@ -175,6 +182,26 @@ router.post("/data/import", (req, res) => {
               category: e.category || "General",
               amount: e.amount || 0,
               updatedAt: e.updatedAt || null,
+            })
+            .run();
+        }
+      }
+
+      // Import goals
+      if (Array.isArray(data.goals)) {
+        for (const g of data.goals) {
+          tx.insert(goals)
+            .values({
+              id: g.id,
+              name: g.name,
+              targetAmount: g.targetAmount || 0,
+              savedAmount: g.savedAmount || 0,
+              deadline: g.deadline || null,
+              priority: g.priority || "medium",
+              notes: g.notes || null,
+              history: g.history ? JSON.stringify(g.history) : null,
+              completedAt: g.completedAt || null,
+              createdAt: g.createdAt || today,
             })
             .run();
         }
