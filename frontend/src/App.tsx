@@ -3,17 +3,19 @@ import DashboardView from "./components/dashboard/DashboardView";
 import AccountsView from "./components/accounts/AccountsView";
 import BudgetView from "./components/budget/BudgetView";
 import SubscriptionsView from "./components/subscriptions/SubscriptionsView";
+import GoalsView from "./components/goals/GoalsView";
 import SettingsModal from "./components/layout/SettingsModal";
 import Toast from "./components/layout/Toast";
 import { ConnectionDot, ConnectionPill, useConnectionNotice } from "./components/layout/ConnectionNotice";
 
-type View = "dashboard" | "accounts" | "budget" | "subscriptions";
+type View = "dashboard" | "accounts" | "budget" | "subscriptions" | "goals";
 
 const NAV_ITEMS: { view: View; icon: string; label: string; desktop: string }[] = [
   { view: "dashboard", icon: "📊", label: "Home", desktop: "Dashboard" },
   { view: "accounts", icon: "🏦", label: "Assets", desktop: "Assets" },
   { view: "budget", icon: "💰", label: "Budget", desktop: "Budget" },
   { view: "subscriptions", icon: "🔄", label: "Bills", desktop: "Bills" },
+  { view: "goals", icon: "🎯", label: "Goals", desktop: "Goals" },
 ];
 
 /** Chrome/Android only: offer to install the app when the browser allows it */
@@ -113,12 +115,13 @@ export default function App() {
       {/* Main Content */}
       <main className="relative max-w-[1280px] mx-auto px-8 py-7 pb-[60px] max-md:px-4 max-md:pb-24">
         <div key={refreshKey}>
-          {activeView === "dashboard" && <DashboardView />}
+          {activeView === "dashboard" && <DashboardView onOpenGoals={() => setActiveView("goals")} />}
           {activeView === "accounts" && <AccountsView onToast={showToast} />}
           {activeView === "budget" && (
             <BudgetView onToast={showToast} />
           )}
           {activeView === "subscriptions" && <SubscriptionsView onToast={showToast} />}
+          {activeView === "goals" && <GoalsView onToast={showToast} />}
         </div>
       </main>
 

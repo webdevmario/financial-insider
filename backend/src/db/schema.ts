@@ -40,6 +40,20 @@ export const expenses = sqliteTable("expenses", {
   updatedAt: text("updated_at"), // ISO timestamp of the last edit, for last-write-wins sync
 });
 
+// ── Goals (Savings targets) ────────────────────────────────────────
+export const goals = sqliteTable("goals", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  targetAmount: real("target_amount").notNull().default(0),
+  savedAmount: real("saved_amount").notNull().default(0),
+  deadline: text("deadline"), // YYYY-MM-DD, optional
+  priority: text("priority").notNull().default("medium"), // high | medium | low
+  notes: text("notes"),
+  history: text("history"), // JSON string: [{date, amount, note?}] — each entry is a change to savedAmount
+  completedAt: text("completed_at"), // YYYY-MM-DD the goal first reached its target
+  createdAt: text("created_at").notNull(),
+});
+
 // ── Settings (key-value store) ─────────────────────────────────────
 // Stores: paycheck, income, paycheckHistory, budgetTargets
 export const settings = sqliteTable("settings", {
@@ -54,3 +68,5 @@ export type Subscription = typeof subscriptions.$inferSelect;
 export type NewSubscription = typeof subscriptions.$inferInsert;
 export type Expense = typeof expenses.$inferSelect;
 export type NewExpense = typeof expenses.$inferInsert;
+export type Goal = typeof goals.$inferSelect;
+export type NewGoal = typeof goals.$inferInsert;
