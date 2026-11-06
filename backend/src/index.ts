@@ -8,6 +8,8 @@ import expensesRouter from "./routes/expenses.js";
 import subscriptionsRouter from "./routes/subscriptions.js";
 import goalsRouter from "./routes/goals.js";
 import settingsRouter from "./routes/settings.js";
+import transactionsRouter from "./routes/transactions.js";
+import { watchStatements } from "./lib/statements/importer.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -48,6 +50,7 @@ app.use("/api/accounts", accountsRouter);
 app.use("/api/expenses", expensesRouter);
 app.use("/api/subscriptions", subscriptionsRouter);
 app.use("/api/goals", goalsRouter);
+app.use("/api/transactions", transactionsRouter);
 app.use("/api", settingsRouter); // settings, dashboard, data routes
 
 // Serve frontend in production
@@ -62,11 +65,12 @@ if (existsSync(publicDir)) {
 
 app.listen(PORT, () => {
   console.log(`\n  🚀 Financial Insider API running on http://localhost:${PORT}`);
-  console.log(`  📁 Database: ${resolve(dataDir, "finance.db")}`);
+  console.log(`  📁 Database: ${process.env.DB_PATH || resolve(dataDir, "finance.db")}`);
   if (existsSync(publicDir)) {
     console.log(`  🌐 Frontend: serving from ${publicDir}`);
   } else {
     console.log(`  ⚠️  No frontend build found. Run: cd frontend && pnpm build`);
   }
   console.log();
+  watchStatements();
 });

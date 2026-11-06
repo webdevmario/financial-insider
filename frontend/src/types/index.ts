@@ -79,6 +79,166 @@ export interface Goal {
   createdAt: string;
 }
 
+// ── Imported transactions ──────────────────────────────────────
+export type TxnKind = "spend" | "income" | "refund" | "transfer" | "fee" | "interest";
+
+export interface Transaction {
+  id: string;
+  accountId: string;
+  date: string;
+  postedDate: string | null;
+  month: string;
+  /** Negative = money leaving you; positive = money coming in */
+  amount: number;
+  description: string;
+  merchant: string;
+  category: string;
+  kind: TxnKind;
+  member: string | null;
+  transferPeerId: string | null;
+  edited: number;
+}
+
+export interface StatementAccount {
+  id: string;
+  institution: string;
+  name: string;
+  kind: "checking" | "credit";
+  last4: string | null;
+  count: number;
+  firstDate: string | null;
+  lastDate: string | null;
+}
+
+export interface ImportResult {
+  batchId: string;
+  fileName: string;
+  format: string;
+  accountId: string;
+  accountName: string;
+  rowCount: number;
+  inserted: number;
+  duplicates: number;
+  dateFrom: string | null;
+  dateTo: string | null;
+}
+
+export interface ScanResult {
+  scannedAt: string;
+  folder: string;
+  imported: ImportResult[];
+  skipped: number;
+  unrecognized: { file: string; error: string }[];
+}
+
+export interface ImportBatch {
+  id: string;
+  fileName: string;
+  sourcePath: string | null;
+  status: "imported" | "undone";
+  format: string;
+  accountId: string;
+  rowCount: number;
+  inserted: number;
+  duplicates: number;
+  dateFrom: string | null;
+  dateTo: string | null;
+  importedAt: string;
+}
+
+export interface MerchantRule {
+  id: string;
+  pattern: string;
+  merchant: string | null;
+  category: string | null;
+  kind: TxnKind | null;
+  createdAt: string;
+}
+
+export interface MonthSummary {
+  spent: number;
+  refunds: number;
+  netSpent: number;
+  income: number;
+  net: number;
+  fees: number;
+  interest: number;
+  transfersExcluded: number;
+  count: number;
+}
+
+export interface RecurringCharge {
+  key: string;
+  merchant: string;
+  category: string;
+  accounts: string[];
+  cadence: "weekly" | "biweekly" | "monthly" | "quarterly" | "annual";
+  count: number;
+  firstDate: string;
+  lastDate: string;
+  nextExpected: string;
+  lastAmount: number;
+  prevAmount: number;
+  avgAmount: number;
+  minAmount: number;
+  maxAmount: number;
+  /** Size and date of the most recent price change in the last 6 months */
+  change: number;
+  changeDate: string | null;
+  variable: boolean;
+  priceChanged: boolean;
+  yearlyCost: number;
+  status: "active" | "new" | "late" | "stopped";
+  billId: string | null;
+  billName: string | null;
+  history: { date: string; amount: number }[];
+}
+
+export interface BillVsActual {
+  id: string;
+  name: string;
+  frequency: string;
+  listedAmount: number;
+  matched: number;
+  lastDate: string | null;
+  lastAmount: number | null;
+  avgAmount: number | null;
+  diff: number | null;
+  notSeenRecently: boolean;
+}
+
+export interface CardPayments {
+  accountId: string;
+  name: string;
+  count: number;
+  total: number;
+  lastDate: string | null;
+  sources: { name: string; count: number; total: number }[];
+  recent: { date: string; amount: number; from: string | null }[];
+}
+
+export interface Insights {
+  months: string[];
+  month: string;
+  prevMonth: string | null;
+  asOf: string;
+  /** The month is still in progress; prevSummary then covers the same days of last month */
+  partial: boolean;
+  summary: MonthSummary;
+  prevSummary: MonthSummary | null;
+  byCategory: { category: string; amount: number }[];
+  topMerchants: { merchant: string; amount: number; count: number }[];
+  byAccount: { accountId: string; name: string; spent: number; count: number }[];
+  recurring: RecurringCharge[];
+  billsVsActual: BillVsActual[];
+  duplicates: { a: Transaction; b: Transaction }[];
+  feesAndInterest: Transaction[];
+  feesAndInterestTotal: number;
+  paychecks: { id: string; date: string; amount: number; description: string; accountId: string }[];
+  expectedPaycheck: number;
+  cardPayments: CardPayments[];
+}
+
 // ── Settings ───────────────────────────────────────────────────
 export interface AppSettings {
   paycheck: number;

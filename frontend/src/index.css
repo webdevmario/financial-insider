@@ -51,6 +51,13 @@ body::before {
     @apply text-base py-2.5 px-3.5 rounded-lg border border-border bg-bg-input text-text outline-none transition-colors w-full;
     -webkit-appearance: none;
   }
+  /* The reset above hides native checkboxes; bring them back */
+  input[type="checkbox"] {
+    -webkit-appearance: checkbox;
+    appearance: auto;
+    @apply w-4 h-4 p-0 shrink-0 cursor-pointer;
+    accent-color: #4a6cf7;
+  }
   input:focus, select:focus, textarea:focus {
     @apply border-accent;
   }

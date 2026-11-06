@@ -4,17 +4,19 @@ import AccountsView from "./components/accounts/AccountsView";
 import BudgetView from "./components/budget/BudgetView";
 import SubscriptionsView from "./components/subscriptions/SubscriptionsView";
 import GoalsView from "./components/goals/GoalsView";
+import ActivityView from "./components/activity/ActivityView";
 import SettingsModal from "./components/layout/SettingsModal";
 import Toast from "./components/layout/Toast";
 import { ConnectionDot, ConnectionPill, useConnectionNotice } from "./components/layout/ConnectionNotice";
 
-type View = "dashboard" | "accounts" | "budget" | "subscriptions" | "goals";
+type View = "dashboard" | "accounts" | "budget" | "subscriptions" | "goals" | "activity";
 
 const NAV_ITEMS: { view: View; icon: string; label: string; desktop: string }[] = [
   { view: "dashboard", icon: "📊", label: "Home", desktop: "Dashboard" },
   { view: "accounts", icon: "🏦", label: "Assets", desktop: "Assets" },
   { view: "budget", icon: "💰", label: "Budget", desktop: "Budget" },
   { view: "subscriptions", icon: "🔄", label: "Bills", desktop: "Bills" },
+  { view: "activity", icon: "🧾", label: "Activity", desktop: "Activity" },
   { view: "goals", icon: "🎯", label: "Goals", desktop: "Goals" },
 ];
 
@@ -122,6 +124,7 @@ export default function App() {
           )}
           {activeView === "subscriptions" && <SubscriptionsView onToast={showToast} />}
           {activeView === "goals" && <GoalsView onToast={showToast} />}
+          {activeView === "activity" && <ActivityView onToast={showToast} />}
         </div>
       </main>
 
