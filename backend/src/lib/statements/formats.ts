@@ -97,14 +97,14 @@ function category(v: string | undefined, kind: Kind, description: string): strin
 }
 
 /** Kind for a checking-account row, from the description alone */
-function bankKind(amount: number, description: string, typeHint = ""): Kind {
+export function bankKind(amount: number, description: string, typeHint = ""): Kind {
   if (CARD_PAYMENT.test(description) || OWN_TRANSFER.test(description) || /XFER/i.test(typeHint)) return "transfer";
   if (amount > 0) return INTEREST_EARNED.test(description) ? "interest" : "income";
   if (FEE.test(description) || /FEE/i.test(typeHint)) return "fee";
   return "spend";
 }
 
-function build(
+export function build(
   r: Record<string, string>,
   fields: {
     date: string | null;
@@ -265,7 +265,9 @@ const amex: Format = {
       category: r["category"],
       kind,
       member: r["card member"],
-      uniq: r["reference"] || "",
+      // No reference number here: the basic Amex export has none, and including it would make the
+      // detailed export (Extended Details, Reference, …) re-import every row the basic one already added
+      uniq: "",
     });
   },
 };

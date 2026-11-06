@@ -102,20 +102,20 @@ router.get("/imports", (_req, res) => {
   });
 });
 
-router.post("/scan", (_req, res) => {
+router.post("/scan", async (_req, res) => {
   try {
-    res.json(scanStatements());
+    res.json(await scanStatements());
   } catch (err) {
     res.status(500).json({ error: `Scan failed: ${(err as Error).message}` });
   }
 });
 
-// POST /api/transactions/upload { name, content } — content is the CSV text
-router.post("/upload", (req, res) => {
-  const { name, content } = req.body as { name?: string; content?: string };
+// POST /api/transactions/upload { name, content, encoding? } — CSV text, or a PDF as base64
+router.post("/upload", async (req, res) => {
+  const { name, content, encoding } = req.body as { name?: string; content?: string; encoding?: string };
   if (!content?.trim()) return res.status(400).json({ error: "File is empty" });
   try {
-    res.json(saveUpload(name || "upload.csv", content));
+    res.json(await saveUpload(name || "upload.csv", content, encoding === "base64" ? "base64" : "utf8"));
   } catch (err) {
     res.status(500).json({ error: `Upload failed: ${(err as Error).message}` });
   }
@@ -124,13 +124,24 @@ router.post("/upload", (req, res) => {
 router.post("/imports/:id/undo", (req, res) => {
   const batch = db.select().from(importBatches).where(eq(importBatches.id, req.params.id)).get();
   if (!batch) return res.status(404).json({ error: "Not found" });
-  res.json({ removed: undoBatch(batch.id) });
+  // Undo the whole file: a PDF holding several accounts has one batch per account
+  let removed = 0;
+  for (const b of db.select().from(importBatches).where(eq(importBatches.fileHash, batch.fileHash)).all()) {
+    if (b.status === "imported") removed += undoBatch(b.id);
+  }
+  res.json({ removed });
 });
 
 // Forget an undone import so the next scan picks the file up again
-router.post("/imports/:id/forget", (req, res) => {
-  forgetBatch(req.params.id);
-  res.json(scanStatements({ fresh: true }));
+router.post("/imports/:id/forget", async (req, res) => {
+  // A PDF holding several accounts has one batch per account: forget all of them
+  const batch = db.select().from(importBatches).where(eq(importBatches.id, req.params.id)).get();
+  if (batch) {
+    for (const b of db.select().from(importBatches).where(eq(importBatches.fileHash, batch.fileHash)).all()) {
+      if (b.status === "undone") forgetBatch(b.id);
+    }
+  }
+  res.json(await scanStatements({ fresh: true }));
 });
 
 // ── One transaction ───────────────────────────────────────────────

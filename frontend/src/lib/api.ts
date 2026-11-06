@@ -271,10 +271,10 @@ export const api = {
     imports: () =>
       cachedGet<{ folder: string; lastScan: ScanResult | null; batches: ImportBatch[] }>("/transactions/imports"),
     scan: () => request<ScanResult>("/transactions/scan", { method: "POST" }),
-    upload: (name: string, content: string) =>
+    upload: (name: string, content: string, encoding: "utf8" | "base64" = "utf8") =>
       request<ScanResult>("/transactions/upload", {
         method: "POST",
-        body: JSON.stringify({ name, content }),
+        body: JSON.stringify({ name, content, encoding }),
       }),
     undoImport: (id: string) =>
       request<{ removed: number }>(`/transactions/imports/${id}/undo`, { method: "POST" }),
