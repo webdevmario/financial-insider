@@ -96,7 +96,13 @@ export interface Transaction {
   kind: TxnKind;
   member: string | null;
   transferPeerId: string | null;
+  /** 1 = category/type changed by hand on this transaction */
   edited: number;
+  /** What the bank's description cleaned up to, before payees */
+  baseMerchant: string | null;
+  payeeId: string | null;
+  /** 1 = payee picked by hand for this transaction */
+  payeeLocked: number;
 }
 
 export interface StatementAccount {
@@ -146,13 +152,62 @@ export interface ImportBatch {
   importedAt: string;
 }
 
-export interface MerchantRule {
+export type AliasMatch = "contains" | "starts" | "exact" | "merchant";
+
+export interface PayeeAlias {
   id: string;
+  payeeId: string;
   pattern: string;
-  merchant: string | null;
+  match: AliasMatch;
+  amount: number | null;
+  createdAt: string;
+  /** Transactions this alias currently matches */
+  matched: number;
+}
+
+export interface Payee {
+  id: string;
+  name: string;
   category: string | null;
   kind: TxnKind | null;
+  billId: string | null;
+  notes: string | null;
   createdAt: string;
+  count: number;
+  spent: number;
+  lastDate: string | null;
+  aliases: PayeeAlias[];
+  handPicked: number;
+}
+
+export interface PayeeDetail extends Payee {
+  monthly: { month: string; amount: number }[];
+  bankNames: string[];
+  recent: Transaction[];
+}
+
+export interface UnassignedMerchant {
+  key: string;
+  merchant: string;
+  count: number;
+  spent: number;
+  lastDate: string;
+  samples: string[];
+  kinds: TxnKind[];
+}
+
+export interface PayeeSuggestion {
+  id: string;
+  reason: string;
+  name: string;
+  members: { key: string; name: string; payeeId: string | null; count: number; spent: number }[];
+}
+
+export interface AliasPreview {
+  count: number;
+  total: number;
+  merchants: string[];
+  samples: { id: string; date: string; description: string; amount: number; payee: string | null }[];
 }
 
 export interface MonthSummary {
@@ -170,6 +225,7 @@ export interface MonthSummary {
 export interface RecurringCharge {
   key: string;
   merchant: string;
+  payeeId: string | null;
   category: string;
   accounts: string[];
   cadence: "weekly" | "biweekly" | "monthly" | "quarterly" | "annual";
@@ -199,6 +255,8 @@ export interface BillVsActual {
   name: string;
   frequency: string;
   listedAmount: number;
+  /** Payee linked to this bill; null when matched by words in the bill's name */
+  linkedPayee: string | null;
   matched: number;
   lastDate: string | null;
   lastAmount: number | null;

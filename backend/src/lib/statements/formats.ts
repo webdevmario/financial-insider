@@ -303,3 +303,8 @@ export function parseStatement(text: string, fileName: string): ParsedFile {
   const rows = records.map(format.row).filter((r): r is ParsedRow => r !== null);
   return { format: format.id, account: format.account(fileName, records), rows };
 }
+
+/** Re-read one stored row (its raw CSV record) the way the importer first did */
+export function parseRow(formatId: string, raw: Record<string, string>): ParsedRow | null {
+  return FORMATS.find((f) => f.id === formatId)?.row(raw) ?? null;
+}

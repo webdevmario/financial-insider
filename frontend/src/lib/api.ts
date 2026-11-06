@@ -1,6 +1,6 @@
 import type {
   Account, Subscription, Expense, Goal, AppSettings, Transaction, StatementAccount, ScanResult,
-  ImportBatch, MerchantRule, Insights,
+  ImportBatch, Insights, Payee, PayeeDetail, UnassignedMerchant, PayeeSuggestion, AliasPreview,
 } from "../types";
 import { today } from "./formatters";
 import { offlineDb } from "./offline/db";
@@ -253,7 +253,17 @@ export const api = {
         method: "PUT",
         body: JSON.stringify({ name }),
       }),
-    update: (id: string, data: { merchant?: string; category?: string; kind?: string }) =>
+    update: (
+      id: string,
+      data: {
+        payeeId?: string | null;
+        payeeName?: string;
+        category?: string;
+        kind?: string;
+        remember?: { pattern: string; match: string; amount?: number | null };
+        reset?: boolean;
+      }
+    ) =>
       request<Transaction>(`/transactions/${id}`, {
         method: "PUT",
         body: JSON.stringify(data),
@@ -270,14 +280,29 @@ export const api = {
       request<{ removed: number }>(`/transactions/imports/${id}/undo`, { method: "POST" }),
     reimport: (id: string) =>
       request<ScanResult>(`/transactions/imports/${id}/forget`, { method: "POST" }),
-    rules: () => cachedGet<MerchantRule[]>("/transactions/rules"),
-    addRule: (data: { pattern: string; merchant?: string; category?: string; kind?: string }) =>
-      request<{ rule: MerchantRule; updated: number }>("/transactions/rules", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
-    deleteRule: (id: string) =>
-      request<{ success: boolean }>(`/transactions/rules/${id}`, { method: "DELETE" }),
+  },
+
+  // ── Payees (final names + aliases) ───────────────────────────
+  payees: {
+    list: () => cachedGet<Payee[]>("/payees"),
+    get: (id: string) => cachedGet<PayeeDetail>(`/payees/${id}`),
+    unassigned: () => cachedGet<UnassignedMerchant[]>("/payees/unassigned"),
+    suggestions: () => cachedGet<PayeeSuggestion[]>("/payees/suggestions"),
+    dismissSuggestion: (id: string) =>
+      request<{ success: boolean }>(`/payees/suggestions/${encodeURIComponent(id)}/dismiss`, { method: "POST" }),
+    preview: (data: { pattern: string; match: string; amount?: number | null }) =>
+      request<AliasPreview>("/payees/preview", { method: "POST", body: JSON.stringify(data) }),
+    merge: (data: { payeeId?: string; name?: string; category?: string; members: string[] }) =>
+      request<PayeeDetail>("/payees/merge", { method: "POST", body: JSON.stringify(data) }),
+    create: (data: { name: string; category?: string | null; kind?: string | null; billId?: string | null }) =>
+      request<PayeeDetail>("/payees", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: string, data: { name?: string; category?: string | null; kind?: string | null; billId?: string | null; notes?: string | null }) =>
+      request<PayeeDetail>(`/payees/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    delete: (id: string) => request<{ success: boolean }>(`/payees/${id}`, { method: "DELETE" }),
+    addAlias: (id: string, data: { pattern: string; match: string; amount?: number | null }) =>
+      request<PayeeDetail>(`/payees/${id}/aliases`, { method: "POST", body: JSON.stringify(data) }),
+    deleteAlias: (id: string, aliasId: string) =>
+      request<PayeeDetail>(`/payees/${id}/aliases/${aliasId}`, { method: "DELETE" }),
   },
 
   // ── Settings ─────────────────────────────────────────────────

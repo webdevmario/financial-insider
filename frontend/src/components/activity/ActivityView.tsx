@@ -5,20 +5,24 @@ import StatCard from "../layout/StatCard";
 import LoadingState from "../layout/LoadingState";
 import ImportPanel from "./ImportPanel";
 import TransactionEditModal from "./TransactionEditModal";
+import MerchantsTab from "./MerchantsTab";
+import MergeModal, { type MergeMember } from "./MergeModal";
+import PayeeModal from "./PayeeModal";
 import {
   Badge, Card, Empty, CADENCE_LABEL, KIND_BADGE, KIND_LABELS, STATUS_BADGE, STATUS_LABEL,
 } from "./shared";
-import type { Insights, RecurringCharge, StatementAccount, Transaction, TxnKind } from "../../types";
+import type { Insights, Payee, RecurringCharge, StatementAccount, Transaction, TxnKind } from "../../types";
 
 interface ActivityViewProps {
   onToast: (msg: string, err?: boolean) => void;
 }
 
-type Tab = "overview" | "recurring" | "bills" | "watch" | "payments" | "all";
+type Tab = "overview" | "recurring" | "bills" | "merchants" | "watch" | "payments" | "all";
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "recurring", label: "Recurring" },
   { id: "bills", label: "Bills check" },
+  { id: "merchants", label: "Merchants" },
   { id: "watch", label: "Watchlist" },
   { id: "payments", label: "Card payments" },
   { id: "all", label: "Transactions" },
@@ -42,14 +46,18 @@ export default function ActivityView({ onToast }: ActivityViewProps) {
   const [loading, setLoading] = useState(true);
   const [version, setVersion] = useState(0);
   const [editing, setEditing] = useState<Transaction | null>(null);
+  const [payees, setPayees] = useState<Payee[]>([]);
+  const [openPayee, setOpenPayee] = useState<string | null>(null);
+  const [merging, setMerging] = useState<{ members: MergeMember[]; name?: string } | null>(null);
 
   const reload = useCallback(() => setVersion((v) => v + 1), []);
 
   useEffect(() => {
-    Promise.all([api.transactions.insights(month), api.transactions.accounts()])
-      .then(([i, a]) => {
+    Promise.all([api.transactions.insights(month), api.transactions.accounts(), api.payees.list()])
+      .then(([i, a, p]) => {
         setInsights(i);
         setAccounts(a);
+        setPayees(p);
       })
       .catch((err) => onToast(err instanceof Error ? err.message : "Failed to load", true))
       .finally(() => setLoading(false));
@@ -66,9 +74,21 @@ export default function ActivityView({ onToast }: ActivityViewProps) {
 
   const accountName = useMemo(() => new Map(accounts.map((a) => [a.id, a.name])), [accounts]);
   const categories = useMemo(
-    () => [...new Set((insights?.byCategory ?? []).map((c) => c.category).concat("Uncategorized"))].sort(),
-    [insights]
+    () =>
+      [
+        ...new Set(
+          (insights?.byCategory ?? [])
+            .map((c) => c.category)
+            .concat(payees.map((p) => p.category ?? "").filter(Boolean))
+            .concat("Uncategorized")
+        ),
+      ].sort(),
+    [insights, payees]
   );
+  const mergeFromRecurring = useCallback((r: RecurringCharge) => {
+    if (r.payeeId) setOpenPayee(r.payeeId);
+    else setMerging({ members: [{ key: r.key, name: r.merchant, count: r.count }], name: r.merchant });
+  }, []);
 
   if (loading) return <LoadingState />;
 
@@ -116,7 +136,16 @@ export default function ActivityView({ onToast }: ActivityViewProps) {
           </div>
 
           {tab === "overview" && <Overview insights={insights!} />}
-          {tab === "recurring" && <Recurring items={insights!.recurring} asOf={insights!.asOf} />}
+          {tab === "recurring" && <Recurring items={insights!.recurring} asOf={insights!.asOf} onPayee={mergeFromRecurring} />}
+          {tab === "merchants" && (
+            <MerchantsTab
+              payees={payees}
+              version={version}
+              onOpenPayee={setOpenPayee}
+              onMerge={(members, name) => setMerging({ members, name })}
+              onToast={onToast}
+            />
+          )}
           {tab === "bills" && <BillsCheck insights={insights!} />}
           {tab === "watch" && <Watchlist insights={insights!} accountName={accountName} onEdit={setEditing} />}
           {tab === "payments" && <Payments insights={insights!} />}
@@ -134,9 +163,26 @@ export default function ActivityView({ onToast }: ActivityViewProps) {
 
       <TransactionEditModal
         txn={editing}
+        payees={payees}
         categories={categories}
         onClose={() => setEditing(null)}
         onSaved={reload}
+        onToast={onToast}
+      />
+      <PayeeModal
+        payeeId={openPayee}
+        categories={categories}
+        onClose={() => setOpenPayee(null)}
+        onChanged={reload}
+        onToast={onToast}
+      />
+      <MergeModal
+        members={merging?.members ?? null}
+        suggestedName={merging?.name}
+        payees={payees}
+        categories={categories}
+        onClose={() => setMerging(null)}
+        onDone={reload}
         onToast={onToast}
       />
     </div>
@@ -250,7 +296,7 @@ function Overview({ insights }: { insights: Insights }) {
 
 type RecurringFilter = "all" | "changed" | "late" | "unlisted";
 
-function Recurring({ items, asOf }: { items: RecurringCharge[]; asOf: string }) {
+function Recurring({ items, asOf, onPayee }: { items: RecurringCharge[]; asOf: string; onPayee: (r: RecurringCharge) => void }) {
   const [filter, setFilter] = useState<RecurringFilter>("all");
   const [openKey, setOpenKey] = useState<string | null>(null);
 
@@ -324,6 +370,13 @@ function Recurring({ items, asOf }: { items: RecurringCharge[]; asOf: string }) 
                 </div>
               </div>
               {openKey === r.key && (
+                <div className="mt-3 flex justify-end">
+                  <button className="btn btn-sm" onClick={(e) => { e.stopPropagation(); onPayee(r); }}>
+                    {r.payeeId ? "Edit payee" : "Name this payee…"}
+                  </button>
+                </div>
+              )}
+              {openKey === r.key && (
                 <div className="mt-3 flex gap-1 items-end h-16" title="Recent charges">
                   {(() => {
                     const max = Math.max(...r.history.map((h) => h.amount), 1);
@@ -353,8 +406,8 @@ function BillsCheck({ insights }: { insights: Insights }) {
   return (
     <div>
       <p className="text-xs text-text-muted mb-4">
-        Each bill on your Bills list compared with its most recent real charge. Matching uses words from the bill's name.
-        If a bill shows "No charge found" but it does get charged, rename the bill or add a rule on the transaction so they line up.
+        Each bill on your Bills list compared with its most recent real charge. A bill linked to a payee (Merchants tab →
+        payee → Bill) matches exactly; the rest are matched by words in the bill's name.
       </p>
       {bills.length === 0 ? (
         <Empty>No bills on your Bills list yet.</Empty>
@@ -380,7 +433,8 @@ function BillsCheck({ insights }: { insights: Insights }) {
                     )}
                   </div>
                   <div className="text-[11px] text-text-muted mt-1">
-                    {b.frequency}{b.lastDate && <> · last charged {fmtDate(b.lastDate)}</>}
+                    {b.frequency}{b.linkedPayee ? <> · via {b.linkedPayee}</> : b.matched > 0 && <> · matched by name</>}
+                    {b.lastDate && <> · last charged {fmtDate(b.lastDate)}</>}
                     {b.avgAmount != null && b.matched > 1 && <> · avg {fmtP(b.avgAmount)}</>}
                   </div>
                 </div>

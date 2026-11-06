@@ -23,6 +23,17 @@ if (expenseCols.length && !expenseCols.some((c) => c.name === "updated_at")) {
   sqlite.exec("ALTER TABLE expenses ADD COLUMN updated_at TEXT");
 }
 
+// Columns added to transactions for payees
+const txnCols = sqlite.prepare("PRAGMA table_info(transactions)").all() as { name: string }[];
+if (txnCols.length) {
+  for (const [col, type] of [
+    ["base_merchant", "TEXT"], ["base_category", "TEXT"], ["base_kind", "TEXT"],
+    ["payee_id", "TEXT"], ["alias_id", "TEXT"], ["payee_locked", "INTEGER DEFAULT 0 NOT NULL"],
+  ]) {
+    if (!txnCols.some((c) => c.name === col)) sqlite.exec(`ALTER TABLE transactions ADD COLUMN ${col} ${type}`);
+  }
+}
+
 // Tables added after the initial `db:push`
 sqlite.exec(`
   CREATE TABLE IF NOT EXISTS goals (
@@ -78,6 +89,12 @@ sqlite.exec(`
     member TEXT,
     transfer_peer_id TEXT,
     edited INTEGER DEFAULT 0 NOT NULL,
+    base_merchant TEXT,
+    base_category TEXT,
+    base_kind TEXT,
+    payee_id TEXT,
+    alias_id TEXT,
+    payee_locked INTEGER DEFAULT 0 NOT NULL,
     raw TEXT,
     created_at TEXT NOT NULL
   );
@@ -85,6 +102,28 @@ sqlite.exec(`
   CREATE INDEX IF NOT EXISTS transactions_account_date ON transactions(account_id, date);
   CREATE INDEX IF NOT EXISTS transactions_batch ON transactions(batch_id);
   CREATE INDEX IF NOT EXISTS import_batches_hash ON import_batches(file_hash);
+
+  CREATE INDEX IF NOT EXISTS transactions_payee ON transactions(payee_id);
+
+  CREATE TABLE IF NOT EXISTS payees (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    category TEXT,
+    kind TEXT,
+    bill_id TEXT,
+    notes TEXT,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS payee_aliases (
+    id TEXT PRIMARY KEY NOT NULL,
+    payee_id TEXT NOT NULL,
+    pattern TEXT NOT NULL,
+    match TEXT DEFAULT 'contains' NOT NULL,
+    amount REAL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS payee_aliases_payee ON payee_aliases(payee_id);
 
   CREATE TABLE IF NOT EXISTS merchant_rules (
     id TEXT PRIMARY KEY NOT NULL,

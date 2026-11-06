@@ -10,6 +10,8 @@ import goalsRouter from "./routes/goals.js";
 import settingsRouter from "./routes/settings.js";
 import transactionsRouter from "./routes/transactions.js";
 import { watchStatements } from "./lib/statements/importer.js";
+import { migratePayees } from "./lib/statements/payees.js";
+import payeesRouter from "./routes/payees.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -51,6 +53,7 @@ app.use("/api/expenses", expensesRouter);
 app.use("/api/subscriptions", subscriptionsRouter);
 app.use("/api/goals", goalsRouter);
 app.use("/api/transactions", transactionsRouter);
+app.use("/api/payees", payeesRouter);
 app.use("/api", settingsRouter); // settings, dashboard, data routes
 
 // Serve frontend in production
@@ -72,5 +75,10 @@ app.listen(PORT, () => {
     console.log(`  ⚠️  No frontend build found. Run: cd frontend && pnpm build`);
   }
   console.log();
+  try {
+    migratePayees();
+  } catch (err) {
+    console.error(`Payee migration failed: ${(err as Error).message}`);
+  }
   watchStatements();
 });

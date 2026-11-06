@@ -63,3 +63,15 @@ export function Card({ title, extra, children }: { title: string; extra?: React.
 export function Empty({ children }: { children: React.ReactNode }) {
   return <div className="text-xs text-text-muted py-3">{children}</div>;
 }
+
+export const MATCH_LABELS: Record<import("../../types").AliasMatch, string> = {
+  contains: "Contains",
+  starts: "Starts with",
+  exact: "Is exactly",
+  merchant: "Bank name is",
+};
+
+/** Default alias text for a bank description: its start, before store numbers and reference codes */
+export function defaultPattern(description: string): string {
+  return description.replace(/\s+/g, " ").split(/ #| \d{3,}|\*/)[0].trim().slice(0, 40);
+}

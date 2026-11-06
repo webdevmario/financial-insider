@@ -12,13 +12,10 @@ import { homedir } from "os";
 import { basename, join, relative, resolve } from "path";
 import { and, eq, inArray, isNull, ne } from "drizzle-orm";
 import { db } from "../../db/index.js";
-import {
-  importBatches, merchantRules, statementAccounts, transactions,
-  type MerchantRule, type Transaction,
-} from "../../db/schema.js";
+import { importBatches, payees, statementAccounts, transactions, type Transaction } from "../../db/schema.js";
 import { today } from "../date.js";
-import { KINDS, parseStatement, UnrecognizedFormatError, type Kind, type ParsedRow } from "./formats.js";
-import { merchantKey } from "./merchant.js";
+import { parseStatement, UnrecognizedFormatError } from "./formats.js";
+import { recomputeAll } from "./payees.js";
 
 export function statementsDir(): string {
   return resolve(process.env.STATEMENTS_DIR || join(homedir(), "Documents", "finance-statements"));
@@ -45,91 +42,11 @@ export interface ImportResult {
   dateTo: string | null;
 }
 
-// ── Rules ─────────────────────────────────────────────────────────
-
-/** Longest pattern wins, so a specific rule beats a general one */
-function loadRules(): MerchantRule[] {
-  return db.select().from(merchantRules).all().sort((a, b) => b.pattern.length - a.pattern.length);
-}
-
-function ruleFor(rules: MerchantRule[], description: string, merchant: string): MerchantRule | undefined {
-  const d = description.toLowerCase();
-  const m = merchant.toLowerCase();
-  return rules.find((r) => {
-    const p = r.pattern.toLowerCase();
-    return d.includes(p) || m.includes(p);
-  });
-}
-
-function applyRule(row: ParsedRow, rule: MerchantRule | undefined) {
-  if (!rule) return { merchant: row.merchant, category: row.category, kind: row.kind, edited: 0 };
-  return {
-    merchant: rule.merchant || row.merchant,
-    category: rule.category || row.category,
-    kind: rule.kind && KINDS.includes(rule.kind as Kind) ? (rule.kind as Kind) : row.kind,
-    edited: 1,
-  };
-}
-
-/** Re-apply every rule to stored transactions (after a rule is added or removed) */
-export function reapplyRules(): number {
-  const rules = loadRules();
-  let changed = 0;
-  db.transaction((tx) => {
-    for (const t of tx.select().from(transactions).all()) {
-      const rule = ruleFor(rules, t.description, t.merchant);
-      if (!rule) continue;
-      const set: Partial<Transaction> = {};
-      if (rule.merchant && rule.merchant !== t.merchant) set.merchant = rule.merchant;
-      if (rule.category && rule.category !== t.category) set.category = rule.category;
-      if (rule.kind && rule.kind !== t.kind && KINDS.includes(rule.kind as Kind)) {
-        set.kind = rule.kind;
-        // A rule that says "not a transfer" breaks the pairing on both sides
-        if (t.transferPeerId && rule.kind !== "transfer") {
-          set.transferPeerId = null;
-          tx.update(transactions).set({ transferPeerId: null }).where(eq(transactions.id, t.transferPeerId)).run();
-        }
-      }
-      if (Object.keys(set).length) {
-        tx.update(transactions).set({ ...set, edited: 1 }).where(eq(transactions.id, t.id)).run();
-        changed++;
-      }
-    }
-  });
-  pairTransfers();
-  return changed;
-}
-
 // ── Import ────────────────────────────────────────────────────────
-
-/**
- * Banks without categories (Amex, Ally) borrow one from the same merchant seen on
- * another card: the most common category it has there. Rows edited by hand are left alone.
- */
-function fillCategories() {
-  const all = db.select({ id: transactions.id, merchant: transactions.merchant, category: transactions.category, edited: transactions.edited }).from(transactions).all();
-  const counts = new Map<string, Map<string, number>>();
-  for (const t of all) {
-    if (t.category === "Uncategorized" || t.category === "Transfer") continue;
-    const k = merchantKey(t.merchant);
-    const m = counts.get(k) ?? counts.set(k, new Map()).get(k)!;
-    m.set(t.category, (m.get(t.category) || 0) + 1);
-  }
-  db.transaction((tx) => {
-    for (const t of all) {
-      if (t.category !== "Uncategorized" || t.edited) continue;
-      const m = counts.get(merchantKey(t.merchant));
-      if (!m) continue;
-      const best = [...m].sort((a, b) => b[1] - a[1])[0][0];
-      tx.update(transactions).set({ category: best }).where(eq(transactions.id, t.id)).run();
-    }
-  });
-}
 
 export function importCsv(text: string, fileName: string, sourcePath: string | null = null): ImportResult {
   const parsed = parseStatement(text, fileName);
   const { account, rows } = parsed;
-  const rules = loadRules();
   const now = new Date().toISOString();
   const batchId = newId();
 
@@ -140,7 +57,6 @@ export function importCsv(text: string, fileName: string, sourcePath: string | n
     const key = `${account.id}|${row.date}|${row.amount.toFixed(2)}|${row.description}|${row.uniq}`;
     const n = seen.get(key) ?? 0;
     seen.set(key, n + 1);
-    const applied = applyRule(row, ruleFor(rules, row.description, row.merchant));
     return {
       id: sha256(`${key}|${n}`).slice(0, 24),
       accountId: account.id,
@@ -150,12 +66,18 @@ export function importCsv(text: string, fileName: string, sourcePath: string | n
       month: row.date.slice(0, 7),
       amount: row.amount,
       description: row.description,
-      merchant: applied.merchant,
-      category: applied.category,
-      kind: applied.kind,
+      merchant: row.merchant,
+      category: row.category,
+      kind: row.kind,
       member: row.member,
       transferPeerId: null,
-      edited: applied.edited,
+      edited: 0,
+      baseMerchant: row.merchant,
+      baseCategory: row.category,
+      baseKind: row.kind,
+      payeeId: null,
+      aliasId: null,
+      payeeLocked: 0,
       raw: JSON.stringify(row.raw),
       createdAt: now,
     };
@@ -191,8 +113,9 @@ export function importCsv(text: string, fileName: string, sourcePath: string | n
       .run();
   });
 
+  // Payees first (they can say what is or isn't a transfer), then pair transfers
+  recomputeAll();
   pairTransfers();
-  fillCategories();
 
   const name = db.select().from(statementAccounts).where(eq(statementAccounts.id, account.id)).get()?.name;
   return {
@@ -261,6 +184,10 @@ export function pairTransfers(): number {
     (byAmount.get(k) ?? byAmount.set(k, []).get(k)!).push(t);
   }
 
+  // A payee that says "this is spending" (or income…) keeps its rows out of pairing
+  const notTransfer = new Set(
+    db.select().from(payees).all().filter((p) => p.kind && p.kind !== "transfer").map((p) => p.id)
+  );
   const used = new Set<string>();
   const pairs: [Transaction, Transaction][] = [];
   const anchors = open.filter((t) => t.kind === "transfer").sort((a, b) => a.date.localeCompare(b.date));
@@ -274,7 +201,7 @@ export function pairTransfers(): number {
         b.accountId !== a.accountId &&
         Math.sign(b.amount) === -Math.sign(a.amount) &&
         Math.abs(dayNumber(b.date) - dayNumber(a.date)) <= PAIR_WINDOW_DAYS &&
-        (b.kind === "transfer" || (!b.edited && PAYMENT_LIKE.test(b.description)))
+        (b.kind === "transfer" || (!b.edited && !(b.payeeId && notTransfer.has(b.payeeId)) && PAYMENT_LIKE.test(b.description)))
     );
     if (!candidates.length) continue;
     // Prefer rows already marked as transfers, then the closest date

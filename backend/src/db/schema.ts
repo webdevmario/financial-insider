@@ -99,12 +99,41 @@ export const transactions = sqliteTable("transactions", {
   kind: text("kind").notNull(), // spend | income | refund | transfer | fee | interest
   member: text("member"), // Card member / purchased by, when the bank says
   transferPeerId: text("transfer_peer_id"), // The other side of a transfer between your own accounts
-  edited: integer("edited").notNull().default(0), // 1 once changed by hand or by a rule: auto-detection leaves it alone
+  edited: integer("edited").notNull().default(0), // 1 once category/kind were changed by hand on this transaction
+  // What the importer read from the bank, before payees: merchant/category/kind above are
+  // recomputed from these plus the matching payee whenever payees or aliases change
+  baseMerchant: text("base_merchant"),
+  baseCategory: text("base_category"),
+  baseKind: text("base_kind"),
+  payeeId: text("payee_id"),
+  aliasId: text("alias_id"), // The alias that matched, if any
+  payeeLocked: integer("payee_locked").notNull().default(0), // 1 = payee picked by hand for this transaction
   raw: text("raw"), // Original CSV row as JSON
   createdAt: text("created_at").notNull(),
 });
 
-// ── Merchant rules (teach the importer) ────────────────────────────
+// ── Payees (one final name for everything that's really the same merchant) ──
+export const payees = sqliteTable("payees", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  category: text("category"), // Default category for its transactions
+  kind: text("kind"), // Default kind (spend, income, transfer, ...)
+  billId: text("bill_id"), // Linked bill on the Bills list
+  notes: text("notes"),
+  createdAt: text("created_at").notNull(),
+});
+
+// Any statement text that means this payee
+export const payeeAliases = sqliteTable("payee_aliases", {
+  id: text("id").primaryKey(),
+  payeeId: text("payee_id").notNull(),
+  pattern: text("pattern").notNull(),
+  match: text("match").notNull().default("contains"), // contains | starts | exact | merchant
+  amount: real("amount"), // Only match charges of exactly this amount (e.g. Amazon at $14.99 = Prime)
+  createdAt: text("created_at").notNull(),
+});
+
+// ── Merchant rules (replaced by payees; migrated on startup, kept for reference) ──
 // Any transaction whose description contains `pattern` (case-insensitive) gets these values
 export const merchantRules = sqliteTable("merchant_rules", {
   id: text("id").primaryKey(),
@@ -136,3 +165,5 @@ export type ImportBatch = typeof importBatches.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
 export type NewTransaction = typeof transactions.$inferInsert;
 export type MerchantRule = typeof merchantRules.$inferSelect;
+export type Payee = typeof payees.$inferSelect;
+export type PayeeAlias = typeof payeeAliases.$inferSelect;
