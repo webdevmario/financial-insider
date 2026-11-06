@@ -123,7 +123,7 @@ export default function ImportPanel({ onToast, onChanged }: ImportPanelProps) {
         <div className="min-w-0 flex-1">
           <div className="text-sm font-medium">Statements folder</div>
           <div className="text-[11px] text-text-muted truncate" title={folder}>
-            Drop bank CSVs or Ally PDF statements into <span className="font-mono text-text-dim">{folder || "…"}</span> or onto this box. They're picked up automatically.
+            Drop bank CSVs or PDF statements (Ally, Chase, Apple Card, Amex) into <span className="font-mono text-text-dim">{folder || "…"}</span> or onto this box. They're picked up automatically.
             {lastImport && <> · Last import {fmtDate(lastImport.importedAt.slice(0, 10))}</>}
           </div>
         </div>

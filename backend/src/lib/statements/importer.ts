@@ -63,6 +63,44 @@ function csvCoverage(accountId: string): [string, string][] {
     .map((b) => [b.dateFrom!, b.dateTo!]);
 }
 
+/** Rows from an account's CSV imports on the given days */
+function csvRowsOn(accountId: string, dates: string[]): { date: string; amount: number }[] {
+  if (!dates.length) return [];
+  const csvBatches = db
+    .select({ id: importBatches.id, format: importBatches.format })
+    .from(importBatches)
+    .where(and(eq(importBatches.accountId, accountId), eq(importBatches.status, "imported")))
+    .all()
+    .filter((b) => !isPdfFormat(b.format))
+    .map((b) => b.id);
+  if (!csvBatches.length) return [];
+  return db
+    .select({ date: transactions.date, amount: transactions.amount })
+    .from(transactions)
+    .where(and(eq(transactions.accountId, accountId), inArray(transactions.batchId, csvBatches), inArray(transactions.date, [...new Set(dates)])))
+    .all();
+}
+
+/** Takes one row with the same date and amount out of `pool`, if there is one */
+function claim(pool: { date: string; amount: number }[], row: { date: string; amount: number }): boolean {
+  const i = pool.findIndex((p) => p.date === row.date && Math.abs(p.amount - row.amount) < 0.005);
+  if (i < 0) return false;
+  pool.splice(i, 1);
+  return true;
+}
+
+/**
+ * Amex prints a new account ending after a card is replaced, though it's the same account with
+ * one continuous balance. With a single Amex account on file, statements for a new ending go there.
+ */
+function sameAccount(account: AccountInfo): AccountInfo {
+  if (account.institution !== "Amex") return account;
+  const amex = db.select().from(statementAccounts).where(eq(statementAccounts.institution, "Amex")).all();
+  if (amex.length !== 1 || amex[0].id === account.id) return account;
+  const a = amex[0];
+  return { id: a.id, institution: a.institution, name: a.name, kind: a.kind as AccountInfo["kind"], last4: a.last4 };
+}
+
 /**
  * Store one account's rows from one file as one import batch.
  * PDF rows inside a CSV-covered range are skipped; a CSV replaces PDF rows in its range,
@@ -78,7 +116,12 @@ function storeRows(
   const batchId = newId();
   const fromPdf = isPdfFormat(format);
   const covered = fromPdf ? csvCoverage(account.id) : [];
-  const keep = fromPdf ? rows.filter((r) => !covered.some(([a, b]) => r.date >= a && r.date <= b)) : rows;
+  const inside = (d: string) => covered.some(([a, b]) => d >= a && d <= b);
+  // A CSV's first and last day may be partial (a download that starts mid-day, a charge that posted
+  // after the cutoff), so on those days a PDF row only gives way to a CSV row with the same amount
+  const edge = (d: string) => inside(d) && !covered.some(([a, b]) => d > a && d < b);
+  const onEdges = fromPdf ? csvRowsOn(account.id, rows.map((r) => r.date).filter(edge)) : [];
+  const keep = fromPdf ? rows.filter((r) => !inside(r.date) || (edge(r.date) && !claim(onEdges, r))) : rows;
 
   // Identical rows in one file (two $5 coffees the same day) get an occurrence number,
   // so they stay separate here but still match the same rows in an overlapping download
@@ -131,11 +174,14 @@ function storeRows(
         .filter((b) => isPdfFormat(b.format))
         .map((b) => b.id);
       if (pdfBatches.length) {
+        // Whole days inside the CSV's range go; on its first and last day only the rows it also has
+        const mine = keep.map((r) => ({ date: r.date, amount: r.amount }));
         const stale = tx
-          .select({ id: transactions.id })
+          .select({ id: transactions.id, date: transactions.date, amount: transactions.amount })
           .from(transactions)
           .where(and(eq(transactions.accountId, account.id), inArray(transactions.batchId, pdfBatches), gte(transactions.date, dateFrom), lte(transactions.date, dateTo)))
           .all()
+          .filter((r) => (r.date !== dateFrom && r.date !== dateTo) || claim(mine, r))
           .map((r) => r.id);
         if (stale.length) {
           tx.update(transactions).set({ transferPeerId: null }).where(inArray(transactions.transferPeerId, stale)).run();
@@ -197,7 +243,7 @@ export function importCsv(text: string, fileName: string, sourcePath: string | n
 export async function importPdf(data: Uint8Array, fileName: string, sourcePath: string | null, fileHash: string): Promise<ImportResult[]> {
   const parsed = parsePdfStatement(await extractPdfLines(data));
   const results = parsed.sections.map((s) =>
-    storeRows(s.account, parsed.format, s.rows, {
+    storeRows(sameAccount(s.account), parsed.format, s.rows, {
       fileName: parsed.sections.length > 1 ? `${fileName} · ${s.account.name}` : fileName,
       sourcePath,
       fileHash,
@@ -317,6 +363,7 @@ export interface ScanResult {
 
 let lastScan: ScanResult | null = null;
 let scanning = false;
+let rescanWanted = false;
 
 export function lastScanResult() {
   return lastScan;
@@ -345,7 +392,11 @@ const isPdfPath = (p: string) => /\.pdf$/i.test(p);
 export async function scanStatements({ fresh = false } = {}): Promise<ScanResult> {
   const folder = statementsDir();
   const result: ScanResult = { scannedAt: new Date().toISOString(), folder, imported: [], skipped: 0, unrecognized: [] };
-  if (scanning) return lastScan ?? result;
+  if (scanning) {
+    // Files that land mid-scan (a big folder copy) get a second pass once this one finishes
+    rescanWanted = true;
+    return lastScan ?? result;
+  }
   scanning = true;
   try {
     mkdirSync(folder, { recursive: true });
@@ -387,6 +438,12 @@ export async function scanStatements({ fresh = false } = {}): Promise<ScanResult
     scanning = false;
   }
   lastScan = result;
+  if (rescanWanted) {
+    rescanWanted = false;
+    setTimeout(() => {
+      scanStatements().catch((err) => console.error(`${new Date().toISOString()} Statements scan failed: ${(err as Error).message}`));
+    }, 2000);
+  }
   return result;
 }
 
