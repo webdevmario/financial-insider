@@ -18,6 +18,14 @@ function describeScan(r: ScanResult): string {
   return parts.join(" · ");
 }
 
+/** File → base64 (no data: prefix), in chunks so large PDFs don't overflow the call stack */
+async function toBase64(file: File): Promise<string> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(binary);
+}
+
 export default function ImportPanel({ onToast, onChanged }: ImportPanelProps) {
   const [folder, setFolder] = useState("");
   const [batches, setBatches] = useState<ImportBatch[]>([]);
@@ -61,14 +69,16 @@ export default function ImportPanel({ onToast, onChanged }: ImportPanelProps) {
   }
 
   async function upload(files: FileList | File[]) {
-    const list = [...files].filter((f) => /\.csv$/i.test(f.name));
-    if (!list.length) return onToast("Choose a .csv file", true);
+    const list = [...files].filter((f) => /\.(csv|pdf)$/i.test(f.name));
+    if (!list.length) return onToast("Choose a .csv or .pdf statement", true);
     setBusy(true);
     try {
       let last: ScanResult | null = null;
       const combined: ScanResult = { scannedAt: "", folder, imported: [], skipped: 0, unrecognized: [] };
       for (const f of list) {
-        last = await api.transactions.upload(f.name, await f.text());
+        last = /\.pdf$/i.test(f.name)
+          ? await api.transactions.upload(f.name, await toBase64(f), "base64")
+          : await api.transactions.upload(f.name, await f.text());
         combined.imported.push(...last.imported);
         combined.unrecognized.push(...last.unrecognized);
       }
@@ -113,7 +123,7 @@ export default function ImportPanel({ onToast, onChanged }: ImportPanelProps) {
         <div className="min-w-0 flex-1">
           <div className="text-sm font-medium">Statements folder</div>
           <div className="text-[11px] text-text-muted truncate" title={folder}>
-            Drop bank CSVs into <span className="font-mono text-text-dim">{folder || "…"}</span> or onto this box. They're picked up automatically.
+            Drop bank CSVs or Ally PDF statements into <span className="font-mono text-text-dim">{folder || "…"}</span> or onto this box. They're picked up automatically.
             {lastImport && <> · Last import {fmtDate(lastImport.importedAt.slice(0, 10))}</>}
           </div>
         </div>
@@ -121,12 +131,12 @@ export default function ImportPanel({ onToast, onChanged }: ImportPanelProps) {
           <button className="btn btn-sm" onClick={() => setOpen((o) => !o)}>
             {open ? "Hide imports" : `Imports (${batches.length})`}
           </button>
-          <button className="btn btn-sm" disabled={busy} onClick={() => fileRef.current?.click()}>Upload CSV</button>
+          <button className="btn btn-sm" disabled={busy} onClick={() => fileRef.current?.click()}>Upload file</button>
           <button className="btn btn-sm btn-primary" disabled={busy} onClick={scan}>{busy ? "Working…" : "Scan folder"}</button>
           <input
             ref={fileRef}
             type="file"
-            accept=".csv,text/csv"
+            accept=".csv,text/csv,.pdf,application/pdf"
             multiple
             className="hidden"
             onChange={(e) => { if (e.target.files) upload(e.target.files); e.target.value = ""; }}

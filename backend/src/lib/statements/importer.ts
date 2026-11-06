@@ -10,11 +10,13 @@ import { createHash } from "crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, watch, writeFileSync } from "fs";
 import { homedir } from "os";
 import { basename, join, relative, resolve } from "path";
-import { and, eq, inArray, isNull, ne } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lte, ne } from "drizzle-orm";
 import { db } from "../../db/index.js";
 import { importBatches, payees, statementAccounts, transactions, type Transaction } from "../../db/schema.js";
 import { today } from "../date.js";
-import { parseStatement, UnrecognizedFormatError } from "./formats.js";
+import { parseStatement, UnrecognizedFormatError, type AccountInfo, type ParsedRow } from "./formats.js";
+import { extractPdfLines } from "./pdf.js";
+import { parsePdfStatement, StatementCheckError, UnrecognizedPdfError } from "./pdfFormats.js";
 import { recomputeAll } from "./payees.js";
 
 export function statementsDir(): string {
@@ -38,22 +40,50 @@ export interface ImportResult {
   rowCount: number;
   inserted: number;
   duplicates: number;
+  /** PDF rows skipped because a CSV already covers those days */
+  covered?: number;
+  /** PDF rows this CSV replaced */
+  replaced?: number;
   dateFrom: string | null;
   dateTo: string | null;
 }
 
 // ── Import ────────────────────────────────────────────────────────
 
-export function importCsv(text: string, fileName: string, sourcePath: string | null = null): ImportResult {
-  const parsed = parseStatement(text, fileName);
-  const { account, rows } = parsed;
+const isPdfFormat = (format: string) => format.endsWith("-pdf");
+
+/** Date ranges an account's CSV imports cover; CSVs are the source of truth there */
+function csvCoverage(accountId: string): [string, string][] {
+  return db
+    .select()
+    .from(importBatches)
+    .where(and(eq(importBatches.accountId, accountId), eq(importBatches.status, "imported")))
+    .all()
+    .filter((b) => !isPdfFormat(b.format) && b.dateFrom && b.dateTo)
+    .map((b) => [b.dateFrom!, b.dateTo!]);
+}
+
+/**
+ * Store one account's rows from one file as one import batch.
+ * PDF rows inside a CSV-covered range are skipped; a CSV replaces PDF rows in its range,
+ * so the result is the same whichever file arrives first.
+ */
+function storeRows(
+  account: AccountInfo,
+  format: string,
+  rows: ParsedRow[],
+  file: { fileName: string; sourcePath: string | null; fileHash: string }
+): ImportResult {
   const now = new Date().toISOString();
   const batchId = newId();
+  const fromPdf = isPdfFormat(format);
+  const covered = fromPdf ? csvCoverage(account.id) : [];
+  const keep = fromPdf ? rows.filter((r) => !covered.some(([a, b]) => r.date >= a && r.date <= b)) : rows;
 
   // Identical rows in one file (two $5 coffees the same day) get an occurrence number,
   // so they stay separate here but still match the same rows in an overlapping download
   const seen = new Map<string, number>();
-  const records = rows.map((row) => {
+  const records = keep.map((row) => {
     const key = `${account.id}|${row.date}|${row.amount.toFixed(2)}|${row.description}|${row.uniq}`;
     const n = seen.get(key) ?? 0;
     seen.set(key, n + 1);
@@ -83,53 +113,98 @@ export function importCsv(text: string, fileName: string, sourcePath: string | n
     };
   });
 
-  const dates = records.map((r) => r.date).sort();
+  const dates = rows.map((r) => r.date).sort();
+  const dateFrom = dates[0] ?? null;
+  const dateTo = dates[dates.length - 1] ?? null;
   let inserted = 0;
+  let replaced = 0;
 
   db.transaction((tx) => {
-    tx.insert(statementAccounts)
-      .values({ ...account, createdAt: today() })
-      .onConflictDoNothing()
-      .run();
-    for (const r of records) {
-      inserted += tx.insert(transactions).values(r).onConflictDoNothing().run().changes;
+    tx.insert(statementAccounts).values({ ...account, createdAt: today() }).onConflictDoNothing().run();
+    if (!fromPdf && dateFrom && dateTo) {
+      // This CSV supersedes rows read from PDF statements for the same days
+      const pdfBatches = tx
+        .select({ id: importBatches.id, format: importBatches.format })
+        .from(importBatches)
+        .where(eq(importBatches.accountId, account.id))
+        .all()
+        .filter((b) => isPdfFormat(b.format))
+        .map((b) => b.id);
+      if (pdfBatches.length) {
+        const stale = tx
+          .select({ id: transactions.id })
+          .from(transactions)
+          .where(and(eq(transactions.accountId, account.id), inArray(transactions.batchId, pdfBatches), gte(transactions.date, dateFrom), lte(transactions.date, dateTo)))
+          .all()
+          .map((r) => r.id);
+        if (stale.length) {
+          tx.update(transactions).set({ transferPeerId: null }).where(inArray(transactions.transferPeerId, stale)).run();
+          replaced = tx.delete(transactions).where(inArray(transactions.id, stale)).run().changes;
+        }
+      }
     }
+    for (const r of records) inserted += tx.insert(transactions).values(r).onConflictDoNothing().run().changes;
     tx.insert(importBatches)
       .values({
         id: batchId,
-        fileName,
-        sourcePath,
-        fileHash: sha256(text),
+        fileName: file.fileName,
+        sourcePath: file.sourcePath,
+        fileHash: file.fileHash,
         status: "imported",
-        format: parsed.format,
+        format,
         accountId: account.id,
-        rowCount: records.length,
+        rowCount: rows.length,
         inserted,
-        duplicates: records.length - inserted,
-        dateFrom: dates[0] ?? null,
-        dateTo: dates[dates.length - 1] ?? null,
+        duplicates: rows.length - inserted,
+        dateFrom,
+        dateTo,
         importedAt: now,
       })
       .run();
   });
 
-  // Payees first (they can say what is or isn't a transfer), then pair transfers
-  recomputeAll();
-  pairTransfers();
-
   const name = db.select().from(statementAccounts).where(eq(statementAccounts.id, account.id)).get()?.name;
   return {
     batchId,
-    fileName,
-    format: parsed.format,
+    fileName: file.fileName,
+    format,
     accountId: account.id,
     accountName: name || account.name,
-    rowCount: records.length,
+    rowCount: rows.length,
     inserted,
-    duplicates: records.length - inserted,
-    dateFrom: dates[0] ?? null,
-    dateTo: dates[dates.length - 1] ?? null,
+    duplicates: rows.length - inserted,
+    covered: rows.length - keep.length,
+    replaced,
+    dateFrom,
+    dateTo,
   };
+}
+
+/** Payees first (they can say what is or isn't a transfer), then pair transfers */
+function settle() {
+  recomputeAll();
+  pairTransfers();
+}
+
+export function importCsv(text: string, fileName: string, sourcePath: string | null = null): ImportResult {
+  const parsed = parseStatement(text, fileName);
+  const result = storeRows(parsed.account, parsed.format, parsed.rows, { fileName, sourcePath, fileHash: sha256(text) });
+  settle();
+  return result;
+}
+
+/** One PDF statement can hold several accounts (Ally: checking + savings): one batch each */
+export async function importPdf(data: Uint8Array, fileName: string, sourcePath: string | null, fileHash: string): Promise<ImportResult[]> {
+  const parsed = parsePdfStatement(await extractPdfLines(data));
+  const results = parsed.sections.map((s) =>
+    storeRows(s.account, parsed.format, s.rows, {
+      fileName: parsed.sections.length > 1 ? `${fileName} · ${s.account.name}` : fileName,
+      sourcePath,
+      fileHash,
+    })
+  );
+  settle();
+  return results;
 }
 
 /** Remove the transactions a batch added; the folder scan then skips that file */
@@ -247,21 +322,27 @@ export function lastScanResult() {
   return lastScan;
 }
 
-/** CSV files under the folder, a few levels deep, skipping hidden files and partial downloads */
-function listCsvFiles(dir: string, depth = 0): string[] {
+/** Statement files (CSV, PDF) under the folder, a few levels deep, skipping hidden files */
+function listStatementFiles(dir: string, depth = 0): string[] {
   if (depth > 3 || !existsSync(dir)) return [];
   const out: string[] = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (entry.name.startsWith(".")) continue;
     const full = join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...listCsvFiles(full, depth + 1));
-    else if (entry.isFile() && /\.csv$/i.test(entry.name)) out.push(full);
+    if (entry.isDirectory()) out.push(...listStatementFiles(full, depth + 1));
+    else if (entry.isFile() && /\.(csv|pdf)$/i.test(entry.name)) out.push(full);
   }
-  return out.sort();
+  return out;
 }
 
-/** `fresh: true` skips the "still downloading" check, for a file we just wrote ourselves */
-export function scanStatements({ fresh = false } = {}): ScanResult {
+const isPdfPath = (p: string) => /\.pdf$/i.test(p);
+
+/**
+ * Import every file not seen before. CSVs go first: where a CSV and a PDF statement cover
+ * the same days, the CSV is the source of truth. `fresh: true` skips the "still downloading"
+ * check, for a file we just wrote ourselves.
+ */
+export async function scanStatements({ fresh = false } = {}): Promise<ScanResult> {
   const folder = statementsDir();
   const result: ScanResult = { scannedAt: new Date().toISOString(), folder, imported: [], skipped: 0, unrecognized: [] };
   if (scanning) return lastScan ?? result;
@@ -269,27 +350,38 @@ export function scanStatements({ fresh = false } = {}): ScanResult {
   try {
     mkdirSync(folder, { recursive: true });
     const known = new Set(db.select({ h: importBatches.fileHash }).from(importBatches).all().map((r) => r.h));
-    for (const path of listCsvFiles(folder)) {
+    const files = listStatementFiles(folder).sort((a, b) => Number(isPdfPath(a)) - Number(isPdfPath(b)) || a.localeCompare(b));
+    for (const path of files) {
       // A file still being written by the browser: catch it on the next scan
       if (!fresh && Date.now() - statSync(path).mtimeMs < 1500) continue;
-      const text = readFileSync(path, "utf8");
-      const hash = sha256(text);
+      const bytes = readFileSync(path);
+      const hash = createHash("sha256").update(bytes).digest("hex");
       if (known.has(hash)) {
         result.skipped++;
         continue;
       }
+      const rel = relative(folder, path);
       try {
-        result.imported.push(importCsv(text, basename(path), relative(folder, path)));
+        if (isPdfPath(path)) result.imported.push(...(await importPdf(new Uint8Array(bytes), basename(path), rel, hash)));
+        else result.imported.push(importCsv(bytes.toString("utf8"), basename(path), rel));
         known.add(hash);
       } catch (err) {
+        const known = err instanceof UnrecognizedFormatError || err instanceof UnrecognizedPdfError || err instanceof StatementCheckError;
         result.unrecognized.push({
-          file: relative(folder, path),
-          error: err instanceof UnrecognizedFormatError ? err.message : `Import failed: ${(err as Error).message}`,
+          file: rel,
+          error: err instanceof StatementCheckError
+            ? `Statement didn't add up, nothing imported: ${err.message}`
+            : known ? (err as Error).message : `Import failed: ${(err as Error).message}`,
         });
       }
     }
     for (const r of result.imported) {
-      console.log(`${new Date().toISOString()} Imported ${r.fileName}: ${r.inserted} new, ${r.duplicates} already had (${r.accountName})`);
+      const extra = [r.covered ? `${r.covered} skipped (CSV has those days)` : "", r.replaced ? `${r.replaced} PDF rows replaced` : ""].filter(Boolean).join(", ");
+      console.log(`${new Date().toISOString()} Imported ${r.fileName}: ${r.inserted} new, ${r.duplicates} already had${extra ? `, ${extra}` : ""} (${r.accountName})`);
+    }
+    // PDFs from banks without a reader yet are listed in the app, not logged on every scan
+    for (const u of result.unrecognized) {
+      if (!u.error.startsWith("Not a statement")) console.log(`${new Date().toISOString()} Not imported ${u.file}: ${u.error}`);
     }
   } finally {
     scanning = false;
@@ -298,13 +390,14 @@ export function scanStatements({ fresh = false } = {}): ScanResult {
   return result;
 }
 
-/** Save an uploaded CSV into the folder's uploads/ subfolder and import it */
-export function saveUpload(fileName: string, text: string): ScanResult {
+/** Save an uploaded statement (CSV text, or a PDF as base64) into uploads/ and import it */
+export async function saveUpload(fileName: string, content: string, encoding: "utf8" | "base64" = "utf8"): Promise<ScanResult> {
   const dir = join(statementsDir(), "uploads");
   mkdirSync(dir, { recursive: true });
   const safe = basename(fileName).replace(/[^\w .()-]/g, "_") || "upload.csv";
+  const ext = /\.(csv|pdf)$/i.test(safe) ? "" : encoding === "base64" ? ".pdf" : ".csv";
   const stamp = new Date().toISOString().replace(/[:T]/g, "-").slice(0, 19);
-  writeFileSync(join(dir, `${stamp} ${/\.csv$/i.test(safe) ? safe : `${safe}.csv`}`), text);
+  writeFileSync(join(dir, `${stamp} ${safe}${ext}`), encoding === "base64" ? Buffer.from(content, "base64") : content);
   return scanStatements({ fresh: true });
 }
 
@@ -323,11 +416,9 @@ export function watchStatements() {
     return;
   }
   const run = () => {
-    try {
-      scanStatements();
-    } catch (err) {
+    scanStatements().catch((err) => {
       console.error(`${new Date().toISOString()} Statements scan failed: ${(err as Error).message}`);
-    }
+    });
   };
   let timer: NodeJS.Timeout | null = null;
   const schedule = (delay: number) => {
