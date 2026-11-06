@@ -5,7 +5,8 @@ import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const dbPath = resolve(__dirname, "../../../data/finance.db");
+// DB_PATH lets a test run point at a scratch database instead of the real one
+const dbPath = process.env.DB_PATH || resolve(__dirname, "../../../data/finance.db");
 
 const sqlite = new Database(dbPath);
 
@@ -35,7 +36,64 @@ sqlite.exec(`
     history TEXT,
     completed_at TEXT,
     created_at TEXT NOT NULL
-  )
+  );
+
+  CREATE TABLE IF NOT EXISTS statement_accounts (
+    id TEXT PRIMARY KEY NOT NULL,
+    institution TEXT NOT NULL,
+    name TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    last4 TEXT,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS import_batches (
+    id TEXT PRIMARY KEY NOT NULL,
+    file_name TEXT NOT NULL,
+    source_path TEXT,
+    file_hash TEXT NOT NULL,
+    status TEXT DEFAULT 'imported' NOT NULL,
+    format TEXT NOT NULL,
+    account_id TEXT NOT NULL,
+    row_count INTEGER NOT NULL,
+    inserted INTEGER NOT NULL,
+    duplicates INTEGER NOT NULL,
+    date_from TEXT,
+    date_to TEXT,
+    imported_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS transactions (
+    id TEXT PRIMARY KEY NOT NULL,
+    account_id TEXT NOT NULL,
+    batch_id TEXT NOT NULL,
+    date TEXT NOT NULL,
+    posted_date TEXT,
+    month TEXT NOT NULL,
+    amount REAL NOT NULL,
+    description TEXT NOT NULL,
+    merchant TEXT NOT NULL,
+    category TEXT DEFAULT 'Uncategorized' NOT NULL,
+    kind TEXT NOT NULL,
+    member TEXT,
+    transfer_peer_id TEXT,
+    edited INTEGER DEFAULT 0 NOT NULL,
+    raw TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS transactions_month ON transactions(month);
+  CREATE INDEX IF NOT EXISTS transactions_account_date ON transactions(account_id, date);
+  CREATE INDEX IF NOT EXISTS transactions_batch ON transactions(batch_id);
+  CREATE INDEX IF NOT EXISTS import_batches_hash ON import_batches(file_hash);
+
+  CREATE TABLE IF NOT EXISTS merchant_rules (
+    id TEXT PRIMARY KEY NOT NULL,
+    pattern TEXT NOT NULL,
+    merchant TEXT,
+    category TEXT,
+    kind TEXT,
+    created_at TEXT NOT NULL
+  );
 `);
 
 export const db = drizzle(sqlite, { schema });

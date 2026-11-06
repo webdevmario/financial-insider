@@ -1,4 +1,7 @@
-import type { Account, Subscription, Expense, Goal, AppSettings } from "../types";
+import type {
+  Account, Subscription, Expense, Goal, AppSettings, Transaction, StatementAccount, ScanResult,
+  ImportBatch, MerchantRule, Insights,
+} from "../types";
 import { today } from "./formatters";
 import { offlineDb } from "./offline/db";
 import { enqueue, pendingOps } from "./offline/outbox";
@@ -232,6 +235,49 @@ export const api = {
       request<{ success: boolean }>(`/goals/${id}`, {
         method: "DELETE",
       }),
+  },
+
+  // ── Imported transactions ────────────────────────────────────
+  transactions: {
+    list: (params: { month?: string; account?: string; kind?: string; q?: string; limit?: number } = {}) => {
+      const qs = new URLSearchParams(
+        Object.entries(params).filter(([, v]) => v !== undefined && v !== "").map(([k, v]) => [k, String(v)])
+      ).toString();
+      return cachedGet<Transaction[]>(`/transactions${qs ? `?${qs}` : ""}`);
+    },
+    insights: (month?: string) =>
+      cachedGet<Insights>(`/transactions/insights${month ? `?month=${month}` : ""}`),
+    accounts: () => cachedGet<StatementAccount[]>("/transactions/accounts"),
+    renameAccount: (id: string, name: string) =>
+      request<{ success: boolean }>(`/transactions/accounts/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ name }),
+      }),
+    update: (id: string, data: { merchant?: string; category?: string; kind?: string }) =>
+      request<Transaction>(`/transactions/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    imports: () =>
+      cachedGet<{ folder: string; lastScan: ScanResult | null; batches: ImportBatch[] }>("/transactions/imports"),
+    scan: () => request<ScanResult>("/transactions/scan", { method: "POST" }),
+    upload: (name: string, content: string) =>
+      request<ScanResult>("/transactions/upload", {
+        method: "POST",
+        body: JSON.stringify({ name, content }),
+      }),
+    undoImport: (id: string) =>
+      request<{ removed: number }>(`/transactions/imports/${id}/undo`, { method: "POST" }),
+    reimport: (id: string) =>
+      request<ScanResult>(`/transactions/imports/${id}/forget`, { method: "POST" }),
+    rules: () => cachedGet<MerchantRule[]>("/transactions/rules"),
+    addRule: (data: { pattern: string; merchant?: string; category?: string; kind?: string }) =>
+      request<{ rule: MerchantRule; updated: number }>("/transactions/rules", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    deleteRule: (id: string) =>
+      request<{ success: boolean }>(`/transactions/rules/${id}`, { method: "DELETE" }),
   },
 
   // ── Settings ─────────────────────────────────────────────────

@@ -248,6 +248,21 @@ After `pnpm prod:deploy`, phones download the new version in the background and 
 
 ---
 
+## Bank Statements (Activity tab)
+
+Download CSVs from each bank or card site and drop them into **`~/Documents/finance-statements/`** (subfolders are fine). The server watches that folder and imports new files within a few seconds; **Scan folder** in the Activity tab does the same on demand, and **Upload CSV** works from any device.
+
+- **Supported formats:** Chase cards, Chase checking, Apple Card, Amex, Ally checking. The bank is recognized from the CSV's column headers, so file names don't matter (Chase card numbers are read from `Chase1234_…` names when present).
+- **Files are never moved or changed.** Each file's fingerprint is recorded, so a scan skips files it has already seen. Overlapping downloads only add the transactions that are new.
+- **Transfers between your accounts:** a card's "payment received" is paired with the matching withdrawal from checking (same amount, within 6 days), and both are left out of spending and income.
+- **Teaching it:** click any transaction to rename the merchant, change its category, or change its type. With "Apply to every transaction containing…" ticked, the change becomes a rule for past and future imports.
+- **Undo:** Activity → Imports → Undo removes what a file added. That file is then skipped until you choose Re-import.
+- **Other folder:** set `STATEMENTS_DIR` for the server. Set `STATEMENTS_WATCH=0` to turn off the automatic watching.
+
+The transactions live in the same `data/finance.db`, so the daily backups cover them. The CSVs in the folder remain the original source: if anything goes wrong, undo the import and import the file again.
+
+---
+
 ## Database
 
 ### Where it lives

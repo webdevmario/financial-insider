@@ -1,6 +1,6 @@
 # Financial Insider
 
-A self-hosted personal finance tracker. Tracks net worth, assets, monthly bills, and budget expenses across devices via Tailscale.
+A self-hosted personal finance tracker. Tracks net worth, assets, monthly bills, and budget expenses across devices via Tailscale, and imports bank/card CSVs to show what you actually pay (see "Bank Statements" in docs/OPERATIONS.md).
 
 ## Tech Stack
 

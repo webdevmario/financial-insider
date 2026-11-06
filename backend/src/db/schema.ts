@@ -54,6 +54,67 @@ export const goals = sqliteTable("goals", {
   createdAt: text("created_at").notNull(),
 });
 
+// ── Statement accounts (where imported transactions come from) ─────
+// One per bank account or card seen in an imported CSV, keyed like "chase-0134"
+export const statementAccounts = sqliteTable("statement_accounts", {
+  id: text("id").primaryKey(),
+  institution: text("institution").notNull(), // Chase, Amex, Apple, Ally
+  name: text("name").notNull(), // Display name, editable
+  kind: text("kind").notNull(), // checking | credit
+  last4: text("last4"),
+  createdAt: text("created_at").notNull(),
+});
+
+// ── Import batches (one per imported CSV file) ─────────────────────
+export const importBatches = sqliteTable("import_batches", {
+  id: text("id").primaryKey(),
+  fileName: text("file_name").notNull(),
+  sourcePath: text("source_path"), // Where the file sits in the statements folder (files are never moved)
+  fileHash: text("file_hash").notNull(), // sha256 of the file: the folder scan skips files already seen
+  status: text("status").notNull().default("imported"), // imported | undone (undone files are skipped by the scan)
+  format: text("format").notNull(), // chase-card | apple-card | amex | ally
+  accountId: text("account_id").notNull(),
+  rowCount: integer("row_count").notNull(),
+  inserted: integer("inserted").notNull(),
+  duplicates: integer("duplicates").notNull(),
+  dateFrom: text("date_from"),
+  dateTo: text("date_to"),
+  importedAt: text("imported_at").notNull(),
+});
+
+// ── Transactions (imported from bank / card CSVs) ──────────────────
+// Sign convention: negative = money leaving you (purchase, fee, bill paid from checking),
+// positive = money coming in (paycheck, refund, a payment received by a card).
+export const transactions = sqliteTable("transactions", {
+  id: text("id").primaryKey(), // Hash of account + date + amount + description + occurrence: re-imports dedupe
+  accountId: text("account_id").notNull(),
+  batchId: text("batch_id").notNull(),
+  date: text("date").notNull(), // Transaction date, YYYY-MM-DD
+  postedDate: text("posted_date"),
+  month: text("month").notNull(), // YYYY-MM
+  amount: real("amount").notNull(),
+  description: text("description").notNull(), // As the bank wrote it
+  merchant: text("merchant").notNull(), // Cleaned up for grouping
+  category: text("category").notNull().default("Uncategorized"),
+  kind: text("kind").notNull(), // spend | income | refund | transfer | fee | interest
+  member: text("member"), // Card member / purchased by, when the bank says
+  transferPeerId: text("transfer_peer_id"), // The other side of a transfer between your own accounts
+  edited: integer("edited").notNull().default(0), // 1 once changed by hand or by a rule: auto-detection leaves it alone
+  raw: text("raw"), // Original CSV row as JSON
+  createdAt: text("created_at").notNull(),
+});
+
+// ── Merchant rules (teach the importer) ────────────────────────────
+// Any transaction whose description contains `pattern` (case-insensitive) gets these values
+export const merchantRules = sqliteTable("merchant_rules", {
+  id: text("id").primaryKey(),
+  pattern: text("pattern").notNull(),
+  merchant: text("merchant"),
+  category: text("category"),
+  kind: text("kind"),
+  createdAt: text("created_at").notNull(),
+});
+
 // ── Settings (key-value store) ─────────────────────────────────────
 // Stores: paycheck, income, paycheckHistory, budgetTargets
 export const settings = sqliteTable("settings", {
@@ -70,3 +131,8 @@ export type Expense = typeof expenses.$inferSelect;
 export type NewExpense = typeof expenses.$inferInsert;
 export type Goal = typeof goals.$inferSelect;
 export type NewGoal = typeof goals.$inferInsert;
+export type StatementAccount = typeof statementAccounts.$inferSelect;
+export type ImportBatch = typeof importBatches.$inferSelect;
+export type Transaction = typeof transactions.$inferSelect;
+export type NewTransaction = typeof transactions.$inferInsert;
+export type MerchantRule = typeof merchantRules.$inferSelect;
