@@ -6,10 +6,11 @@
  * Amounts in the output are positive costs unless the field says otherwise.
  */
 import { db } from "../../db/index.js";
-import { settings, statementAccounts, subscriptions, transactions, type Transaction } from "../../db/schema.js";
+import { payees, settings, statementAccounts, subscriptions, transactions, type Transaction } from "../../db/schema.js";
 import { eq } from "drizzle-orm";
 import { today } from "../date.js";
 import { merchantKey } from "./merchant.js";
+import { groupKey } from "./payees.js";
 
 const round = (n: number) => Math.round(n * 100) / 100;
 
@@ -87,6 +88,11 @@ export function computeInsights(month?: string) {
   const accounts = db.select().from(statementAccounts).all();
   const accountName = new Map(accounts.map((a) => [a.id, a.name]));
   const bills = db.select().from(subscriptions).all();
+  const payeeList = db.select().from(payees).all();
+  const payeeById = new Map(payeeList.map((p) => [p.id, p]));
+  // Bills linked to a payee match by that link; the rest fall back to words in the bill's name
+  const linkedBillIds = new Set(payeeList.map((p) => p.billId).filter(Boolean));
+  const unlinkedBills = bills.filter((b) => !linkedBillIds.has(b.id));
   const paycheckSetting = db.select().from(settings).where(eq(settings.key, "paycheck")).get();
   const expectedPaycheck = paycheckSetting ? Number(JSON.parse(paycheckSetting.value)) || 0 : 0;
 
@@ -105,7 +111,7 @@ export function computeInsights(month?: string) {
   for (const t of inMonth) {
     if (!isCost(t)) continue;
     byCategory.set(t.category, (byCategory.get(t.category) || 0) - t.amount);
-    const k = merchantKey(t.merchant);
+    const k = groupKey(t);
     const m = byMerchant.get(k) ?? { merchant: t.merchant, amount: 0, count: 0 };
     m.amount -= t.amount;
     m.count++;
@@ -116,11 +122,11 @@ export function computeInsights(month?: string) {
     byAccount.set(t.accountId, a);
   }
 
-  // Recurring: group costs by merchant, look for a steady rhythm
+  // Recurring: group costs by payee (or bank name), look for a steady rhythm
   const groups = new Map<string, Transaction[]>();
   for (const t of all) {
     if (!isCost(t)) continue;
-    const k = merchantKey(t.merchant);
+    const k = groupKey(t);
     (groups.get(k) ?? groups.set(k, []).get(k)!).push(t);
   }
 
@@ -181,10 +187,14 @@ export function computeInsights(month?: string) {
       : isNew ? "new"
       : "active";
 
-    const bill = bills.find((b) => matchesBill(key, billTokens(b.name)));
+    const payee = last.payeeId ? payeeById.get(last.payeeId) : undefined;
+    const bill = payee?.billId
+      ? bills.find((b) => b.id === payee.billId)
+      : unlinkedBills.find((b) => matchesBill(merchantKey(last.merchant), billTokens(b.name)));
     recurring.push({
       key,
       merchant: last.merchant,
+      payeeId: last.payeeId ?? null,
       category: last.category,
       accounts: [...new Set(rows.map((t) => accountName.get(t.accountId) || t.accountId))],
       cadence: cadence.id,
@@ -212,10 +222,15 @@ export function computeInsights(month?: string) {
 
   // Bills list vs actual charges
   const billsVsActual = bills.map((b) => {
+    const linked = new Set(payeeList.filter((p) => p.billId === b.id).map((p) => p.id));
     const tokens = billTokens(b.name);
-    const charges = tokens.length
-      ? all.filter((t) => isCost(t) && matchesBill(merchantKey(t.merchant), tokens)).sort((x, y) => x.date.localeCompare(y.date))
-      : [];
+    const charges = (
+      linked.size
+        ? all.filter((t) => isCost(t) && t.payeeId && linked.has(t.payeeId))
+        : tokens.length
+          ? all.filter((t) => isCost(t) && matchesBill(merchantKey(t.merchant), tokens))
+          : []
+    ).sort((x, y) => x.date.localeCompare(y.date));
     const last = charges[charges.length - 1];
     const recentAmounts = charges.slice(-6).map((t) => -t.amount);
     const window = b.frequency === "annual" ? 380 : b.frequency === "quarterly" ? 100 : 40;
@@ -224,6 +239,7 @@ export function computeInsights(month?: string) {
       name: b.name,
       frequency: b.frequency,
       listedAmount: b.amount,
+      linkedPayee: linked.size ? payeeById.get([...linked][0])?.name ?? null : null,
       matched: charges.length,
       lastDate: last?.date ?? null,
       lastAmount: last ? round(-last.amount) : null,
@@ -243,7 +259,7 @@ export function computeInsights(month?: string) {
     for (let j = i + 1; j < dupCandidates.length; j++) {
       const a = dupCandidates[i], b = dupCandidates[j];
       if (dayNumber(b.date) - dayNumber(a.date) > 3) break;
-      if (a.accountId === b.accountId && a.amount === b.amount && merchantKey(a.merchant) === merchantKey(b.merchant)) {
+      if (a.accountId === b.accountId && a.amount === b.amount && groupKey(a) === groupKey(b)) {
         duplicates.push({ a, b });
       }
     }

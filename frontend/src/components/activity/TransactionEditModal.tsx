@@ -2,55 +2,69 @@ import { useEffect, useState } from "react";
 import Modal from "../layout/Modal";
 import { api } from "../../lib/api";
 import { fmtDate, fmtP } from "../../lib/formatters";
-import { KIND_LABELS } from "./shared";
-import type { Transaction, TxnKind } from "../../types";
+import AliasEditor, { type AliasDraft } from "./AliasEditor";
+import { KIND_LABELS, defaultPattern } from "./shared";
+import type { Payee, Transaction, TxnKind } from "../../types";
 
 interface Props {
   txn: Transaction | null;
+  payees: Payee[];
   categories: string[];
   onClose: () => void;
   onSaved: () => void;
   onToast: (msg: string, err?: boolean) => void;
 }
 
-/** Edit one transaction, or teach a rule that applies to every matching one */
-export default function TransactionEditModal({ txn, categories, onClose, onSaved, onToast }: Props) {
-  const [merchant, setMerchant] = useState("");
+/**
+ * Put a transaction under a payee. With "Remember" on, the statement text becomes an
+ * alias of the payee (past and future imports) and category/type become the payee's defaults.
+ * With it off, only this one transaction changes.
+ */
+export default function TransactionEditModal({ txn, payees, categories, onClose, onSaved, onToast }: Props) {
+  const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [kind, setKind] = useState<TxnKind>("spend");
-  const [asRule, setAsRule] = useState(true);
-  const [pattern, setPattern] = useState("");
+  const [remember, setRemember] = useState(true);
+  const [alias, setAlias] = useState<AliasDraft>({ pattern: "", match: "contains", amount: null });
   const [saving, setSaving] = useState(false);
+
+  const currentPayee = txn?.payeeId ? payees.find((p) => p.id === txn.payeeId) : undefined;
 
   useEffect(() => {
     if (!txn) return;
-    setMerchant(txn.merchant);
+    setName(currentPayee?.name ?? txn.merchant);
     setCategory(txn.category);
     setKind(txn.kind);
-    setAsRule(true);
-    // Default pattern: the start of the bank's description, before any numbers
-    setPattern(txn.description.replace(/\s+/g, " ").split(/ #| \d{3,}|\*/)[0].trim().slice(0, 40));
+    setRemember(true);
+    setAlias({ pattern: defaultPattern(txn.description), match: "contains", amount: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [txn]);
 
   if (!txn) return null;
+  const t = txn;
 
   async function save() {
-    if (!txn) return;
     setSaving(true);
     try {
-      const changes = {
-        merchant: merchant.trim() !== txn.merchant ? merchant.trim() : undefined,
-        category: category.trim() !== txn.category ? category.trim() : undefined,
-        kind: kind !== txn.kind ? kind : undefined,
-      };
-      if (!changes.merchant && !changes.category && !changes.kind) return onClose();
-      if (asRule) {
-        const r = await api.transactions.addRule({ pattern: pattern.trim(), ...changes });
-        // The rule may not match this row if the pattern was edited: update it directly too
-        await api.transactions.update(txn.id, changes);
-        onToast(`Rule saved · ${r.updated} transaction${r.updated === 1 ? "" : "s"} updated`);
+      const payeeName = name.trim();
+      const changedCategory = category.trim() && category.trim() !== t.category ? category.trim() : undefined;
+      const changedKind = kind !== t.kind ? kind : undefined;
+      if (remember) {
+        if (!payeeName) throw new Error("Give the payee a name");
+        await api.transactions.update(t.id, {
+          payeeName,
+          category: category.trim() && category.trim() !== "Uncategorized" ? category.trim() : undefined,
+          kind: changedKind,
+          remember: { pattern: alias.pattern.trim(), match: alias.match, amount: alias.amount },
+        });
+        onToast(`Saved · “${alias.pattern.trim()}” now means ${payeeName}`);
       } else {
-        await api.transactions.update(txn.id, changes);
+        const renamed = payeeName !== (currentPayee?.name ?? t.merchant);
+        await api.transactions.update(t.id, {
+          ...(renamed ? (payeeName ? { payeeName } : { payeeId: null }) : {}),
+          category: changedCategory,
+          kind: changedKind,
+        });
         onToast("Transaction updated");
       }
       onSaved();
@@ -62,17 +76,42 @@ export default function TransactionEditModal({ txn, categories, onClose, onSaved
     }
   }
 
+  async function reset() {
+    setSaving(true);
+    try {
+      await api.transactions.update(t.id, { reset: true });
+      onToast("Back to automatic");
+      onSaved();
+      onClose();
+    } catch (err) {
+      onToast(err instanceof Error ? err.message : "Failed to reset", true);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <Modal open={!!txn} onClose={onClose} title="Edit transaction">
       <div className="text-xs text-text-muted mb-4 leading-relaxed">
-        <div className="font-mono text-text-dim break-all">{txn.description}</div>
-        {fmtDate(txn.date)} · <span className="font-mono">{fmtP(txn.amount)}</span>
+        <div className="font-mono text-text-dim break-all">{t.description}</div>
+        {fmtDate(t.date)} · <span className="font-mono">{fmtP(t.amount)}</span>
+        {currentPayee
+          ? <> · payee <span className="text-text-dim">{currentPayee.name}</span>{t.payeeLocked ? " (picked by hand)" : ""}</>
+          : <> · no payee yet</>}
       </div>
 
       <div className="flex flex-col gap-4">
         <div className="input-group">
-          <label>Merchant</label>
-          <input value={merchant} onChange={(e) => setMerchant(e.target.value)} />
+          <label>Payee</label>
+          <input list="payee-names" value={name} onChange={(e) => setName(e.target.value)} placeholder={t.baseMerchant ?? ""} />
+          <datalist id="payee-names">
+            {payees.map((p) => <option key={p.id} value={p.name} />)}
+          </datalist>
+          <span className="text-[11px] text-text-muted">
+            {payees.some((p) => p.name.toLowerCase() === name.trim().toLowerCase())
+              ? "Existing payee"
+              : name.trim() ? "A new payee will be created" : ""}
+          </span>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="input-group">
@@ -91,19 +130,34 @@ export default function TransactionEditModal({ txn, categories, onClose, onSaved
         </div>
 
         <label className="flex items-start gap-2.5 text-sm cursor-pointer">
-          <input type="checkbox" checked={asRule} onChange={(e) => setAsRule(e.target.checked)} className="mt-0.5" />
+          <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="mt-0.5" />
           <span>
-            Apply to every transaction containing
-            <span className="block text-[11px] text-text-muted">Past and future imports. Matching ignores upper/lower case.</span>
+            Remember: statement text that means this payee
+            <span className="block text-[11px] text-text-muted">
+              {remember
+                ? "Applies to past and future imports. The category and type become this payee's defaults."
+                : "Only this transaction changes."}
+            </span>
           </span>
         </label>
-        {asRule && <input value={pattern} onChange={(e) => setPattern(e.target.value)} className="font-mono !text-sm" />}
+        {remember && <AliasEditor value={alias} onChange={setAlias} amountHint={t.amount} />}
 
-        <div className="flex justify-end gap-2 mt-2">
-          <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" disabled={saving || (asRule && pattern.trim().length < 3)} onClick={save}>
-            {saving ? "Saving…" : "Save"}
-          </button>
+        <div className="flex items-center gap-2 mt-2">
+          {(t.edited === 1 || t.payeeLocked === 1) && (
+            <button className="btn btn-sm" disabled={saving} onClick={reset} title="Drop hand edits on this transaction">
+              Reset to automatic
+            </button>
+          )}
+          <div className="flex gap-2 ml-auto">
+            <button className="btn" onClick={onClose}>Cancel</button>
+            <button
+              className="btn btn-primary"
+              disabled={saving || (remember && (alias.pattern.trim().length < 3 || !name.trim()))}
+              onClick={save}
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
+          </div>
         </div>
       </div>
     </Modal>
