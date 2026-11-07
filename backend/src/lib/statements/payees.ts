@@ -324,17 +324,47 @@ export function listPayees() {
     .sort((a, b) => b.spent - a.spent || a.name.localeCompare(b.name));
 }
 
+/** "2026-03" shifted by n months */
+function shiftMonth(month: string, n: number): string {
+  const [y, m] = month.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + n, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
 export function payeeDetail(id: string) {
   const payee = listPayees().find((p) => p.id === id);
   if (!payee) return null;
   const rows = db.select().from(transactions).where(eq(transactions.payeeId, id)).all().sort((a, b) => b.date.localeCompare(a.date));
   const monthly = new Map<string, number>();
   for (const t of rows) if (isCost(t)) monthly.set(t.month, (monthly.get(t.month) || 0) - t.amount);
+
+  // Each bank name with how many transactions carry it and what files them here:
+  // the alias that catches most of them, or none when they were picked by hand
+  const names = new Map<string, { name: string; count: number; byAlias: Map<string, number>; handPicked: number }>();
+  for (const t of rows) {
+    const name = t.baseMerchant || t.merchant;
+    const n = names.get(name) ?? names.set(name, { name, count: 0, byAlias: new Map(), handPicked: 0 }).get(name)!;
+    n.count++;
+    if (t.aliasId) n.byAlias.set(t.aliasId, (n.byAlias.get(t.aliasId) || 0) + 1);
+    else n.handPicked++;
+  }
+
+  // Transactions for the 12 months ending with the payee's latest one, the span the chart shows
+  const latest = rows[0]?.month;
+  const from = latest ? shiftMonth(latest, -11) : "";
+
   return {
     ...payee,
     monthly: [...monthly].map(([month, amount]) => ({ month, amount: round(amount) })).sort((a, b) => a.month.localeCompare(b.month)),
-    bankNames: [...new Set(rows.map((t) => t.baseMerchant || t.merchant))],
-    recent: rows.slice(0, 15).map(({ raw: _raw, ...t }) => t),
+    bankNames: [...names.values()]
+      .map(({ name, count, byAlias, handPicked }) => ({
+        name,
+        count,
+        aliasId: [...byAlias].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null,
+        handPicked,
+      }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
+    recent: rows.filter((t) => t.month >= from).slice(0, 500).map(({ raw: _raw, ...t }) => t),
   };
 }
 
