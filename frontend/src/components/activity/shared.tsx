@@ -1,6 +1,22 @@
 import { Fragment } from "react";
-import { fmtDate, fmtP, moLabel } from "../../lib/formatters";
+import { fmt, fmtDate, fmtP, moLabel } from "../../lib/formatters";
 import type { RecurringCharge, TxnKind } from "../../types";
+
+// ── Money out vs money in ─────────────────────────────────────────
+
+/**
+ * A group's headline amount: what it cost, or, for a group that only
+ * brings money in (interest earned, paychecks, cashouts), the green
+ * money-in total, so it doesn't read as $0.00
+ */
+export function money(spent: number, received: number, f: (n: number) => string = fmt): React.ReactNode {
+  return spent === 0 && received > 0 ? <span className="text-green">+{f(received)} in</span> : f(spent);
+}
+
+/** "+$X in" to sit beside spending when a group has both; skips stray refunds under 1% of the spend */
+export function moneyInNote(spent: number, received: number, f: (n: number) => string = fmt): string | null {
+  return spent > 0 && received >= 1 && received >= spent * 0.01 ? `+${f(received)} in` : null;
+}
 
 export const KIND_LABELS: Record<TxnKind, string> = {
   spend: "Spending",

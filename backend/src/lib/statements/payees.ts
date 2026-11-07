@@ -296,6 +296,8 @@ export function previewAlias(pattern: string, match: string, amount: number | nu
 // ── Lists ─────────────────────────────────────────────────────────
 
 const isCost = (t: Transaction) => t.amount < 0 && (t.kind === "spend" || t.kind === "fee" || t.kind === "interest");
+/** Money coming in from outside: income, refunds, interest earned (not moves between your own accounts) */
+const isIncoming = (t: Transaction) => t.amount > 0 && t.kind !== "transfer";
 
 export function listPayees() {
   const all = db.select().from(transactions).all();
@@ -316,12 +318,13 @@ export function listPayees() {
         ...p,
         count: rows.length,
         spent: round(rows.filter(isCost).reduce((s, t) => s - t.amount, 0)),
+        received: round(rows.filter(isIncoming).reduce((s, t) => s + t.amount, 0)),
         lastDate: rows.reduce((m, t) => (t.date > m ? t.date : m), "") || null,
         aliases: aliases.filter((a) => a.payeeId === p.id).map((a) => ({ ...a, matched: byAlias.get(a.id) || 0 })),
         handPicked: rows.filter((t) => t.payeeLocked).length,
       };
     })
-    .sort((a, b) => b.spent - a.spent || a.name.localeCompare(b.name));
+    .sort((a, b) => b.spent - a.spent || b.received - a.received || a.name.localeCompare(b.name));
 }
 
 /** "2026-03" shifted by n months */
@@ -335,8 +338,13 @@ export function payeeDetail(id: string) {
   const payee = listPayees().find((p) => p.id === id);
   if (!payee) return null;
   const rows = db.select().from(transactions).where(eq(transactions.payeeId, id)).all().sort((a, b) => b.date.localeCompare(a.date));
-  const monthly = new Map<string, number>();
-  for (const t of rows) if (isCost(t)) monthly.set(t.month, (monthly.get(t.month) || 0) - t.amount);
+  const monthly = new Map<string, { amount: number; received: number }>();
+  for (const t of rows) {
+    if (!isCost(t) && !isIncoming(t)) continue;
+    const m = monthly.get(t.month) ?? monthly.set(t.month, { amount: 0, received: 0 }).get(t.month)!;
+    if (isCost(t)) m.amount -= t.amount;
+    else m.received += t.amount;
+  }
 
   // Each bank name with how many transactions carry it and what files them here:
   // the alias that catches most of them, or none when they were picked by hand
@@ -355,7 +363,7 @@ export function payeeDetail(id: string) {
 
   return {
     ...payee,
-    monthly: [...monthly].map(([month, amount]) => ({ month, amount: round(amount) })).sort((a, b) => a.month.localeCompare(b.month)),
+    monthly: [...monthly].map(([month, m]) => ({ month, amount: round(m.amount), received: round(m.received) })).sort((a, b) => a.month.localeCompare(b.month)),
     bankNames: [...names.values()]
       .map(({ name, count, byAlias, handPicked }) => ({
         name,
@@ -368,24 +376,25 @@ export function payeeDetail(id: string) {
   };
 }
 
-/** Bank names with no payee yet, biggest spend first */
+/** Bank names with no payee yet, biggest spend first, then biggest money in */
 export function unassignedMerchants() {
-  const groups = new Map<string, { key: string; merchant: string; count: number; spent: number; lastDate: string; samples: string[]; kinds: Set<string> }>();
+  const groups = new Map<string, { key: string; merchant: string; count: number; spent: number; received: number; lastDate: string; samples: string[]; kinds: Set<string> }>();
   for (const t of db.select().from(transactions).all()) {
     if (t.payeeId || t.kind === "transfer") continue;
     const name = t.baseMerchant || t.merchant;
     const key = merchantKey(name);
-    const g = groups.get(key) ?? { key, merchant: name, count: 0, spent: 0, lastDate: "", samples: [], kinds: new Set() };
+    const g = groups.get(key) ?? { key, merchant: name, count: 0, spent: 0, received: 0, lastDate: "", samples: [], kinds: new Set() };
     g.count++;
     if (isCost(t)) g.spent -= t.amount;
+    if (isIncoming(t)) g.received += t.amount;
     if (t.date > g.lastDate) g.lastDate = t.date;
     if (g.samples.length < 3 && !g.samples.includes(t.description)) g.samples.push(t.description);
     g.kinds.add(t.kind);
     groups.set(key, g);
   }
   return [...groups.values()]
-    .map(({ kinds, ...g }) => ({ ...g, spent: round(g.spent), kinds: [...kinds] }))
-    .sort((a, b) => b.spent - a.spent || b.count - a.count);
+    .map(({ kinds, ...g }) => ({ ...g, spent: round(g.spent), received: round(g.received), kinds: [...kinds] }))
+    .sort((a, b) => b.spent - a.spent || b.received - a.received || b.count - a.count);
 }
 
 // ── Suggestions ───────────────────────────────────────────────────
@@ -421,6 +430,7 @@ export interface SuggestionMember {
   payeeId: string | null;
   count: number;
   spent: number;
+  received: number;
 }
 
 export interface Suggestion {
@@ -456,10 +466,12 @@ export function suggestions(): Suggestion[] {
       payeeId: t.payeeId,
       count: 0,
       spent: 0,
+      received: 0,
       rows: [],
     };
     g.count++;
     if (isCost(t)) g.spent = round(g.spent - t.amount);
+    if (isIncoming(t)) g.received = round(g.received + t.amount);
     g.rows.push(t);
     groups.set(key, g);
   }

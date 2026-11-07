@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import SearchInput from "../layout/SearchInput";
 import { api } from "../../lib/api";
-import { fmt, fmtDate } from "../../lib/formatters";
-import { Badge, Card, Empty } from "./shared";
+import { fmtDate } from "../../lib/formatters";
+import { Badge, Card, Empty, money, moneyInNote } from "./shared";
 import type { MergeMember } from "./MergeModal";
 import type { Payee, PayeeSuggestion, UnassignedMerchant } from "../../types";
 
@@ -58,7 +58,7 @@ const byDateDesc = (a: string | null, b: string | null) => (b ?? "").localeCompa
 
 function sortPayees(list: Payee[], sort: PayeeSort): Payee[] {
   const key = (a: Payee, b: Payee) =>
-    sort === "spent" ? b.spent - a.spent
+    sort === "spent" ? b.spent - a.spent || b.received - a.received
     : sort === "count" ? b.count - a.count
     : sort === "recent" ? byDateDesc(a.lastDate, b.lastDate)
     : sort === "newest" ? byDateDesc(a.createdAt, b.createdAt)
@@ -68,7 +68,7 @@ function sortPayees(list: Payee[], sort: PayeeSort): Payee[] {
 
 function sortOpen(list: UnassignedMerchant[], sort: OpenSort): UnassignedMerchant[] {
   const key = (a: UnassignedMerchant, b: UnassignedMerchant) =>
-    sort === "spent" ? b.spent - a.spent
+    sort === "spent" ? b.spent - a.spent || b.received - a.received
     : sort === "count" ? b.count - a.count
     : sort === "recent" ? byDateDesc(a.lastDate, b.lastDate)
     : 0;
@@ -98,12 +98,17 @@ function SortSelect<T extends string>({ label, value, options, onChange }: {
   );
 }
 
-/** Right-hand row figure: the sorted-by value on top, a secondary figure under it */
-function RowStat({ main, sub }: { main: string; sub?: string }) {
+/** Right-hand row figure: the sorted-by value on top, secondary figures under it */
+function RowStat({ main, sub = [] }: { main: React.ReactNode; sub?: React.ReactNode[] }) {
+  const parts = sub.filter((x) => x != null && x !== "");
   return (
     <span className="text-right shrink-0">
       <span className="block font-mono text-xs whitespace-nowrap">{main}</span>
-      {sub && <span className="block text-[10px] text-text-muted whitespace-nowrap">{sub}</span>}
+      {parts.length > 0 && (
+        <span className="block text-[10px] text-text-muted whitespace-nowrap">
+          {parts.map((x, i) => <Fragment key={i}>{i > 0 && " · "}{x}</Fragment>)}
+        </span>
+      )}
     </span>
   );
 }
@@ -114,17 +119,21 @@ function shortDate(ds: string): string {
   return ds.startsWith(String(new Date().getFullYear())) ? full.replace(/, \d{4}$/, "") : full;
 }
 
-function payeeStat(p: Payee, sort: PayeeSort) {
-  if (sort === "recent") return { main: p.lastDate ? shortDate(p.lastDate) : "—", sub: fmt(p.spent) };
-  if (sort === "count") return { main: `${p.count}×`, sub: fmt(p.spent) };
-  if (sort === "newest") return { main: shortDate(p.createdAt.slice(0, 10)), sub: "added" };
-  return { main: fmt(p.spent) };
+function payeeStat(p: Payee, sort: PayeeSort): { main: React.ReactNode; sub?: React.ReactNode[] } {
+  const amount = money(p.spent, p.received);
+  const extra = moneyInNote(p.spent, p.received);
+  if (sort === "recent") return { main: p.lastDate ? shortDate(p.lastDate) : "—", sub: [amount, extra] };
+  if (sort === "count") return { main: `${p.count}×`, sub: [amount, extra] };
+  if (sort === "newest") return { main: shortDate(p.createdAt.slice(0, 10)), sub: ["added"] };
+  return { main: amount, sub: [extra] };
 }
 
-function openStat(u: UnassignedMerchant, sort: OpenSort) {
-  if (sort === "recent") return { main: shortDate(u.lastDate), sub: fmt(u.spent) };
-  if (sort === "count") return { main: `${u.count}×`, sub: fmt(u.spent) };
-  return { main: fmt(u.spent), sub: `${u.count}×` };
+function openStat(u: UnassignedMerchant, sort: OpenSort): { main: React.ReactNode; sub?: React.ReactNode[] } {
+  const amount = money(u.spent, u.received);
+  const extra = moneyInNote(u.spent, u.received);
+  if (sort === "recent") return { main: shortDate(u.lastDate), sub: [amount, extra] };
+  if (sort === "count") return { main: `${u.count}×`, sub: [amount, extra] };
+  return { main: amount, sub: [`${u.count}×`, extra] };
 }
 
 export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, onToast }: Props) {
@@ -203,7 +212,7 @@ export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, on
                 <div className="flex flex-wrap gap-1.5 mb-3">
                   {s.members.map((m) => (
                     <span key={m.key} className={`text-xs px-2 py-0.5 rounded-md border ${m.payeeId ? "border-accent/40 text-accent" : "border-border text-text-dim"}`}>
-                      {m.name} <span className="text-text-muted">· {m.count}× · {fmt(m.spent)}</span>
+                      {m.name} <span className="text-text-muted">· {m.count}× · {money(m.spent, m.received)}</span>
                     </span>
                   ))}
                 </div>
@@ -211,7 +220,7 @@ export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, on
                   <button className="btn btn-sm" onClick={() => dismiss(s)}>Not the same</button>
                   <button
                     className="btn btn-sm btn-primary"
-                    onClick={() => onMerge(s.members.map((m) => ({ key: m.key, name: m.name, count: m.count, spent: m.spent })), s.name)}
+                    onClick={() => onMerge(s.members.map((m) => ({ key: m.key, name: m.name, count: m.count, spent: m.spent, received: m.received })), s.name)}
                   >
                     Group…
                   </button>
@@ -266,7 +275,7 @@ export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, on
             <button
               className="btn btn-sm btn-primary"
               onClick={() => {
-                const members = (unassigned ?? []).filter((u) => selected.has(u.key)).map((u) => ({ key: `m:${u.key}`, name: u.merchant, count: u.count, spent: u.spent }));
+                const members = (unassigned ?? []).filter((u) => selected.has(u.key)).map((u) => ({ key: `m:${u.key}`, name: u.merchant, count: u.count, spent: u.spent, received: u.received }));
                 onMerge(members);
               }}
             >

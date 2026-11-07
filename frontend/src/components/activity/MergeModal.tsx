@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Modal from "../layout/Modal";
 import { api } from "../../lib/api";
 import { fmtP } from "../../lib/formatters";
+import { money } from "./shared";
 import type { Payee } from "../../types";
 
 export interface MergeMember {
@@ -10,6 +11,7 @@ export interface MergeMember {
   name: string;
   count?: number;
   spent?: number;
+  received?: number;
 }
 
 interface Props {
@@ -86,7 +88,7 @@ export default function MergeModal({ members, payees, suggestedName, categories,
               {m.key.startsWith("p:") && <span className="text-accent"> · payee</span>}
             </span>
             {m.count != null && (
-              <span className="text-text-muted shrink-0">{m.count}× · <span className="font-mono">{fmtP(m.spent ?? 0)}</span></span>
+              <span className="text-text-muted shrink-0">{m.count}× · <span className="font-mono">{money(m.spent ?? 0, m.received ?? 0, fmtP)}</span></span>
             )}
           </div>
         ))}
