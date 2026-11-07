@@ -14,6 +14,119 @@ interface Props {
   onToast: (msg: string, err?: boolean) => void;
 }
 
+// ── Sorting ──────────────────────────────────────────────────────
+const PAYEE_SORTS = [
+  { id: "spent", label: "Most spent" },
+  { id: "recent", label: "Recent" },
+  { id: "count", label: "Most frequent" },
+  { id: "name", label: "Name A–Z" },
+  { id: "newest", label: "Newest" },
+] as const;
+const OPEN_SORTS = [
+  { id: "spent", label: "Most spent" },
+  { id: "count", label: "Most frequent" },
+  { id: "recent", label: "Recent" },
+  { id: "name", label: "Name A–Z" },
+] as const;
+type PayeeSort = (typeof PAYEE_SORTS)[number]["id"];
+type OpenSort = (typeof OPEN_SORTS)[number]["id"];
+const PAYEE_SORT_KEY = "merchants.payees.sort";
+const OPEN_SORT_KEY = "merchants.unassigned.sort";
+
+function stored<T extends string>(key: string, options: readonly { id: T }[]): T {
+  try {
+    const v = localStorage.getItem(key);
+    const hit = options.find((o) => o.id === v);
+    if (hit) return hit.id;
+  } catch {
+    // Storage unavailable: fall back to the default
+  }
+  return options[0].id;
+}
+
+function remember(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Storage unavailable: the choice just won't stick
+  }
+}
+
+const byName = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: "base" });
+/** Newest first; rows with no date go last */
+const byDateDesc = (a: string | null, b: string | null) => (b ?? "").localeCompare(a ?? "");
+
+function sortPayees(list: Payee[], sort: PayeeSort): Payee[] {
+  const key = (a: Payee, b: Payee) =>
+    sort === "spent" ? b.spent - a.spent
+    : sort === "count" ? b.count - a.count
+    : sort === "recent" ? byDateDesc(a.lastDate, b.lastDate)
+    : sort === "newest" ? byDateDesc(a.createdAt, b.createdAt)
+    : 0;
+  return [...list].sort((a, b) => key(a, b) || byName(a.name, b.name) || a.id.localeCompare(b.id));
+}
+
+function sortOpen(list: UnassignedMerchant[], sort: OpenSort): UnassignedMerchant[] {
+  const key = (a: UnassignedMerchant, b: UnassignedMerchant) =>
+    sort === "spent" ? b.spent - a.spent
+    : sort === "count" ? b.count - a.count
+    : sort === "recent" ? byDateDesc(a.lastDate, b.lastDate)
+    : 0;
+  return [...list].sort((a, b) => key(a, b) || byName(a.merchant, b.merchant) || a.key.localeCompare(b.key));
+}
+
+/** Compact sort picker that sits beside a list's search box */
+function SortSelect<T extends string>({ label, value, options, onChange }: {
+  label: string;
+  value: T;
+  options: readonly { id: T; label: string }[];
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="relative shrink-0">
+      <select
+        aria-label={label}
+        title={label}
+        value={value}
+        onChange={(e) => onChange(e.target.value as T)}
+        className="!w-[110px] !text-xs !py-1.5 !pl-2.5 !pr-6 h-full cursor-pointer"
+      >
+        {options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+      </select>
+      <span aria-hidden className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-text-muted">▾</span>
+    </div>
+  );
+}
+
+/** Right-hand row figure: the sorted-by value on top, a secondary figure under it */
+function RowStat({ main, sub }: { main: string; sub?: string }) {
+  return (
+    <span className="text-right shrink-0">
+      <span className="block font-mono text-xs whitespace-nowrap">{main}</span>
+      {sub && <span className="block text-[10px] text-text-muted whitespace-nowrap">{sub}</span>}
+    </span>
+  );
+}
+
+/** "Oct 27" this year, "Oct 27, 2025" otherwise: keeps the date column narrow on phones */
+function shortDate(ds: string): string {
+  const full = fmtDate(ds);
+  return ds.startsWith(String(new Date().getFullYear())) ? full.replace(/, \d{4}$/, "") : full;
+}
+
+function payeeStat(p: Payee, sort: PayeeSort) {
+  if (sort === "recent") return { main: p.lastDate ? shortDate(p.lastDate) : "—", sub: fmt(p.spent) };
+  if (sort === "count") return { main: `${p.count}×`, sub: fmt(p.spent) };
+  if (sort === "newest") return { main: shortDate(p.createdAt.slice(0, 10)), sub: "added" };
+  return { main: fmt(p.spent) };
+}
+
+function openStat(u: UnassignedMerchant, sort: OpenSort) {
+  if (sort === "recent") return { main: shortDate(u.lastDate), sub: fmt(u.spent) };
+  if (sort === "count") return { main: `${u.count}×`, sub: fmt(u.spent) };
+  return { main: fmt(u.spent), sub: `${u.count}×` };
+}
+
 export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, onToast }: Props) {
   const [suggestions, setSuggestions] = useState<PayeeSuggestion[] | null>(null);
   const [unassigned, setUnassigned] = useState<UnassignedMerchant[] | null>(null);
@@ -21,6 +134,8 @@ export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, on
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [qPayees, setQPayees] = useState("");
   const [qUnassigned, setQUnassigned] = useState("");
+  const [payeeSort, setPayeeSort] = useState<PayeeSort>(() => stored(PAYEE_SORT_KEY, PAYEE_SORTS));
+  const [openSort, setOpenSort] = useState<OpenSort>(() => stored(OPEN_SORT_KEY, OPEN_SORTS));
 
   useEffect(() => {
     api.payees.suggestions().then(setSuggestions).catch(() => setSuggestions([]));
@@ -28,13 +143,14 @@ export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, on
     setSelected(new Set());
   }, [version]);
 
+  // Search first, then sort what's left
   const filteredPayees = useMemo(
-    () => payees.filter((p) => !qPayees || p.name.toLowerCase().includes(qPayees.toLowerCase()) || p.aliases.some((a) => a.pattern.toLowerCase().includes(qPayees.toLowerCase()))),
-    [payees, qPayees]
+    () => sortPayees(payees.filter((p) => !qPayees || p.name.toLowerCase().includes(qPayees.toLowerCase()) || p.aliases.some((a) => a.pattern.toLowerCase().includes(qPayees.toLowerCase()))), payeeSort),
+    [payees, qPayees, payeeSort]
   );
   const filteredUnassigned = useMemo(
-    () => (unassigned ?? []).filter((u) => !qUnassigned || u.merchant.toLowerCase().includes(qUnassigned.toLowerCase()) || u.samples.some((s) => s.toLowerCase().includes(qUnassigned.toLowerCase()))),
-    [unassigned, qUnassigned]
+    () => sortOpen((unassigned ?? []).filter((u) => !qUnassigned || u.merchant.toLowerCase().includes(qUnassigned.toLowerCase()) || u.samples.some((s) => s.toLowerCase().includes(qUnassigned.toLowerCase()))), openSort),
+    [unassigned, qUnassigned, openSort]
   );
 
   function toggle(key: string) {
@@ -108,7 +224,15 @@ export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, on
 
       <div className="grid grid-cols-2 max-lg:grid-cols-1 gap-5">
         <Card title={`Payees (${payees.length})`}>
-          <SearchInput placeholder="Search payees and aliases" value={qPayees} onChange={setQPayees} className="mb-2" />
+          <div className="flex gap-2 mb-2">
+            <SearchInput placeholder="Search payee or alias" value={qPayees} onChange={setQPayees} className="flex-1 min-w-0" />
+            <SortSelect
+              label="Sort payees"
+              value={payeeSort}
+              options={PAYEE_SORTS}
+              onChange={(v) => { setPayeeSort(v); remember(PAYEE_SORT_KEY, v); }}
+            />
+          </div>
           {filteredPayees.length === 0 ? (
             <Empty>{payees.length ? "No match." : "No payees yet. Group a suggestion or pick bank names under No payee yet."}</Empty>
           ) : (
@@ -129,7 +253,7 @@ export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, on
                       {p.lastDate && <> · last {fmtDate(p.lastDate)}</>}
                     </div>
                   </div>
-                  <span className="font-mono text-xs shrink-0">{fmt(p.spent)}</span>
+                  <RowStat {...payeeStat(p, payeeSort)} />
                 </button>
               ))}
             </div>
@@ -150,7 +274,15 @@ export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, on
             </button>
           )}
         >
-          <SearchInput placeholder="Search bank names" value={qUnassigned} onChange={setQUnassigned} className="mb-2" />
+          <div className="flex gap-2 mb-2">
+            <SearchInput placeholder="Search bank names" value={qUnassigned} onChange={setQUnassigned} className="flex-1 min-w-0" />
+            <SortSelect
+              label="Sort bank names"
+              value={openSort}
+              options={OPEN_SORTS}
+              onChange={(v) => { setOpenSort(v); remember(OPEN_SORT_KEY, v); }}
+            />
+          </div>
           {unassigned === null ? (
             <Empty>Loading…</Empty>
           ) : filteredUnassigned.length === 0 ? (
@@ -164,10 +296,7 @@ export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, on
                     <div className="text-sm truncate">{u.merchant}</div>
                     <div className="text-[11px] text-text-muted truncate font-mono" title={u.samples.join("\n")}>{u.samples[0]}</div>
                   </div>
-                  <span className="text-right shrink-0">
-                    <span className="block font-mono text-xs">{fmt(u.spent)}</span>
-                    <span className="block text-[10px] text-text-muted">{u.count}×</span>
-                  </span>
+                  <RowStat {...openStat(u, openSort)} />
                 </label>
               ))}
             </div>
