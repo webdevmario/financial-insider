@@ -1,3 +1,4 @@
+import { fmtDate, fmtP } from "../../lib/formatters";
 import type { RecurringCharge, TxnKind } from "../../types";
 
 export const KIND_LABELS: Record<TxnKind, string> = {
@@ -74,4 +75,35 @@ export const MATCH_LABELS: Record<import("../../types").AliasMatch, string> = {
 /** Default alias text for a bank description: its start, before store numbers and reference codes */
 export function defaultPattern(description: string): string {
   return description.replace(/\s+/g, " ").split(/ #| \d{3,}|\*/)[0].trim().slice(0, 40);
+}
+
+interface TxnRow {
+  id: string;
+  date: string;
+  description: string;
+  amount: number;
+}
+
+/**
+ * Date · description · amount in columns that line up from row to row: one
+ * grid shared by every row (subgrid), so each column is as wide as its widest
+ * cell. Long descriptions truncate; amounts are right-aligned tabular figures.
+ */
+export function TxnRows({ rows, compact }: { rows: TxnRow[]; compact?: boolean }) {
+  return (
+    <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-3 tabular-nums">
+      {rows.map((t) => (
+        <div
+          key={t.id}
+          className={`grid grid-cols-subgrid col-span-3 items-baseline ${
+            compact ? "mt-1" : "text-xs py-1.5 border-b border-border/30 last:border-0"
+          }`}
+        >
+          <span className="text-text-muted whitespace-nowrap">{fmtDate(t.date)}</span>
+          <span className="font-mono truncate" title={t.description}>{t.description}</span>
+          <span className={`font-mono text-right whitespace-nowrap ${t.amount > 0 ? "text-green" : ""}`}>{fmtP(t.amount)}</span>
+        </div>
+      ))}
+    </div>
+  );
 }

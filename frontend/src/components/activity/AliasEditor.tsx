@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
-import { fmtDate, fmtP } from "../../lib/formatters";
-import { MATCH_LABELS } from "./shared";
+import { fmtP } from "../../lib/formatters";
+import { MATCH_LABELS, TxnRows } from "./shared";
 import type { AliasMatch, AliasPreview } from "../../types";
 
 export interface AliasDraft {
@@ -66,12 +66,7 @@ export default function AliasEditor({ value, onChange, amountHint }: Props) {
             {preview.merchants.length > 1 && <> across {preview.merchants.length}{preview.merchants.length === 12 ? "+" : ""} bank names</>}
             {preview.count > 300 && " · that's a lot, check it isn't too broad"}
           </div>
-          {preview.samples.slice(0, 4).map((s) => (
-            <div key={s.id} className="flex justify-between gap-3 mt-1">
-              <span className="truncate font-mono">{fmtDate(s.date)} · {s.description}</span>
-              <span className="font-mono shrink-0">{fmtP(s.amount)}</span>
-            </div>
-          ))}
+          <TxnRows rows={preview.samples.slice(0, 4)} compact />
         </div>
       )}
     </div>
