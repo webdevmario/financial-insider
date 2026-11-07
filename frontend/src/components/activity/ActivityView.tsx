@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import SearchInput from "../layout/SearchInput";
 import { api } from "../../lib/api";
 import { fmt, fmtDate, fmtP, moLabel } from "../../lib/formatters";
 import StatCard from "../layout/StatCard";
@@ -590,7 +591,7 @@ function AllTransactions({
   return (
     <div>
       <div className="flex gap-2 flex-wrap mb-4">
-        <input placeholder="Search merchant, description, category" value={q} onChange={(e) => setQ(e.target.value)} className="!w-[260px] max-md:!w-full !text-sm !py-1.5" />
+        <SearchInput placeholder="Search merchant, description, category" value={q} onChange={setQ} className="w-[260px] max-md:w-full" />
         <select value={account} onChange={(e) => setAccount(e.target.value)} className="!w-auto !text-sm !py-1.5">
           <option value="">All accounts</option>
           {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}

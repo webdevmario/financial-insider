@@ -1,4 +1,5 @@
-import { fmtDate, fmtP } from "../../lib/formatters";
+import { Fragment } from "react";
+import { fmtDate, fmtP, moLabel } from "../../lib/formatters";
 import type { RecurringCharge, TxnKind } from "../../types";
 
 export const KIND_LABELS: Record<TxnKind, string> = {
@@ -88,22 +89,36 @@ interface TxnRow {
  * Date · description · amount in columns that line up from row to row: one
  * grid shared by every row (subgrid), so each column is as wide as its widest
  * cell. Long descriptions truncate; amounts are right-aligned tabular figures.
+ * byMonth adds a header per month with its subtotal under the amount column.
  */
-export function TxnRows({ rows, compact }: { rows: TxnRow[]; compact?: boolean }) {
+export function TxnRows({ rows, compact, byMonth }: { rows: TxnRow[]; compact?: boolean; byMonth?: boolean }) {
+  const subtotals = new Map<string, number>();
+  if (byMonth) for (const t of rows) subtotals.set(t.date.slice(0, 7), (subtotals.get(t.date.slice(0, 7)) || 0) + t.amount);
   return (
     <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-3 tabular-nums">
-      {rows.map((t) => (
-        <div
-          key={t.id}
-          className={`grid grid-cols-subgrid col-span-3 items-baseline ${
-            compact ? "mt-1" : "text-xs py-1.5 border-b border-border/30 last:border-0"
-          }`}
-        >
-          <span className="text-text-muted whitespace-nowrap">{fmtDate(t.date)}</span>
-          <span className="font-mono truncate" title={t.description}>{t.description}</span>
-          <span className={`font-mono text-right whitespace-nowrap ${t.amount > 0 ? "text-green" : ""}`}>{fmtP(t.amount)}</span>
-        </div>
-      ))}
+      {rows.map((t, i) => {
+        const month = t.date.slice(0, 7);
+        const newMonth = byMonth && month !== rows[i - 1]?.date.slice(0, 7);
+        return (
+          <Fragment key={t.id}>
+            {newMonth && (
+              <div className={`grid grid-cols-subgrid col-span-3 items-baseline text-[11px] font-semibold uppercase tracking-wider text-text-muted pb-1 border-b border-border ${i ? "pt-4" : ""}`}>
+                <span className="col-span-2">{moLabel(month)}</span>
+                <span className="font-mono text-right normal-case tracking-normal text-text-dim">{fmtP(subtotals.get(month)!)}</span>
+              </div>
+            )}
+            <div
+              className={`grid grid-cols-subgrid col-span-3 items-baseline ${
+                compact ? "mt-1" : "text-xs py-1.5 border-b border-border/30 last:border-0"
+              }`}
+            >
+              <span className="text-text-muted whitespace-nowrap">{fmtDate(t.date)}</span>
+              <span className="font-mono truncate" title={t.description}>{t.description}</span>
+              <span className={`font-mono text-right whitespace-nowrap ${t.amount > 0 ? "text-green" : ""}`}>{fmtP(t.amount)}</span>
+            </div>
+          </Fragment>
+        );
+      })}
     </div>
   );
 }

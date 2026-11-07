@@ -77,6 +77,11 @@ body::before {
     -webkit-appearance: none;
     margin: 0;
   }
+  /* SearchInput draws its own clear button */
+  input[type="search"]::-webkit-search-cancel-button,
+  input[type="search"]::-webkit-search-decoration {
+    -webkit-appearance: none;
+  }
   select {
     @apply cursor-pointer;
   }

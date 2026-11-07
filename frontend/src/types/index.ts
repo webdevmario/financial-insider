@@ -182,7 +182,9 @@ export interface Payee {
 
 export interface PayeeDetail extends Payee {
   monthly: { month: string; amount: number }[];
-  bankNames: string[];
+  /** Each bank name filed under this payee; aliasId is the alias catching most of them */
+  bankNames: { name: string; count: number; aliasId: string | null; handPicked: number }[];
+  /** Transactions from the 12 months ending with the latest one (capped at 500) */
   recent: Transaction[];
 }
 

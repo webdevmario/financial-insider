@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import SearchInput from "../layout/SearchInput";
 import { api } from "../../lib/api";
 import { fmt, fmtDate } from "../../lib/formatters";
 import { Badge, Card, Empty } from "./shared";
@@ -107,7 +108,7 @@ export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, on
 
       <div className="grid grid-cols-2 max-lg:grid-cols-1 gap-5">
         <Card title={`Payees (${payees.length})`}>
-          <input placeholder="Search payees and aliases" value={qPayees} onChange={(e) => setQPayees(e.target.value)} className="!text-sm !py-1.5 mb-2" />
+          <SearchInput placeholder="Search payees and aliases" value={qPayees} onChange={setQPayees} className="mb-2" />
           {filteredPayees.length === 0 ? (
             <Empty>{payees.length ? "No match." : "No payees yet. Group a suggestion or pick bank names under No payee yet."}</Empty>
           ) : (
@@ -149,7 +150,7 @@ export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, on
             </button>
           )}
         >
-          <input placeholder="Search bank names" value={qUnassigned} onChange={(e) => setQUnassigned(e.target.value)} className="!text-sm !py-1.5 mb-2" />
+          <SearchInput placeholder="Search bank names" value={qUnassigned} onChange={setQUnassigned} className="mb-2" />
           {unassigned === null ? (
             <Empty>Loading…</Empty>
           ) : filteredUnassigned.length === 0 ? (
