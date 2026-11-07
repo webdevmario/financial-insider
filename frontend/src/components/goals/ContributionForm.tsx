@@ -58,7 +58,19 @@ export default function ContributionForm({ open, onClose, onSaved, onToast, goal
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={goal.name}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={goal.name}
+      footer={
+        <>
+          <button className="btn" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+            {mode === "add" ? "Add" : "Withdraw"}
+          </button>
+        </>
+      }
+    >
       <div className="flex flex-col gap-4">
         <div className="grid grid-cols-2 gap-1 p-1 bg-bg-input border border-border rounded-lg">
           {(["add", "withdraw"] as const).map((m) => (
@@ -123,13 +135,6 @@ export default function ContributionForm({ open, onClose, onSaved, onToast, goal
             />
           </div>
           <div className="text-right mt-1.5 font-mono">{pctAfter.toFixed(0)}%</div>
-        </div>
-
-        <div className="flex justify-end gap-2.5 pt-4 border-t border-border max-md:pb-[env(safe-area-inset-bottom)]">
-          <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-            {mode === "add" ? "Add" : "Withdraw"}
-          </button>
         </div>
       </div>
     </Modal>

@@ -3,6 +3,7 @@ import { api } from "../../lib/api";
 import { fmt, fmtDate, fmtP, moLabel } from "../../lib/formatters";
 import StatCard from "../layout/StatCard";
 import LoadingState from "../layout/LoadingState";
+import OptionSheet from "../layout/OptionSheet";
 import ImportPanel from "./ImportPanel";
 import TransactionEditModal from "./TransactionEditModal";
 import MerchantsTab from "./MerchantsTab";
@@ -18,15 +19,17 @@ interface ActivityViewProps {
 }
 
 type Tab = "overview" | "recurring" | "bills" | "merchants" | "watch" | "payments" | "all";
-const TABS: { id: Tab; label: string }[] = [
-  { id: "overview", label: "Overview" },
-  { id: "recurring", label: "Recurring" },
-  { id: "bills", label: "Bills check" },
-  { id: "merchants", label: "Merchants" },
-  { id: "watch", label: "Watchlist" },
-  { id: "payments", label: "Card payments" },
-  { id: "all", label: "Transactions" },
+const TABS: { id: Tab; label: string; hint: string }[] = [
+  { id: "overview", label: "Overview", hint: "" },
+  { id: "recurring", label: "Recurring", hint: "" },
+  { id: "bills", label: "Bills Check", hint: "Your Bills list against real charges" },
+  { id: "merchants", label: "Merchants", hint: "Payees and the bank names behind them" },
+  { id: "watch", label: "Watchlist", hint: "Possible duplicates, fees and interest" },
+  { id: "payments", label: "Card Payments", hint: "Which account paid each card" },
+  { id: "all", label: "Transactions", hint: "" },
 ];
+/** On phones only these get a segment; the rest sit behind "More" */
+const PHONE_TABS: Tab[] = ["overview", "all", "recurring"];
 const TAB_KEY = "activity.tab";
 
 function storedTab(): Tab {
@@ -49,6 +52,7 @@ export default function ActivityView({ onToast }: ActivityViewProps) {
   const [payees, setPayees] = useState<Payee[]>([]);
   const [openPayee, setOpenPayee] = useState<string | null>(null);
   const [merging, setMerging] = useState<{ members: MergeMember[]; name?: string } | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const reload = useCallback(() => setVersion((v) => v + 1), []);
 
@@ -121,7 +125,8 @@ export default function ActivityView({ onToast }: ActivityViewProps) {
         </div>
       ) : (
         <>
-          <div className="flex gap-0.5 p-0.5 bg-bg-card border border-border rounded-lg mb-5 overflow-x-auto w-fit max-w-full">
+          {/* Desktop: every tab */}
+          <div className="max-md:hidden flex gap-0.5 p-0.5 bg-bg-card border border-border rounded-lg mb-5 w-fit">
             {TABS.map((t) => (
               <button
                 key={t.id}
@@ -134,6 +139,37 @@ export default function ActivityView({ onToast }: ActivityViewProps) {
               </button>
             ))}
           </div>
+
+          {/* Phone: three tabs + More */}
+          <div className="md:hidden grid grid-cols-4 gap-0.5 p-0.5 bg-bg-card border border-border rounded-lg mb-5">
+            {PHONE_TABS.map((id) => (
+              <button
+                key={id}
+                onClick={() => pick(id)}
+                className={`px-1 py-2 rounded-md text-xs font-medium truncate transition-all ${
+                  tab === id ? "text-accent bg-accent/[0.1]" : "text-text-dim"
+                }`}
+              >
+                {TABS.find((t) => t.id === id)!.label}
+              </button>
+            ))}
+            <button
+              onClick={() => setMoreOpen(true)}
+              className={`px-1 py-2 rounded-md text-xs font-medium truncate transition-all ${
+                PHONE_TABS.includes(tab) ? "text-text-dim" : "text-accent bg-accent/[0.1]"
+              }`}
+            >
+              {PHONE_TABS.includes(tab) ? "More" : TABS.find((t) => t.id === tab)!.label} ▾
+            </button>
+          </div>
+          <OptionSheet
+            open={moreOpen}
+            onClose={() => setMoreOpen(false)}
+            title="More Activity"
+            options={TABS.filter((t) => !PHONE_TABS.includes(t.id))}
+            active={tab}
+            onPick={pick}
+          />
 
           {tab === "overview" && <Overview insights={insights!} />}
           {tab === "recurring" && <Recurring items={insights!.recurring} asOf={insights!.asOf} onPayee={mergeFromRecurring} />}
@@ -372,7 +408,7 @@ function Recurring({ items, asOf, onPayee }: { items: RecurringCharge[]; asOf: s
               {openKey === r.key && (
                 <div className="mt-3 flex justify-end">
                   <button className="btn btn-sm" onClick={(e) => { e.stopPropagation(); onPayee(r); }}>
-                    {r.payeeId ? "Edit payee" : "Name this payee…"}
+                    {r.payeeId ? "Edit Payee" : "Name This Payee…"}
                   </button>
                 </div>
               )}

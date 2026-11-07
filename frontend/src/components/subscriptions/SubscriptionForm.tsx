@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import Modal from "../layout/Modal";
+import Confirm from "../layout/Confirm";
 import { api } from "../../lib/api";
 import { fmtP } from "../../lib/formatters";
 import { computeEffectiveNextCharge } from "../../lib/billing";
@@ -100,18 +101,35 @@ export default function SubscriptionForm({
 
   if (showConfirm) {
     return (
-      <Modal open={open} onClose={() => setShowConfirm(false)} title={`Remove "${subscription?.name}"?`}>
-        <p className="text-sm text-text-dim mb-6">This action cannot be undone.</p>
-        <div className="flex justify-end gap-2.5 pt-4 border-t border-border">
-          <button className="btn" onClick={() => setShowConfirm(false)}>Cancel</button>
-          <button className="btn btn-danger" onClick={handleDelete}>Delete</button>
-        </div>
-      </Modal>
+      <Confirm
+        open={open}
+        title={`Remove "${subscription?.name}"?`}
+        message="This action cannot be undone."
+        onConfirm={handleDelete}
+        onCancel={() => setShowConfirm(false)}
+      />
     );
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={subscription ? "Edit Bill" : "Add Bill"}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={subscription ? "Edit Bill" : "Add Bill"}
+      footer={
+        <>
+          {subscription && (
+            <button className="btn btn-danger btn-sm mr-auto" onClick={() => setShowConfirm(true)}>
+              🗑️ Delete
+            </button>
+          )}
+          <button className="btn" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={handleSave}>
+            {subscription ? "Update" : "Add"}
+          </button>
+        </>
+      }
+    >
       <div className="flex flex-col gap-4">
         <div className="input-group">
           <label>Service Name</label>
@@ -198,18 +216,6 @@ export default function SubscriptionForm({
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
           />
-        </div>
-
-        <div className="flex justify-end gap-2.5 pt-4 border-t border-border max-md:pb-[env(safe-area-inset-bottom)]">
-          {subscription && (
-            <button className="btn btn-danger btn-sm mr-auto" onClick={() => setShowConfirm(true)}>
-              🗑️ Delete
-            </button>
-          )}
-          <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={handleSave}>
-            {subscription ? "Update" : "Add"}
-          </button>
         </div>
       </div>
     </Modal>

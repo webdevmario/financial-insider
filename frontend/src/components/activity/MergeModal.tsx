@@ -61,7 +61,23 @@ export default function MergeModal({ members, payees, suggestedName, categories,
   }
 
   return (
-    <Modal open={!!members} onClose={onClose} title={members.length === 1 ? "Name this payee" : `Group ${members.length} names`}>
+    <Modal
+      open={!!members}
+      onClose={onClose}
+      title={members.length === 1 ? "Name This Payee" : `Group ${members.length} Names`}
+      footer={
+        <>
+          <button className="btn" onClick={onClose}>Cancel</button>
+          <button
+            className="btn btn-primary"
+            disabled={saving || (mode === "new" ? !name.trim() : !targetId)}
+            onClick={save}
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+        </>
+      }
+    >
       <div className="flex flex-col gap-1 mb-4 max-h-[180px] overflow-y-auto">
         {members.map((m) => (
           <div key={m.key} className="flex justify-between gap-3 text-xs py-1 border-b border-border/30 last:border-0">
@@ -118,16 +134,6 @@ export default function MergeModal({ members, payees, suggestedName, categories,
         Each bank name becomes an alias, so future imports land here too. Payees in the list are folded into this one.
       </p>
 
-      <div className="flex justify-end gap-2 mt-4">
-        <button className="btn" onClick={onClose}>Cancel</button>
-        <button
-          className="btn btn-primary"
-          disabled={saving || (mode === "new" ? !name.trim() : !targetId)}
-          onClick={save}
-        >
-          {saving ? "Saving…" : "Save"}
-        </button>
-      </div>
     </Modal>
   );
 }

@@ -542,6 +542,12 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
         open={targetOpen}
         onClose={() => setTargetOpen(false)}
         title="Set Budget Target"
+        footer={
+          <>
+            <button className="btn" onClick={() => setTargetOpen(false)}>Cancel</button>
+            <button className="btn btn-primary" onClick={saveTarget}>Save</button>
+          </>
+        }
       >
         <p className="text-[13px] text-text-dim mb-5">
           Set your spending target for {moLabel(selectedMonth)}.
@@ -564,10 +570,6 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
               }}
             />
           </div>
-        </div>
-        <div className="flex justify-end gap-2.5 mt-4 pt-4 border-t border-border">
-          <button className="btn" onClick={() => setTargetOpen(false)}>Cancel</button>
-          <button className="btn btn-primary" onClick={saveTarget}>Save</button>
         </div>
       </Modal>
 
@@ -606,6 +608,12 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
         open={reimbOpen}
         onClose={() => setReimbOpen(false)}
         title="Add Reimbursement"
+        footer={
+          <>
+            <button className="btn" onClick={() => setReimbOpen(false)}>Cancel</button>
+            <button className="btn btn-primary" onClick={saveReimbursement}>Add</button>
+          </>
+        }
       >
         <p className="text-[13px] text-text-dim mb-5">
           Got money back? This bumps your budget for {moLabel(selectedMonth)}.
@@ -657,10 +665,6 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
             ))}
           </div>
         )}
-        <div className="flex justify-end gap-2.5 mt-4 pt-4 border-t border-border">
-          <button className="btn" onClick={() => setReimbOpen(false)}>Cancel</button>
-          <button className="btn btn-primary" onClick={saveReimbursement}>Add</button>
-        </div>
       </Modal>
 
       {/* Edit Expense Modal */}
@@ -668,6 +672,15 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
         open={!!editingExpense}
         onClose={() => setEditingExpense(null)}
         title="Edit Expense"
+        footer={
+          <>
+            <button className="btn btn-danger btn-sm mr-auto" onClick={deleteFromEdit}>
+              🗑️ Delete
+            </button>
+            <button className="btn" onClick={() => setEditingExpense(null)}>Cancel</button>
+            <button className="btn btn-primary" onClick={saveEditExpense}>Update</button>
+          </>
+        }
       >
         <div className="flex flex-col gap-4">
           <div className="input-group">
@@ -698,13 +711,6 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
                 onChange={(e) => setEditDate(e.target.value)}
               />
             </div>
-          </div>
-          <div className="flex justify-end gap-2.5 pt-4 border-t border-border max-md:pb-[env(safe-area-inset-bottom)]">
-            <button className="btn btn-danger btn-sm" onClick={deleteFromEdit}>
-              🗑️ Delete
-            </button>
-            <button className="btn" onClick={() => setEditingExpense(null)}>Cancel</button>
-            <button className="btn btn-primary" onClick={saveEditExpense}>Update</button>
           </div>
         </div>
       </Modal>

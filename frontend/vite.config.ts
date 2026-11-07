@@ -38,7 +38,8 @@ export default defineConfig({
     proxy: {
       // In dev, forward /api calls to the Express backend
       "/api": {
-        target: "http://localhost:3001",
+        // API_TARGET lets a test run point at a scratch backend instead of the real one
+        target: process.env.API_TARGET || "http://localhost:3001",
         changeOrigin: true,
       },
     },

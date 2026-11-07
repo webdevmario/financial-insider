@@ -91,7 +91,28 @@ export default function TransactionEditModal({ txn, payees, categories, onClose,
   }
 
   return (
-    <Modal open={!!txn} onClose={onClose} title="Edit transaction">
+    <Modal
+      open={!!txn}
+      onClose={onClose}
+      title="Edit Transaction"
+      footer={
+        <>
+          {(t.edited === 1 || t.payeeLocked === 1) && (
+            <button className="btn btn-sm mr-auto" disabled={saving} onClick={reset} title="Drop hand edits on this transaction">
+              Reset to Auto
+            </button>
+          )}
+          <button className="btn" onClick={onClose}>Cancel</button>
+          <button
+            className="btn btn-primary"
+            disabled={saving || (remember && (alias.pattern.trim().length < 3 || !name.trim()))}
+            onClick={save}
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+        </>
+      }
+    >
       <div className="text-xs text-text-muted mb-4 leading-relaxed">
         <div className="font-mono text-text-dim break-all">{t.description}</div>
         {fmtDate(t.date)} · <span className="font-mono">{fmtP(t.amount)}</span>
@@ -113,7 +134,7 @@ export default function TransactionEditModal({ txn, payees, categories, onClose,
               : name.trim() ? "A new payee will be created" : ""}
           </span>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 max-md:grid-cols-1 gap-3">
           <div className="input-group">
             <label>Category</label>
             <input list="txn-categories" value={category} onChange={(e) => setCategory(e.target.value)} />
@@ -142,23 +163,6 @@ export default function TransactionEditModal({ txn, payees, categories, onClose,
         </label>
         {remember && <AliasEditor value={alias} onChange={setAlias} amountHint={t.amount} />}
 
-        <div className="flex items-center gap-2 mt-2">
-          {(t.edited === 1 || t.payeeLocked === 1) && (
-            <button className="btn btn-sm" disabled={saving} onClick={reset} title="Drop hand edits on this transaction">
-              Reset to automatic
-            </button>
-          )}
-          <div className="flex gap-2 ml-auto">
-            <button className="btn" onClick={onClose}>Cancel</button>
-            <button
-              className="btn btn-primary"
-              disabled={saving || (remember && (alias.pattern.trim().length < 3 || !name.trim()))}
-              onClick={save}
-            >
-              {saving ? "Saving…" : "Save"}
-            </button>
-          </div>
-        </div>
       </div>
     </Modal>
   );

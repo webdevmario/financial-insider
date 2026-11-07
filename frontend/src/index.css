@@ -7,6 +7,12 @@
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #2a2d3e; border-radius: 3px; }
 
+/* ── Notch / home-indicator room (viewport-fit=cover) ── */
+body {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
 /* ── Background gradient ──────────────────────── */
 body::before {
   content: "";
@@ -97,6 +103,19 @@ body::before {
   .btn-primary:hover {
     background: #5a7af8;
     box-shadow: 0 0 20px rgba(74, 108, 247, 0.25);
+  }
+  .btn:disabled {
+    @apply opacity-50 cursor-not-allowed;
+  }
+  .btn:disabled:hover {
+    @apply border-border bg-bg-card;
+    box-shadow: none;
+  }
+  .btn-primary:disabled:hover {
+    @apply border-accent bg-accent;
+  }
+  .btn-danger:disabled:hover {
+    @apply border-red/30 bg-red-dim;
   }
   .btn-sm {
     @apply py-[7px] px-3.5 text-[13px];
