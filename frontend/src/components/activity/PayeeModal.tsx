@@ -5,7 +5,7 @@ import LoadingState from "../layout/LoadingState";
 import { api } from "../../lib/api";
 import { fmt, fmtDate, fmtP, moLabel } from "../../lib/formatters";
 import AliasEditor, { type AliasDraft } from "./AliasEditor";
-import { Badge, Empty, KIND_LABELS, MATCH_LABELS, TxnRows } from "./shared";
+import { Badge, Empty, KIND_LABELS, MATCH_LABELS, TxnRows, money, moneyInNote } from "./shared";
 import type { PayeeDetail, Subscription, TxnKind } from "../../types";
 
 interface Props {
@@ -157,7 +157,9 @@ export default function PayeeModal({ payeeId, categories, onClose, onChanged, on
       ) : (
         <div className="flex flex-col">
           <div className="text-xs text-text-muted mb-2">
-            {detail.count} transactions · {fmt(detail.spent)} spent{detail.lastDate && <> · last {fmtDate(detail.lastDate)}</>}
+            {detail.count} transactions · {detail.spent === 0 && detail.received > 0 ? money(0, detail.received) : <>{fmt(detail.spent)} spent</>}
+            {moneyInNote(detail.spent, detail.received) && <> · {moneyInNote(detail.spent, detail.received)}</>}
+            {detail.lastDate && <> · last {fmtDate(detail.lastDate)}</>}
             {detail.handPicked > 0 && <> · {detail.handPicked} picked by hand</>}
           </div>
 
@@ -338,7 +340,7 @@ function wholeMonths<T extends { date: string }>(rows: T[], n: number): T[] {
 const ROWS_PER_PAGE = 15;
 
 /**
- * Spending by month for the 12 months ending with the payee's latest
+ * Spending by month (or money in, for a payee that only pays you) for the 12 months ending with the payee's latest
  * transaction, then those transactions grouped by month, newest months
  * first with the rest behind "Show earlier months". Tapping a bar narrows
  * the list to that month.
@@ -349,8 +351,11 @@ function Activity({ detail }: { detail: PayeeDetail }) {
   const latest = detail.recent[0]?.date.slice(0, 7) ?? detail.monthly[detail.monthly.length - 1]?.month;
   if (!latest) return <Empty>No transactions yet.</Empty>;
 
-  const spend = new Map(detail.monthly.map((m) => [m.month, m.amount]));
-  const months = Array.from({ length: 12 }, (_, i) => shiftMonth(latest, i - 11)).map((m) => ({ month: m, amount: spend.get(m) ?? 0 }));
+  const byMonth = new Map(detail.monthly.map((m) => [m.month, m]));
+  const span = Array.from({ length: 12 }, (_, i) => shiftMonth(latest, i - 11));
+  // Chart money in instead when the payee has no spending in the span (interest earned, paychecks)
+  const moneyIn = span.every((m) => !byMonth.get(m)?.amount) && span.some((m) => byMonth.get(m)?.received);
+  const months = span.map((m) => ({ month: m, amount: (moneyIn ? byMonth.get(m)?.received : byMonth.get(m)?.amount) ?? 0 }));
   const max = Math.max(...months.map((m) => m.amount), 1);
   const avg = months.reduce((s, m) => s + m.amount, 0) / months.length;
   const rows = month ? detail.recent.filter((t) => t.date.startsWith(month)) : wholeMonths(detail.recent, limit);
@@ -362,7 +367,7 @@ function Activity({ detail }: { detail: PayeeDetail }) {
       {avg > 0 && (
         <div>
           <div className="flex items-baseline justify-between mb-1.5">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">Spending by month</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">{moneyIn ? "Money in by month" : "Spending by month"}</div>
             <div className="text-[11px] text-text-muted">avg <span className="font-mono text-text-dim">{fmtP(avg)}</span>/mo</div>
           </div>
           <div className="flex gap-1 items-end h-[60px]">
@@ -380,7 +385,9 @@ function Activity({ detail }: { detail: PayeeDetail }) {
                 >
                   <div
                     className={`w-full max-w-[28px] rounded-sm transition-colors ${
-                      on ? "bg-accent" : month ? "bg-accent/25 group-hover:bg-accent/50" : "bg-accent/70 group-hover:bg-accent"
+                      moneyIn
+                        ? on ? "bg-green" : month ? "bg-green/25 group-hover:bg-green/50" : "bg-green/70 group-hover:bg-green"
+                        : on ? "bg-accent" : month ? "bg-accent/25 group-hover:bg-accent/50" : "bg-accent/70 group-hover:bg-accent"
                     }`}
                     style={{ height: `${m.amount ? Math.max(3, (m.amount / max) * 44) : 1}px` }}
                   />

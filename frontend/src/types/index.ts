@@ -174,14 +174,18 @@ export interface Payee {
   notes: string | null;
   createdAt: string;
   count: number;
+  /** Money out (spend, fees, interest charged) */
   spent: number;
+  /** Money in (income, refunds, interest earned) */
+  received: number;
   lastDate: string | null;
   aliases: PayeeAlias[];
   handPicked: number;
 }
 
 export interface PayeeDetail extends Payee {
-  monthly: { month: string; amount: number }[];
+  /** amount is money out that month, received is money in */
+  monthly: { month: string; amount: number; received: number }[];
   /** Each bank name filed under this payee; aliasId is the alias catching most of them */
   bankNames: { name: string; count: number; aliasId: string | null; handPicked: number }[];
   /** Transactions from the 12 months ending with the latest one (capped at 500) */
@@ -193,6 +197,7 @@ export interface UnassignedMerchant {
   merchant: string;
   count: number;
   spent: number;
+  received: number;
   lastDate: string;
   samples: string[];
   kinds: TxnKind[];
@@ -202,7 +207,7 @@ export interface PayeeSuggestion {
   id: string;
   reason: string;
   name: string;
-  members: { key: string; name: string; payeeId: string | null; count: number; spent: number }[];
+  members: { key: string; name: string; payeeId: string | null; count: number; spent: number; received: number }[];
 }
 
 export interface AliasPreview {
