@@ -155,7 +155,7 @@ export default function ImportPanel({ onToast, onChanged }: ImportPanelProps) {
       )}
 
       {open && (
-        <div className="mt-4 border-t border-border pt-3 flex flex-col gap-1 max-h-[320px] overflow-y-auto">
+        <div className="mt-4 border-t border-border pt-3 flex flex-col gap-1 max-h-[320px] scroll-list">
           {batches.length === 0 ? (
             <div className="text-xs text-text-muted py-2">Nothing imported yet.</div>
           ) : (

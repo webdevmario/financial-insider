@@ -112,7 +112,7 @@ export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, on
           {filteredPayees.length === 0 ? (
             <Empty>{payees.length ? "No match." : "No payees yet. Group a suggestion or pick bank names under No payee yet."}</Empty>
           ) : (
-            <div className="flex flex-col max-h-[520px] overflow-y-auto">
+            <div className="flex flex-col max-h-[520px] scroll-list">
               {filteredPayees.map((p) => (
                 <button
                   key={p.id}
@@ -156,7 +156,7 @@ export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, on
           ) : filteredUnassigned.length === 0 ? (
             <Empty>{unassigned.length ? "No match." : "Everything has a payee."}</Empty>
           ) : (
-            <div className="flex flex-col max-h-[520px] overflow-y-auto">
+            <div className="flex flex-col max-h-[520px] scroll-list">
               {filteredUnassigned.slice(0, 300).map((u) => (
                 <label key={u.key} className="flex items-center gap-3 py-2 px-1 border-b border-border/30 last:border-0 cursor-pointer hover:bg-white/[0.02]">
                   <input type="checkbox" checked={selected.has(u.key)} onChange={() => toggle(u.key)} />

@@ -102,7 +102,7 @@ export function TxnRows({ rows, compact, byMonth }: { rows: TxnRow[]; compact?: 
         return (
           <Fragment key={t.id}>
             {newMonth && (
-              <div className={`grid grid-cols-subgrid col-span-3 items-baseline text-[11px] font-semibold uppercase tracking-wider text-text-muted pb-1 border-b border-border ${i ? "pt-4" : ""}`}>
+              <div className={`grid grid-cols-subgrid col-span-3 items-baseline text-[11px] font-semibold uppercase tracking-wider text-text-muted pb-1 border-b border-border ${i ? "pt-3" : ""}`}>
                 <span className="col-span-2">{moLabel(month)}</span>
                 <span className="font-mono text-right normal-case tracking-normal text-text-dim">{fmtP(subtotals.get(month)!)}</span>
               </div>

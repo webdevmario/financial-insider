@@ -46,6 +46,12 @@ body::before {
 
 /* ── Form elements ────────────────────────────── */
 @layer components {
+  /* Scrolling list inside a card: room between the row values and the
+     scrollbar, and the same row width whether or not it scrolls */
+  .scroll-list {
+    @apply overflow-y-auto pr-2.5;
+    scrollbar-gutter: stable;
+  }
   .input-group {
     @apply flex flex-col gap-1.5;
   }
