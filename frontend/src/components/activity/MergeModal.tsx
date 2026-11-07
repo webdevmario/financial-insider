@@ -78,7 +78,7 @@ export default function MergeModal({ members, payees, suggestedName, categories,
         </>
       }
     >
-      <div className="flex flex-col gap-1 mb-4 max-h-[180px] overflow-y-auto">
+      <div className="flex flex-col gap-1 mb-4 max-h-[180px] scroll-list">
         {members.map((m) => (
           <div key={m.key} className="flex justify-between gap-3 text-xs py-1 border-b border-border/30 last:border-0">
             <span className="truncate">

@@ -141,7 +141,7 @@ export default function SettingsModal({ open, onClose, onToast, onDataChange }: 
           <summary className="text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-2">
             Pay History
           </summary>
-          <div className="max-h-[150px] overflow-y-auto">
+          <div className="max-h-[150px] scroll-list">
             {paycheckHistory.length === 0 ? (
               <p className="text-xs text-text-muted py-2">No changes yet</p>
             ) : (

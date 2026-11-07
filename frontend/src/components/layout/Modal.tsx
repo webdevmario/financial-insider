@@ -8,6 +8,8 @@ interface ModalProps {
   titleExtra?: React.ReactNode;
   /** Action buttons. Pinned under the scrolling content so they stay in reach on a phone. */
   footer?: React.ReactNode;
+  /** Extra classes for the dialog panel, such as a fixed height for tabbed content */
+  className?: string;
   children: React.ReactNode;
 }
 
@@ -70,7 +72,7 @@ const isPhone = () => window.matchMedia("(max-width: 767px)").matches;
  * Shared dialog: centred card on desktop, bottom sheet on phones.
  * The header and footer stay put; only the content between them scrolls.
  */
-export default function Modal({ open, onClose, title, titleExtra, footer, children }: ModalProps) {
+export default function Modal({ open, onClose, title, titleExtra, footer, className = "", children }: ModalProps) {
   const id = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -147,8 +149,8 @@ export default function Modal({ open, onClose, title, titleExtra, footer, childr
         role="dialog"
         aria-modal="true"
         aria-labelledby={`${id}-title`}
-        className="flex flex-col bg-bg-card border border-border rounded-2xl w-[520px] max-w-[90vw] max-h-[85%] shadow-[0_24px_48px_rgba(0,0,0,0.4)]
-          max-md:w-full max-md:max-w-full max-md:max-h-[calc(100%-max(24px,env(safe-area-inset-top)))] max-md:rounded-b-none max-md:border-x-0 max-md:border-b-0 max-md:animate-[sheetUp_0.25s_ease-out]"
+        className={`flex flex-col bg-bg-card border border-border rounded-2xl w-[520px] max-w-[90vw] max-h-[85%] shadow-[0_24px_48px_rgba(0,0,0,0.4)]
+          max-md:w-full max-md:max-w-full max-md:max-h-[calc(100%-max(24px,env(safe-area-inset-top)))] max-md:rounded-b-none max-md:border-x-0 max-md:border-b-0 max-md:animate-[sheetUp_0.25s_ease-out] ${className}`}
       >
         {/* Header (doubles as the drag handle on phones) */}
         <div

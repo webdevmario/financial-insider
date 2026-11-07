@@ -120,6 +120,9 @@ export default function PayeeModal({ payeeId, categories, onClose, onChanged, on
       open={!!payeeId}
       onClose={onClose}
       title={detail?.name ?? "Payee"}
+      // One height for every tab, so switching tabs doesn't resize the dialog;
+      // a long tab scrolls under the tab bar instead
+      className="h-[min(640px,85%)] max-md:h-[min(720px,90%)]"
       footer={
         detail && (
           <>
@@ -153,13 +156,13 @@ export default function PayeeModal({ payeeId, categories, onClose, onChanged, on
         <LoadingState />
       ) : (
         <div className="flex flex-col">
-          <div className="text-xs text-text-muted mb-3">
+          <div className="text-xs text-text-muted mb-2">
             {detail.count} transactions · {fmt(detail.spent)} spent{detail.lastDate && <> · last {fmtDate(detail.lastDate)}</>}
             {detail.handPicked > 0 && <> · {detail.handPicked} picked by hand</>}
           </div>
 
           {/* Stays in view while a long tab scrolls under it */}
-          <div className="sticky top-0 z-10 bg-bg-card pb-4">
+          <div className="sticky top-0 z-10 bg-bg-card pb-3">
             <div role="tablist" aria-label="Payee sections" className="grid grid-cols-3 gap-0.5 p-0.5 bg-bg border border-border rounded-lg" onKeyDown={onTabKey}>
               {TABS.map((t) => {
                 const active = tab === t.id;
@@ -188,7 +191,7 @@ export default function PayeeModal({ payeeId, categories, onClose, onChanged, on
             </div>
           </div>
 
-          <div role="tabpanel" id={`payee-panel-${tab}`} aria-labelledby={`payee-tab-${tab}`} className="min-h-[min(440px,55vh)]">
+          <div role="tabpanel" id={`payee-panel-${tab}`} aria-labelledby={`payee-tab-${tab}`}>
             {tab === "settings" && (
               <div className="flex flex-col gap-3">
                 <div className="input-group">
@@ -323,13 +326,26 @@ function shiftMonth(month: string, n: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+/** The first `n` rows, extended to the end of the last month they reach, so month subtotals stay whole */
+function wholeMonths<T extends { date: string }>(rows: T[], n: number): T[] {
+  if (rows.length <= n) return rows;
+  const last = rows[n - 1].date.slice(0, 7);
+  let end = n;
+  while (end < rows.length && rows[end].date.startsWith(last)) end++;
+  return rows.slice(0, end);
+}
+
+const ROWS_PER_PAGE = 15;
+
 /**
  * Spending by month for the 12 months ending with the payee's latest
- * transaction, then those transactions grouped by month. Tapping a bar
- * narrows the list to that month.
+ * transaction, then those transactions grouped by month, newest months
+ * first with the rest behind "Show earlier months". Tapping a bar narrows
+ * the list to that month.
  */
 function Activity({ detail }: { detail: PayeeDetail }) {
   const [month, setMonth] = useState<string | null>(null);
+  const [limit, setLimit] = useState(ROWS_PER_PAGE);
   const latest = detail.recent[0]?.date.slice(0, 7) ?? detail.monthly[detail.monthly.length - 1]?.month;
   if (!latest) return <Empty>No transactions yet.</Empty>;
 
@@ -337,18 +353,19 @@ function Activity({ detail }: { detail: PayeeDetail }) {
   const months = Array.from({ length: 12 }, (_, i) => shiftMonth(latest, i - 11)).map((m) => ({ month: m, amount: spend.get(m) ?? 0 }));
   const max = Math.max(...months.map((m) => m.amount), 1);
   const avg = months.reduce((s, m) => s + m.amount, 0) / months.length;
-  const rows = month ? detail.recent.filter((t) => t.date.startsWith(month)) : detail.recent;
+  const rows = month ? detail.recent.filter((t) => t.date.startsWith(month)) : wholeMonths(detail.recent, limit);
+  const hidden = month ? 0 : detail.recent.length - rows.length;
   const older = detail.count - detail.recent.length;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       {avg > 0 && (
         <div>
-          <div className="flex items-baseline justify-between mb-2">
+          <div className="flex items-baseline justify-between mb-1.5">
             <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">Spending by month</div>
             <div className="text-[11px] text-text-muted">avg <span className="font-mono text-text-dim">{fmtP(avg)}</span>/mo</div>
           </div>
-          <div className="flex gap-1 items-end h-20">
+          <div className="flex gap-1 items-end h-[60px]">
             {months.map((m) => {
               const on = month === m.month;
               return (
@@ -359,13 +376,13 @@ function Activity({ detail }: { detail: PayeeDetail }) {
                   aria-pressed={on}
                   aria-label={`${moLabel(m.month)}: ${fmtP(m.amount)}`}
                   title={`${moLabel(m.month)} · ${fmtP(m.amount)}`}
-                  className="flex-1 h-full flex flex-col justify-end items-center gap-1 min-w-0 group"
+                  className="flex-1 h-full flex flex-col justify-end items-center gap-0.5 min-w-0 group"
                 >
                   <div
                     className={`w-full max-w-[28px] rounded-sm transition-colors ${
                       on ? "bg-accent" : month ? "bg-accent/25 group-hover:bg-accent/50" : "bg-accent/70 group-hover:bg-accent"
                     }`}
-                    style={{ height: `${m.amount ? Math.max(3, (m.amount / max) * 56) : 1}px` }}
+                    style={{ height: `${m.amount ? Math.max(3, (m.amount / max) * 44) : 1}px` }}
                   />
                   <span className={`text-[9px] ${on ? "text-accent" : "text-text-muted"}`}>{moLabel(m.month).slice(0, 3)}</span>
                 </button>
@@ -376,7 +393,7 @@ function Activity({ detail }: { detail: PayeeDetail }) {
       )}
 
       {month && (
-        <div className="flex items-center justify-between text-xs text-text-dim -mb-1">
+        <div className="flex items-center justify-between text-xs text-text-dim">
           <span>Showing {moLabel(month)}</span>
           <button className="text-accent hover:underline" onClick={() => setMonth(null)}>Show all months</button>
         </div>
@@ -384,8 +401,14 @@ function Activity({ detail }: { detail: PayeeDetail }) {
 
       {rows.length ? <TxnRows rows={rows} byMonth /> : <Empty>Nothing in {moLabel(month!)}.</Empty>}
 
-      {!month && older > 0 && (
-        <p className="text-[11px] text-text-muted -mt-2">{older} older transaction{older === 1 ? "" : "s"} not shown.</p>
+      {hidden > 0 && (
+        <button className="btn btn-sm self-center" onClick={() => setLimit((n) => n + ROWS_PER_PAGE * 2)}>
+          Show earlier months ({hidden} more)
+        </button>
+      )}
+
+      {!month && !hidden && older > 0 && (
+        <p className="text-[11px] text-text-muted -mt-1">{older} older transaction{older === 1 ? "" : "s"} not shown.</p>
       )}
     </div>
   );
