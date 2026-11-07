@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import Modal from "../layout/Modal";
+import Confirm from "../layout/Confirm";
 import { api } from "../../lib/api";
 import { fmt, fmtDate } from "../../lib/formatters";
 import type { Account, AccountType } from "../../types";
@@ -96,13 +97,13 @@ export default function AccountForm({ open, onClose, onSaved, onToast, account }
   if (showConfirm) {
     const label = account ? `${account.type}${account.owner ? ` (${account.owner})` : ""}` : "";
     return (
-      <Modal open={open} onClose={() => setShowConfirm(false)} title={`Delete "${label}"?`}>
-        <p className="text-sm text-text-dim mb-6">This action cannot be undone.</p>
-        <div className="flex justify-end gap-2.5 pt-4 border-t border-border">
-          <button className="btn" onClick={() => setShowConfirm(false)}>Cancel</button>
-          <button className="btn btn-danger" onClick={handleDelete}>Delete</button>
-        </div>
-      </Modal>
+      <Confirm
+        open={open}
+        title={`Delete "${label}"?`}
+        message="This action cannot be undone."
+        onConfirm={handleDelete}
+        onCancel={() => setShowConfirm(false)}
+      />
     );
   }
 
@@ -118,7 +119,25 @@ export default function AccountForm({ open, onClose, onSaved, onToast, account }
   ) : undefined;
 
   return (
-    <Modal open={open} onClose={onClose} title={account ? "Edit Asset" : "Add Asset"} titleExtra={titleExtra}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={account ? "Edit Asset" : "Add Asset"}
+      titleExtra={titleExtra}
+      footer={
+        <>
+          {account && (
+            <button className="btn btn-danger btn-sm mr-auto" onClick={() => setShowConfirm(true)}>
+              🗑️ Delete
+            </button>
+          )}
+          <button className="btn" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={handleSave}>
+            {account ? "Update" : "Add"}
+          </button>
+        </>
+      }
+    >
       <div className="flex flex-col gap-4">
         {/* Type + Balance row */}
         <div className="grid grid-cols-2 max-md:grid-cols-1 gap-3">
@@ -218,19 +237,6 @@ export default function AccountForm({ open, onClose, onSaved, onToast, account }
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
           />
-        </div>
-
-        {/* Actions */}
-        <div className="flex justify-end gap-2.5 pt-4 border-t border-border max-md:pb-[env(safe-area-inset-bottom)]">
-          {account && (
-            <button className="btn btn-danger btn-sm mr-auto" onClick={() => setShowConfirm(true)}>
-              🗑️ Delete
-            </button>
-          )}
-          <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={handleSave}>
-            {account ? "Update" : "Add"}
-          </button>
         </div>
       </div>
     </Modal>

@@ -7,18 +7,22 @@ import GoalsView from "./components/goals/GoalsView";
 import ActivityView from "./components/activity/ActivityView";
 import SettingsModal from "./components/layout/SettingsModal";
 import Toast from "./components/layout/Toast";
+import OptionSheet from "./components/layout/OptionSheet";
 import { ConnectionDot, ConnectionPill, useConnectionNotice } from "./components/layout/ConnectionNotice";
 
 type View = "dashboard" | "accounts" | "budget" | "subscriptions" | "goals" | "activity";
 
-const NAV_ITEMS: { view: View; icon: string; label: string; desktop: string }[] = [
-  { view: "dashboard", icon: "📊", label: "Home", desktop: "Dashboard" },
-  { view: "accounts", icon: "🏦", label: "Assets", desktop: "Assets" },
-  { view: "budget", icon: "💰", label: "Budget", desktop: "Budget" },
-  { view: "subscriptions", icon: "🔄", label: "Bills", desktop: "Bills" },
-  { view: "activity", icon: "🧾", label: "Activity", desktop: "Activity" },
-  { view: "goals", icon: "🎯", label: "Goals", desktop: "Goals" },
+const NAV_ITEMS: { view: View; icon: string; label: string; desktop: string; hint: string }[] = [
+  { view: "dashboard", icon: "📊", label: "Home", desktop: "Dashboard", hint: "" },
+  { view: "accounts", icon: "🏦", label: "Assets", desktop: "Assets", hint: "Net worth, accounts and property" },
+  { view: "budget", icon: "💰", label: "Budget", desktop: "Budget", hint: "" },
+  { view: "subscriptions", icon: "🔄", label: "Bills", desktop: "Bills", hint: "" },
+  { view: "activity", icon: "🧾", label: "Activity", desktop: "Activity", hint: "" },
+  { view: "goals", icon: "🎯", label: "Goals", desktop: "Goals", hint: "What you're saving toward" },
 ];
+/** The phone tab bar holds these four; the rest live in the "More" sheet */
+const PHONE_TABS: View[] = ["dashboard", "budget", "subscriptions", "activity"];
+const MORE_ITEMS = NAV_ITEMS.filter((i) => !PHONE_TABS.includes(i.view));
 
 /** Chrome/Android only: offer to install the app when the browser allows it */
 function InstallButton() {
@@ -56,6 +60,7 @@ function InstallButton() {
 export default function App() {
   const [activeView, setActiveView] = useState<View>("dashboard");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [toast, setToast] = useState<{ msg: string; err?: boolean } | null>(null);
   const connection = useConnectionNotice();
 
@@ -130,12 +135,12 @@ export default function App() {
 
       {/* Mobile Nav */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-bg/95 backdrop-blur-xl border-t border-border px-2 pb-[max(6px,env(safe-area-inset-bottom))] pt-1.5">
-        <div className="flex justify-around items-center">
-          {NAV_ITEMS.map((item) => (
+        <div className="grid grid-cols-5 items-center">
+          {NAV_ITEMS.filter((i) => PHONE_TABS.includes(i.view)).map((item) => (
             <button
               key={item.view}
               onClick={() => setActiveView(item.view)}
-              className={`flex flex-col items-center gap-0.5 px-2.5 py-1.5 text-[10px] font-medium rounded-lg transition-colors ${
+              className={`flex flex-col items-center gap-0.5 py-1.5 text-[10px] font-medium rounded-lg transition-colors ${
                 activeView === item.view ? "text-accent" : "text-text-muted"
               }`}
             >
@@ -143,8 +148,31 @@ export default function App() {
               {item.label}
             </button>
           ))}
+          <button
+            onClick={() => setMoreOpen(true)}
+            className={`flex flex-col items-center gap-0.5 py-1.5 text-[10px] font-medium rounded-lg transition-colors ${
+              PHONE_TABS.includes(activeView) ? "text-text-muted" : "text-accent"
+            }`}
+          >
+            <span className="text-xl leading-none">
+              {PHONE_TABS.includes(activeView) ? "☰" : NAV_ITEMS.find((i) => i.view === activeView)!.icon}
+            </span>
+            {PHONE_TABS.includes(activeView) ? "More" : NAV_ITEMS.find((i) => i.view === activeView)!.label}
+          </button>
         </div>
       </div>
+
+      <OptionSheet<View | "settings">
+        open={moreOpen}
+        onClose={() => setMoreOpen(false)}
+        title="More"
+        options={[
+          ...MORE_ITEMS.map((i) => ({ id: i.view, label: i.desktop, icon: i.icon, hint: i.hint })),
+          { id: "settings", label: "Settings", icon: "⚙️", hint: "Income, backups and data" },
+        ]}
+        active={activeView}
+        onPick={(id) => (id === "settings" ? setSettingsOpen(true) : setActiveView(id))}
+      />
 
       {/* Settings Modal */}
       <SettingsModal

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Modal from "../layout/Modal";
+import Confirm from "../layout/Confirm";
+import LoadingState from "../layout/LoadingState";
 import { api } from "../../lib/api";
 import { fmt, fmtDate, fmtP, moLabel } from "../../lib/formatters";
 import AliasEditor, { type AliasDraft } from "./AliasEditor";
@@ -23,6 +25,7 @@ export default function PayeeModal({ payeeId, categories, onClose, onChanged, on
   const [billId, setBillId] = useState("");
   const [draft, setDraft] = useState<AliasDraft>({ pattern: "", match: "contains", amount: null });
   const [busy, setBusy] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const fill = useCallback((d: PayeeDetail) => {
     setDetail(d);
@@ -35,6 +38,7 @@ export default function PayeeModal({ payeeId, categories, onClose, onChanged, on
   useEffect(() => {
     if (!payeeId) return;
     setDetail(null);
+    setConfirmingDelete(false);
     setDraft({ pattern: "", match: "contains", amount: null });
     api.payees.get(payeeId).then(fill).catch(() => onToast("Couldn't load payee", true));
     api.subscriptions.list().then(setBills).catch(() => setBills([]));
@@ -60,10 +64,54 @@ export default function PayeeModal({ payeeId, categories, onClose, onChanged, on
     detail && (name.trim() !== detail.name || (category.trim() || null) !== detail.category || (kind || null) !== detail.kind || (billId || null) !== detail.billId);
   const max = Math.max(...(detail?.monthly.map((m) => m.amount) ?? [1]), 1);
 
+  if (confirmingDelete && detail) {
+    return (
+      <Confirm
+        open
+        title={`Delete "${detail.name}"?`}
+        message="Its transactions go back to their bank names. Aliases are removed too."
+        onConfirm={() => {
+          setConfirmingDelete(false);
+          run(async () => {
+            await api.payees.delete(detail.id);
+            onClose();
+          }, "Payee deleted");
+        }}
+        onCancel={() => setConfirmingDelete(false)}
+      />
+    );
+  }
+
   return (
-    <Modal open={!!payeeId} onClose={onClose} title={detail?.name ?? "Payee"}>
+    <Modal
+      open={!!payeeId}
+      onClose={onClose}
+      title={detail?.name ?? "Payee"}
+      footer={
+        detail && (
+          <>
+            <button className="btn btn-danger btn-sm mr-auto" disabled={busy} onClick={() => setConfirmingDelete(true)}>
+              🗑️ Delete
+            </button>
+            <button className="btn" onClick={onClose}>{dirty ? "Cancel" : "Close"}</button>
+            <button
+              className="btn btn-primary"
+              disabled={busy || !dirty || !name.trim()}
+              onClick={() =>
+                run(async () => {
+                  await api.payees.update(detail.id, { name: name.trim(), category: category.trim() || null, kind: kind || null, billId: billId || null });
+                  onClose();
+                }, "Payee saved")
+              }
+            >
+              Save
+            </button>
+          </>
+        )
+      }
+    >
       {!detail ? (
-        <div className="text-sm text-text-muted py-6 text-center">Loading…</div>
+        <LoadingState />
       ) : (
         <div className="flex flex-col gap-5">
           <div className="text-xs text-text-muted">
@@ -76,7 +124,7 @@ export default function PayeeModal({ payeeId, categories, onClose, onChanged, on
               <label>Name</label>
               <input value={name} onChange={(e) => setName(e.target.value)} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 max-md:grid-cols-1 gap-3">
               <div className="input-group">
                 <label>Category</label>
                 <input list="payee-categories" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="What the bank says" />
@@ -100,20 +148,6 @@ export default function PayeeModal({ payeeId, categories, onClose, onChanged, on
               </select>
               <span className="text-[11px] text-text-muted">Linked bills are matched by this payee in Bills check and Recurring, not by name.</span>
             </div>
-            {dirty && (
-              <button
-                className="btn btn-primary btn-sm self-end"
-                disabled={busy || !name.trim()}
-                onClick={() =>
-                  run(
-                    () => api.payees.update(detail.id, { name: name.trim(), category: category.trim() || null, kind: kind || null, billId: billId || null }),
-                    "Payee saved"
-                  )
-                }
-              >
-                Save changes
-              </button>
-            )}
           </div>
 
           <div>
@@ -129,7 +163,7 @@ export default function PayeeModal({ payeeId, categories, onClose, onChanged, on
                     {a.amount != null && <span className="font-mono text-text-muted">= {fmtP(a.amount)}</span>}
                     <span className={`text-text-muted shrink-0 ${a.matched === 0 ? "text-amber" : ""}`}>{a.matched}×</span>
                     <button
-                      className="text-text-muted hover:text-red px-1"
+                      className="text-text-muted hover:text-red px-2 py-1 -my-1"
                       title="Remove alias"
                       disabled={busy}
                       onClick={() => run(() => api.payees.deleteAlias(detail.id, a.id), "Alias removed")}
@@ -152,7 +186,7 @@ export default function PayeeModal({ payeeId, categories, onClose, onChanged, on
                 }, "Alias added")
               }
             >
-              + Add alias
+              + Add Alias
             </button>
           </div>
 
@@ -189,22 +223,6 @@ export default function PayeeModal({ payeeId, categories, onClose, onChanged, on
             </div>
           )}
 
-          <div className="flex justify-between pt-2 border-t border-border">
-            <button
-              className="btn btn-sm btn-danger"
-              disabled={busy}
-              onClick={() => {
-                if (!confirm(`Delete “${detail.name}”? Its transactions go back to their bank names.`)) return;
-                run(async () => {
-                  await api.payees.delete(detail.id);
-                  onClose();
-                }, "Payee deleted");
-              }}
-            >
-              Delete payee
-            </button>
-            <button className="btn btn-sm" onClick={onClose}>Done</button>
-          </div>
         </div>
       )}
     </Modal>

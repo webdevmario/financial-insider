@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import Modal from "../layout/Modal";
+import Confirm from "../layout/Confirm";
 import { api } from "../../lib/api";
 import { fmtP, fmtDate } from "../../lib/formatters";
 import { PRIORITY_LABELS } from "../../lib/goals";
@@ -82,22 +83,37 @@ export default function GoalForm({ open, onClose, onSaved, onToast, goal }: Goal
 
   if (showConfirm) {
     return (
-      <Modal open={open} onClose={() => setShowConfirm(false)} title={`Delete "${goal?.name}"?`}>
-        <p className="text-sm text-text-dim mb-6">
-          This removes the goal and its contribution history. It doesn't touch any of your accounts.
-        </p>
-        <div className="flex justify-end gap-2.5 pt-4 border-t border-border">
-          <button className="btn" onClick={() => setShowConfirm(false)}>Cancel</button>
-          <button className="btn btn-danger" onClick={handleDelete}>Delete</button>
-        </div>
-      </Modal>
+      <Confirm
+        open={open}
+        title={`Delete "${goal?.name}"?`}
+        message="This removes the goal and its contribution history. It doesn't touch any of your accounts."
+        onConfirm={handleDelete}
+        onCancel={() => setShowConfirm(false)}
+      />
     );
   }
 
   const history = goal ? [...goal.history].reverse() : [];
 
   return (
-    <Modal open={open} onClose={onClose} title={goal ? "Edit Goal" : "Add Goal"}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={goal ? "Edit Goal" : "Add Goal"}
+      footer={
+        <>
+          {goal && (
+            <button className="btn btn-danger btn-sm mr-auto" onClick={() => setShowConfirm(true)}>
+              🗑️ Delete
+            </button>
+          )}
+          <button className="btn" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+            {goal ? "Update" : "Add"}
+          </button>
+        </>
+      }
+    >
       <div className="flex flex-col gap-4">
         <div className="input-group">
           <label>Goal Name</label>
@@ -188,18 +204,6 @@ export default function GoalForm({ open, onClose, onSaved, onToast, goal }: Goal
             </div>
           </div>
         )}
-
-        <div className="flex justify-end gap-2.5 pt-4 border-t border-border max-md:pb-[env(safe-area-inset-bottom)]">
-          {goal && (
-            <button className="btn btn-danger btn-sm mr-auto" onClick={() => setShowConfirm(true)}>
-              🗑️ Delete
-            </button>
-          )}
-          <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-            {goal ? "Update" : "Add"}
-          </button>
-        </div>
       </div>
     </Modal>
   );

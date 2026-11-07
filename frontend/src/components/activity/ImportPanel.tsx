@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../lib/api";
 import { fmtDate } from "../../lib/formatters";
+import Confirm from "../layout/Confirm";
 import type { ImportBatch, ScanResult } from "../../types";
 
 interface ImportPanelProps {
@@ -33,6 +34,7 @@ export default function ImportPanel({ onToast, onChanged }: ImportPanelProps) {
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [undoing, setUndoing] = useState<ImportBatch | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(() => {
@@ -91,7 +93,7 @@ export default function ImportPanel({ onToast, onChanged }: ImportPanelProps) {
   }
 
   async function undo(b: ImportBatch) {
-    if (!confirm(`Remove the ${b.inserted} transactions added from ${b.fileName}? The file stays in the folder but won't be imported again unless you choose Re-import.`)) return;
+    setUndoing(null);
     try {
       const r = await api.transactions.undoImport(b.id);
       onToast(`Removed ${r.removed} transactions`);
@@ -129,10 +131,10 @@ export default function ImportPanel({ onToast, onChanged }: ImportPanelProps) {
         </div>
         <div className="flex gap-2 shrink-0">
           <button className="btn btn-sm" onClick={() => setOpen((o) => !o)}>
-            {open ? "Hide imports" : `Imports (${batches.length})`}
+            {open ? "Hide Imports" : `Imports (${batches.length})`}
           </button>
-          <button className="btn btn-sm" disabled={busy} onClick={() => fileRef.current?.click()}>Upload file</button>
-          <button className="btn btn-sm btn-primary" disabled={busy} onClick={scan}>{busy ? "Working…" : "Scan folder"}</button>
+          <button className="btn btn-sm" disabled={busy} onClick={() => fileRef.current?.click()}>Upload File</button>
+          <button className="btn btn-sm btn-primary" disabled={busy} onClick={scan}>{busy ? "Working…" : "Scan Folder"}</button>
           <input
             ref={fileRef}
             type="file"
@@ -168,7 +170,7 @@ export default function ImportPanel({ onToast, onChanged }: ImportPanelProps) {
                   </div>
                 </div>
                 {b.status === "imported" ? (
-                  b.inserted > 0 && <button className="btn btn-sm" onClick={() => undo(b)}>Undo</button>
+                  b.inserted > 0 && <button className="btn btn-sm" onClick={() => setUndoing(b)}>Undo</button>
                 ) : (
                   <button className="btn btn-sm" onClick={() => reimport(b)}>Re-import</button>
                 )}
@@ -177,6 +179,15 @@ export default function ImportPanel({ onToast, onChanged }: ImportPanelProps) {
           )}
         </div>
       )}
+
+      <Confirm
+        open={!!undoing}
+        title="Undo Import?"
+        message={undoing ? `Removes the ${undoing.inserted} transactions added from ${undoing.fileName}. The file stays in the folder but won't be imported again unless you choose Re-import.` : ""}
+        confirmLabel="Remove"
+        onConfirm={() => undoing && undo(undoing)}
+        onCancel={() => setUndoing(null)}
+      />
     </div>
   );
 }

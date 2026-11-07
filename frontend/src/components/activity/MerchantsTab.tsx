@@ -109,7 +109,7 @@ export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, on
         <Card title={`Payees (${payees.length})`}>
           <input placeholder="Search payees and aliases" value={qPayees} onChange={(e) => setQPayees(e.target.value)} className="!text-sm !py-1.5 mb-2" />
           {filteredPayees.length === 0 ? (
-            <Empty>{payees.length ? "No match." : "No payees yet. Group a suggestion or pick bank names on the right."}</Empty>
+            <Empty>{payees.length ? "No match." : "No payees yet. Group a suggestion or pick bank names under No payee yet."}</Empty>
           ) : (
             <div className="flex flex-col max-h-[520px] overflow-y-auto">
               {filteredPayees.map((p) => (

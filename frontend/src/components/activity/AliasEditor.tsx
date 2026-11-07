@@ -38,14 +38,14 @@ export default function AliasEditor({ value, onChange, amountHint }: Props) {
         <select
           value={value.match}
           onChange={(e) => onChange({ ...value, match: e.target.value as AliasMatch })}
-          className="!w-auto !text-sm shrink-0"
+          className="!w-auto shrink-0"
         >
           {(Object.keys(MATCH_LABELS) as AliasMatch[]).map((m) => <option key={m} value={m}>{MATCH_LABELS[m]}</option>)}
         </select>
         <input
           value={value.pattern}
           onChange={(e) => onChange({ ...value, pattern: e.target.value })}
-          className="font-mono !text-sm"
+          className="font-mono min-w-0"
           placeholder="Text from the statement"
         />
       </div>
