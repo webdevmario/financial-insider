@@ -5,7 +5,7 @@ import { fmtDate } from "../../lib/formatters";
 import { Badge, Card, Empty, money, moneyInNote, shortDate } from "./shared";
 import UnassignedModal from "./UnassignedModal";
 import type { MergeMember } from "./MergeModal";
-import type { Payee, PayeeSuggestion, UnassignedMerchant, UnassignedTxn } from "../../types";
+import type { Payee, UnassignedMerchant, UnassignedTxn } from "../../types";
 
 interface Props {
   payees: Payee[];
@@ -144,9 +144,7 @@ function ListIcon() {
 }
 
 export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, onToast }: Props) {
-  const [suggestions, setSuggestions] = useState<PayeeSuggestion[] | null>(null);
   const [unassigned, setUnassigned] = useState<UnassignedMerchant[] | null>(null);
-  const [showAllSuggestions, setShowAllSuggestions] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [inspecting, setInspecting] = useState<UnassignedMerchant | null>(null);
   const [qPayees, setQPayees] = useState("");
@@ -155,7 +153,6 @@ export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, on
   const [openSort, setOpenSort] = useState<OpenSort>(() => stored(OPEN_SORT_KEY, OPEN_SORTS));
 
   useEffect(() => {
-    api.payees.suggestions().then(setSuggestions).catch(() => setSuggestions([]));
     api.payees.unassigned().then(setUnassigned).catch(() => setUnassigned([]));
     setSelected(new Set());
   }, [version]);
@@ -193,16 +190,6 @@ export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, on
     });
   }
 
-  async function dismiss(s: PayeeSuggestion) {
-    try {
-      await api.payees.dismissSuggestion(s.id);
-      setSuggestions((list) => list?.filter((x) => x.id !== s.id) ?? null);
-    } catch (err) {
-      onToast(err instanceof Error ? err.message : "Failed", true);
-    }
-  }
-
-  const shownSuggestions = showAllSuggestions ? suggestions ?? [] : (suggestions ?? []).slice(0, 4);
   const assignedShare = useMemo(() => {
     const assigned = payees.reduce((s, p) => s + p.spent, 0);
     const rest = (unassigned ?? []).reduce((s, u) => s + u.spent, 0);
@@ -218,41 +205,6 @@ export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, on
         a payee here, or from any transaction. {payees.length > 0 && <>Payees cover <span className="text-text">{assignedShare}</span> of your spending so far.</>}
       </p>
 
-      {suggestions && suggestions.length > 0 && (
-        <Card
-          title={`Suggested groups (${suggestions.length})`}
-          extra={suggestions.length > 4 && (
-            <button className="text-xs text-accent" onClick={() => setShowAllSuggestions((v) => !v)}>
-              {showAllSuggestions ? "Show fewer" : "Show all"}
-            </button>
-          )}
-        >
-          <div className="flex flex-col gap-3">
-            {shownSuggestions.map((s) => (
-              <div key={s.id} className="border border-border rounded-lg p-3">
-                <div className="text-[11px] text-text-muted mb-2">{s.reason}</div>
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {s.members.map((m) => (
-                    <span key={m.key} className={`text-xs px-2 py-0.5 rounded-md border ${m.payeeId ? "border-accent/40 text-accent" : "border-border text-text-dim"}`}>
-                      {m.name} <span className="text-text-muted">· {m.count}× · {money(m.spent, m.received)}</span>
-                    </span>
-                  ))}
-                </div>
-                <div className="flex gap-2 justify-end">
-                  <button className="btn btn-sm" onClick={() => dismiss(s)}>Not the same</button>
-                  <button
-                    className="btn btn-sm btn-primary"
-                    onClick={() => onMerge(s.members.map((m) => ({ key: m.key, name: m.name, count: m.count, spent: m.spent, received: m.received })), s.name)}
-                  >
-                    Group…
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-
       <div className="grid grid-cols-2 max-lg:grid-cols-1 gap-5">
         <Card title={`Payees (${payees.length})`}>
           <div className="flex gap-2 mb-2">
@@ -265,7 +217,7 @@ export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, on
             />
           </div>
           {filteredPayees.length === 0 ? (
-            <Empty>{payees.length ? "No match." : "No payees yet. Group a suggestion or pick bank names under No payee yet."}</Empty>
+            <Empty>{payees.length ? "No match." : "No payees yet. Pick bank names under No payee yet to group them."}</Empty>
           ) : (
             <div className="flex flex-col max-h-[520px] scroll-list">
               {filteredPayees.map((p) => (
