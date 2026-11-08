@@ -115,8 +115,8 @@ interface TxnRow {
 const TXN_COLS = {
   plain: "grid-cols-[auto_minmax(0,1fr)_auto]",
   select: "grid-cols-[auto_auto_minmax(0,1fr)_auto]",
-  account: "grid-cols-[auto_minmax(0,1fr)_auto] md:max-lg:grid-cols-[auto_minmax(0,1fr)_auto_auto] xl:grid-cols-[auto_minmax(0,1fr)_auto_auto]",
-  selectAccount: "grid-cols-[auto_auto_minmax(0,1fr)_auto] md:max-lg:grid-cols-[auto_auto_minmax(0,1fr)_auto_auto] xl:grid-cols-[auto_auto_minmax(0,1fr)_auto_auto]",
+  account: "grid-cols-[auto_minmax(0,1fr)_auto] md:grid-cols-[auto_minmax(0,1fr)_auto_auto]",
+  selectAccount: "grid-cols-[auto_auto_minmax(0,1fr)_auto] md:grid-cols-[auto_auto_minmax(0,1fr)_auto_auto]",
 };
 
 /**
@@ -125,8 +125,8 @@ const TXN_COLS = {
  * cell. Long descriptions truncate; amounts are right-aligned tabular figures.
  * byMonth adds a header per month with its subtotal under the amount column.
  * select adds a checkbox per row (the whole row toggles it). Rows with an
- * account get an account column where there's room (wide screens, or the
- * full-width card between md and lg), else the account sits under the description.
+ * account get an account column from md up; on phones the account (and kind
+ * label) sit under the description, which wraps instead of truncating.
  */
 export function TxnRows({ rows, compact, byMonth, select }: {
   rows: TxnRow[];
@@ -175,7 +175,7 @@ export function TxnRows({ rows, compact, byMonth, select }: {
                 </span>
                 {/* Account (where it has no column) and, on phones, the kind label */}
                 {(t.account != null || kindLabel) && (
-                  <span className="flex items-center gap-1.5 min-w-0 mt-0.5 md:max-lg:hidden xl:hidden empty:hidden">
+                  <span className="flex items-center gap-1.5 min-w-0 mt-0.5 md:hidden">
                     {t.account != null && <span className="text-[10px] text-text-muted truncate" title={t.account}>{t.account}</span>}
                     {kindLabel && <span className="md:hidden">{kindLabel}</span>}
                   </span>
@@ -185,7 +185,7 @@ export function TxnRows({ rows, compact, byMonth, select }: {
               <span className="font-mono truncate" title={t.description}>{t.description}</span>
             )}
             {withAccount && (
-              <span className="text-text-muted whitespace-nowrap max-w-[10rem] truncate max-md:hidden lg:max-xl:hidden" title={t.account}>{t.account}</span>
+              <span className="text-text-muted whitespace-nowrap max-w-[10rem] truncate max-md:hidden" title={t.account}>{t.account}</span>
             )}
             <span className={`font-mono text-right whitespace-nowrap ${t.amount > 0 ? "text-green" : ""}`}>
               {t.kind && t.amount > 0 ? "+" : ""}{fmtP(t.amount)}
