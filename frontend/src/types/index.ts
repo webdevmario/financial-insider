@@ -219,13 +219,6 @@ export interface UnassignedTxn {
   kind: TxnKind;
 }
 
-export interface PayeeSuggestion {
-  id: string;
-  reason: string;
-  name: string;
-  members: { key: string; name: string; payeeId: string | null; count: number; spent: number; received: number }[];
-}
-
 export interface AliasPreview {
   count: number;
   total: number;

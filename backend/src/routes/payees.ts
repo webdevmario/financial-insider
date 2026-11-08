@@ -5,8 +5,8 @@ import { payeeAliases, payees, subscriptions, type Payee } from "../db/schema.js
 import { KINDS, type Kind } from "../lib/statements/formats.js";
 import { pairTransfers } from "../lib/statements/importer.js";
 import {
-  addAlias, deletePayee, dismissSuggestion, findOrCreatePayee, listPayees, MATCH_TYPES, mergeInto,
-  payeeDetail, previewAlias, recomputeAll, suggestions, unassignedMerchants, unassignedTransactions,
+  addAlias, deletePayee, findOrCreatePayee, listPayees, MATCH_TYPES, mergeInto,
+  payeeDetail, previewAlias, recomputeAll, unassignedMerchants, unassignedTransactions,
 } from "../lib/statements/payees.js";
 
 const router = Router();
@@ -49,16 +49,6 @@ router.get("/unassigned", (_req, res) => {
 router.get("/unassigned/:key/transactions", (req, res) => {
   const limit = Math.max(0, Math.floor(Number(req.query.limit) || 0));
   res.json(unassignedTransactions(req.params.key, limit || undefined));
-});
-
-// GET /api/payees/suggestions — likely merges
-router.get("/suggestions", (_req, res) => {
-  res.json(suggestions());
-});
-
-router.post("/suggestions/:id/dismiss", (req, res) => {
-  dismissSuggestion(req.params.id);
-  res.json({ success: true });
 });
 
 // POST /api/payees/preview { pattern, match, amount? } — what an alias would match
