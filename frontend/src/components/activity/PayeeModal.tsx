@@ -7,6 +7,7 @@ import { fmt, fmtDate, fmtP, moLabel } from "../../lib/formatters";
 import AliasEditor, { type AliasDraft } from "./AliasEditor";
 import { Badge, Empty, KIND_LABELS, MATCH_LABELS, TxnRows, money, moneyInNote } from "./shared";
 import type { PayeeDetail, Subscription, TxnKind } from "../../types";
+import { BILL_STATE_LABEL, billState, isActiveBill } from "../../lib/billing";
 
 interface Props {
   payeeId: string | null;
@@ -220,7 +221,7 @@ export default function PayeeModal({ payeeId, categories, onClose, onChanged, on
                   <label>Bill on your Bills list</label>
                   <select value={billId} onChange={(e) => setBillId(e.target.value)}>
                     <option value="">Not a bill</option>
-                    {bills.map((b) => <option key={b.id} value={b.id}>{b.name} · {fmtP(b.amount)} {b.frequency}</option>)}
+                    {bills.map((b) => <option key={b.id} value={b.id}>{b.name} · {fmtP(b.amount)} {b.frequency}{isActiveBill(b) ? "" : ` · ${BILL_STATE_LABEL[billState(b)].toLowerCase()}`}</option>)}
                   </select>
                   <span className="text-[11px] text-text-muted">Linked bills are matched by this payee in Bills check and Recurring, not by name.</span>
                 </div>

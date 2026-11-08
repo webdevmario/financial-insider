@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "../../lib/api";
-import { fmtP, curMo } from "../../lib/formatters";
-import { computeEffectiveNextCharge } from "../../lib/billing";
+import { fmtP, curMo, fmtDate } from "../../lib/formatters";
+import { BILL_STATE_LABEL, billState, computeEffectiveNextCharge, isActiveBill } from "../../lib/billing";
 import StatCard from "../layout/StatCard";
 import SubscriptionForm from "./SubscriptionForm";
 import type { Subscription } from "../../types";
@@ -18,6 +18,7 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
   const [catFilter, setCatFilter] = useState("");
   const [freqFilter, setFreqFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [showStopped, setShowStopped] = useState(false);
   const [ppPopover, setPpPopover] = useState<"pp1" | "pp2" | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -45,9 +46,12 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
   function openNew() { setEditing(null); setFormOpen(true); }
   function openEdit(s: Subscription) { setEditing(s); setFormOpen(true); }
 
+  // Paused and cancelled bills stay listed for their history but don't count anywhere
+  const activeSubs = subs.filter(isActiveBill);
+
   // Calculations
   let mT = 0, qT = 0, aT = 0;
-  subs.forEach((s) => {
+  activeSubs.forEach((s) => {
     const my = s.amount / (s.splitBy || 1);
     if (s.frequency === "monthly") mT += my;
     else if (s.frequency === "quarterly") qT += my / 3;
@@ -59,7 +63,7 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
   let pp1 = 0, pp2 = 0;
   const pp1Items: { name: string; amount: number; actualAmount: number; day: number; frequency: string; thisMonth: boolean }[] = [];
   const pp2Items: { name: string; amount: number; actualAmount: number; day: number; frequency: string; thisMonth: boolean }[] = [];
-  subs.forEach((s) => {
+  activeSubs.forEach((s) => {
     const my = s.amount / (s.splitBy || 1);
     const me = s.frequency === "monthly" ? my : s.frequency === "quarterly" ? my / 3 : my / 12;
     const effective = computeEffectiveNextCharge(s.nextCharge, s.frequency);
@@ -87,6 +91,66 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
   if (freqFilter) filtered = filtered.filter((s) => s.frequency === freqFilter);
   if (statusFilter) filtered = filtered.filter((s) => (s.status || "") === statusFilter);
   filtered = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
+  const activeRows = filtered.filter(isActiveBill);
+  const stoppedRows = filtered.filter((s) => !isActiveBill(s));
+
+  function renderRow(s: Subscription) {
+    const state = billState(s);
+    const isSplit = s.splitBy > 1;
+    const myCost = s.amount / (s.splitBy || 1);
+    const freqClass =
+      s.frequency === "monthly"
+        ? "bg-accent-glow text-accent"
+        : s.frequency === "quarterly"
+          ? "bg-amber-dim text-amber"
+          : "bg-green-dim text-green";
+
+    return (
+      <div
+        key={s.id}
+        className={`grid grid-cols-[1fr_120px_100px_110px_32px] max-md:flex max-md:gap-2 items-center px-4 py-3 border-b border-border/40 text-sm cursor-pointer hover:bg-accent/[0.04] transition-all ${state !== "active" ? "opacity-60" : ""}`}
+        onClick={() => openEdit(s)}
+      >
+        <div className="min-w-0">
+          <div className="flex items-center flex-wrap gap-1">
+            <span>{s.name}</span>
+            {isSplit && (
+              <span className="text-[10px] text-cyan bg-cyan/10 px-1.5 py-0.5 rounded-xl">
+                Shared
+              </span>
+            )}
+            {s.status === "review" && state === "active" && (
+              <span title="Under review" className="text-[13px] cursor-default">⚠️</span>
+            )}
+            {state !== "active" && (
+              <span className="text-[10px] text-text-dim bg-white/[0.06] px-1.5 py-0.5 rounded-xl">
+                {BILL_STATE_LABEL[state]}{s.stateSince ? ` ${fmtDate(s.stateSince)}` : ""}
+              </span>
+            )}
+          </div>
+          {s.notes && (
+            <div className="text-[11px] text-text-muted mt-1 truncate max-w-[300px]">
+              {s.notes}
+            </div>
+          )}
+        </div>
+        <span className="max-md:hidden">
+          <span className="inline-flex px-2.5 py-0.5 rounded-2xl text-[11px] font-semibold bg-purple-dim text-purple">
+            {s.category || "General"}
+          </span>
+        </span>
+        <span className="max-md:hidden">
+          <span className={`inline-flex px-2.5 py-0.5 rounded-2xl text-[11px] font-semibold ${freqClass}`}>
+            {s.frequency}
+          </span>
+        </span>
+        <span className={`font-mono text-right max-md:ml-auto max-md:flex-shrink-0 ${state !== "active" ? "line-through" : ""}`}>
+          {fmtP(myCost)}
+        </span>
+        <span className="text-text-muted text-lg opacity-60 text-right">›</span>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -254,57 +318,26 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
             <p className="text-sm">{subs.length === 0 ? "No bills yet" : "No bills match filters"}</p>
           </div>
         ) : (
-          filtered.map((s) => {
-            const isSplit = s.splitBy > 1;
-            const myCost = s.amount / (s.splitBy || 1);
-            const freqClass =
-              s.frequency === "monthly"
-                ? "bg-accent-glow text-accent"
-                : s.frequency === "quarterly"
-                  ? "bg-amber-dim text-amber"
-                  : "bg-green-dim text-green";
-
-            return (
-              <div
-                key={s.id}
-                className="grid grid-cols-[1fr_120px_100px_110px_32px] max-md:flex max-md:gap-2 items-center px-4 py-3 border-b border-border/40 text-sm cursor-pointer hover:bg-accent/[0.04] transition-all"
-                onClick={() => openEdit(s)}
-              >
-                <div className="min-w-0">
-                  <div className="flex items-center flex-wrap gap-1">
-                    <span>{s.name}</span>
-                    {isSplit && (
-                      <span className="text-[10px] text-cyan bg-cyan/10 px-1.5 py-0.5 rounded-xl">
-                        Shared
-                      </span>
-                    )}
-                    {s.status === "review" && (
-                      <span title="Under review" className="text-[13px] cursor-default">⚠️</span>
-                    )}
-                  </div>
-                  {s.notes && (
-                    <div className="text-[11px] text-text-muted mt-1 truncate max-w-[300px]">
-                      {s.notes}
-                    </div>
-                  )}
-                </div>
-                <span className="max-md:hidden">
-                  <span className="inline-flex px-2.5 py-0.5 rounded-2xl text-[11px] font-semibold bg-purple-dim text-purple">
-                    {s.category || "General"}
-                  </span>
-                </span>
-                <span className="max-md:hidden">
-                  <span className={`inline-flex px-2.5 py-0.5 rounded-2xl text-[11px] font-semibold ${freqClass}`}>
-                    {s.frequency}
-                  </span>
-                </span>
-                <span className="font-mono text-right max-md:ml-auto max-md:flex-shrink-0">
-                  {fmtP(myCost)}
-                </span>
-                <span className="text-text-muted text-lg opacity-60 text-right">›</span>
-              </div>
-            );
-          })
+          <>
+            {activeRows.map(renderRow)}
+            {activeRows.length === 0 && (
+              <div className="text-center py-8 text-sm text-text-dim">No active bills match filters</div>
+            )}
+            {stoppedRows.length > 0 && (
+              <>
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-between px-4 py-2.5 border-b border-border/40 text-[11px] font-semibold uppercase tracking-wider text-text-muted hover:bg-white/[0.02]"
+                  aria-expanded={showStopped}
+                  onClick={() => setShowStopped((v) => !v)}
+                >
+                  <span>Paused &amp; cancelled ({stoppedRows.length})</span>
+                  <span className={`transition-transform ${showStopped ? "rotate-90" : ""}`}>›</span>
+                </button>
+                {showStopped && stoppedRows.map(renderRow)}
+              </>
+            )}
+          </>
         )}
       </div>
 

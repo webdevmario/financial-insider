@@ -3,6 +3,7 @@ import { db } from "../db/index.js";
 import { subscriptions } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 import { today as todayStr } from "../lib/date.js";
+import { cleanState } from "../lib/bills.js";
 
 const router = Router();
 
@@ -47,6 +48,8 @@ router.post("/", (req, res) => {
     nextCharge: body.nextCharge || null,
     splitBy: body.splitBy || 1,
     status: body.status || null,
+    state: cleanState(body.state),
+    stateSince: cleanState(body.state) ? body.stateSince || today : null,
     notes: body.notes || null,
     priceHistory: JSON.stringify([{ date: today, amount: body.amount || 0 }]),
     createdAt: today,
@@ -79,6 +82,16 @@ router.put("/:id", (req, res) => {
     priceHistory.push({ date: today, amount: body.amount });
   }
 
+  // Pausing or cancelling records when; going back to active clears it
+  const state = body.state !== undefined ? cleanState(body.state) : existing.state;
+  const stateSince = !state
+    ? null
+    : body.stateSince
+      ? String(body.stateSince)
+      : state !== existing.state || !existing.stateSince
+        ? today
+        : existing.stateSince;
+
   db.update(subscriptions)
     .set({
       name: body.name ?? existing.name,
@@ -91,6 +104,8 @@ router.put("/:id", (req, res) => {
           : existing.nextCharge,
       splitBy: body.splitBy ?? existing.splitBy,
       status: body.status !== undefined ? body.status : existing.status,
+      state,
+      stateSince,
       notes: body.notes !== undefined ? body.notes : existing.notes,
       priceHistory: JSON.stringify(priceHistory),
     })
