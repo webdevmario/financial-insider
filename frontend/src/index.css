@@ -52,6 +52,12 @@ body::before {
     @apply overflow-y-auto pr-2.5;
     scrollbar-gutter: stable;
   }
+  /* A row above a .scroll-list (search, sort) that keeps the same right edge
+     as the list's rows, scrollbar or not. Clips, so no focus shadows here */
+  .scroll-list-align {
+    @apply overflow-hidden pr-2.5;
+    scrollbar-gutter: stable;
+  }
   .input-group {
     @apply flex flex-col gap-1.5;
   }

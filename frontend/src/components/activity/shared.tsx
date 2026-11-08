@@ -66,10 +66,11 @@ export function Badge({ className, children }: { className: string; children: Re
   );
 }
 
-export function Card({ title, extra, children }: { title: string; extra?: React.ReactNode; children: React.ReactNode }) {
+/** `actionRow` keeps the header as tall as a small button, so side-by-side cards line up */
+export function Card({ title, extra, actionRow, children }: { title: string; extra?: React.ReactNode; actionRow?: boolean; children: React.ReactNode }) {
   return (
     <div className="bg-bg-card border border-border rounded-xl p-5 max-md:p-4">
-      <div className="flex items-center justify-between gap-3 mb-3">
+      <div className={`flex items-center justify-between gap-3 mb-3 ${actionRow ? "min-h-9" : ""}`}>
         <div className="text-[12px] font-semibold uppercase tracking-wider text-text-muted">{title}</div>
         {extra}
       </div>

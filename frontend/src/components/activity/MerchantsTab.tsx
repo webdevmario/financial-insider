@@ -10,6 +10,8 @@ import type { Payee, UnassignedMerchant, UnassignedTxn } from "../../types";
 interface Props {
   payees: Payee[];
   version: number;
+  /** Goes up after each successful grouping */
+  groupings: number;
   onOpenPayee: (id: string) => void;
   onMerge: (members: MergeMember[], suggestedName?: string) => void;
   onToast: (msg: string, err?: boolean) => void;
@@ -143,7 +145,7 @@ function ListIcon() {
   );
 }
 
-export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, onToast }: Props) {
+export default function MerchantsTab({ payees, version, groupings, onOpenPayee, onMerge, onToast }: Props) {
   const [unassigned, setUnassigned] = useState<UnassignedMerchant[] | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [inspecting, setInspecting] = useState<UnassignedMerchant | null>(null);
@@ -156,6 +158,12 @@ export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, on
     api.payees.unassigned().then(setUnassigned).catch(() => setUnassigned([]));
     setSelected(new Set());
   }, [version]);
+
+  // Each grouping starts the next one fresh
+  useEffect(() => {
+    setQPayees("");
+    setQUnassigned("");
+  }, [groupings]);
 
   // Keep the open bank name's header figures current after a refresh
   useEffect(() => {
@@ -206,8 +214,8 @@ export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, on
       </p>
 
       <div className="grid grid-cols-2 max-lg:grid-cols-1 gap-5">
-        <Card title={`Payees (${payees.length})`}>
-          <div className="flex gap-2 mb-2">
+        <Card title={`Payees (${payees.length})`} actionRow>
+          <div className="flex gap-2 mb-2 scroll-list-align">
             <SearchInput placeholder="Search payee or alias" value={qPayees} onChange={setQPayees} className="flex-1 min-w-0" />
             <SortSelect
               label="Sort payees"
@@ -245,19 +253,27 @@ export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, on
 
         <Card
           title={`No payee yet (${unassigned?.length ?? "…"})`}
-          extra={selected.size > 0 && (
-            <button
-              className="btn btn-sm btn-primary"
-              onClick={() => {
-                const members = (unassigned ?? []).filter((u) => selected.has(u.key)).map((u) => ({ key: `m:${u.key}`, name: u.merchant, count: u.count, spent: u.spent, received: u.received }));
-                onMerge(members);
-              }}
-            >
-              {selected.size === 1 ? "Name it…" : `Group ${selected.size}…`}
-            </button>
-          )}
+          actionRow
+          extra={
+            // Always laid out (hidden when nothing is picked) so ticking a box never shifts the card
+            <div className={`flex items-center gap-3 ${selected.size ? "" : "invisible"}`} aria-hidden={!selected.size}>
+              <button className="text-xs text-text-muted hover:text-text" tabIndex={selected.size ? 0 : -1} onClick={() => setSelected(new Set())}>
+                Clear
+              </button>
+              <button
+                className="btn btn-sm btn-primary"
+                tabIndex={selected.size ? 0 : -1}
+                onClick={() => {
+                  const members = (unassigned ?? []).filter((u) => selected.has(u.key)).map((u) => ({ key: `m:${u.key}`, name: u.merchant, count: u.count, spent: u.spent, received: u.received }));
+                  onMerge(members);
+                }}
+              >
+                {selected.size <= 1 ? "Name it…" : `Group ${selected.size}…`}
+              </button>
+            </div>
+          }
         >
-          <div className="flex gap-2 mb-2">
+          <div className="flex gap-2 mb-2 scroll-list-align">
             <SearchInput placeholder="Search bank names" value={qUnassigned} onChange={setQUnassigned} className="flex-1 min-w-0" />
             <SortSelect
               label="Sort bank names"
@@ -295,11 +311,6 @@ export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, on
                 </div>
               ))}
             </div>
-          )}
-          {selected.size > 0 && (
-            <button className="text-[11px] text-text-muted mt-2 hover:text-text" onClick={() => setSelected(new Set())}>
-              Clear selection
-            </button>
           )}
         </Card>
       </div>
