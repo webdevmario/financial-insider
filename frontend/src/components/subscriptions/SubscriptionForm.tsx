@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import Modal from "../layout/Modal";
 import Confirm from "../layout/Confirm";
 import { api } from "../../lib/api";
-import { fmtP } from "../../lib/formatters";
-import { computeEffectiveNextCharge } from "../../lib/billing";
+import { fmtP, today as todayStr } from "../../lib/formatters";
+import { computeEffectiveNextCharge, billState, type BillState } from "../../lib/billing";
 import type { Subscription } from "../../types";
 import { SUB_CATEGORIES } from "../../types";
 
@@ -25,6 +25,8 @@ export default function SubscriptionForm({
   const [nextCharge, setNextCharge] = useState("");
   const [splitBy, setSplitBy] = useState(1);
   const [status, setStatus] = useState("");
+  const [state, setState] = useState<BillState>("active");
+  const [stateSince, setStateSince] = useState("");
   const [notes, setNotes] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
 
@@ -40,6 +42,8 @@ export default function SubscriptionForm({
       );
       setSplitBy(subscription.splitBy || 1);
       setStatus(subscription.status || "");
+      setState(billState(subscription));
+      setStateSince(subscription.stateSince || "");
       setNotes(subscription.notes || "");
     } else {
       setName("");
@@ -49,6 +53,8 @@ export default function SubscriptionForm({
       setNextCharge("");
       setSplitBy(1);
       setStatus("");
+      setState("active");
+      setStateSince("");
       setNotes("");
     }
     setShowConfirm(false);
@@ -69,6 +75,8 @@ export default function SubscriptionForm({
       nextCharge: nextCharge || null,
       splitBy,
       status: status || null,
+      state: state === "active" ? null : state,
+      stateSince: state === "active" ? null : stateSince || todayStr(),
       notes: notes || null,
     };
 
@@ -199,14 +207,41 @@ export default function SubscriptionForm({
           </div>
         </div>
 
-        <div className="input-group">
-          <label>Status</label>
-          <select value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">None</option>
-            <option value="essential">Essential</option>
-            <option value="review">Under Review</option>
-          </select>
+        <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
+          <div className="input-group">
+            <label>Status</label>
+            <select value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option value="">None</option>
+              <option value="essential">Essential</option>
+              <option value="review">Under Review</option>
+            </select>
+          </div>
+          <div className="input-group">
+            <label>Paying it?</label>
+            <select
+              value={state}
+              onChange={(e) => {
+                const next = e.target.value as BillState;
+                setState(next);
+                if (next !== "active" && !stateSince) setStateSince(todayStr());
+              }}
+            >
+              <option value="active">Active</option>
+              <option value="paused">Paused</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
         </div>
+
+        {state !== "active" && (
+          <div className="input-group">
+            <label>{state === "paused" ? "Paused since" : "Cancelled since"}</label>
+            <input type="date" value={stateSince} onChange={(e) => setStateSince(e.target.value)} />
+            <span className="text-[11px] text-text-muted">
+              Left out of your totals and pay periods. Bills check flags any charge after this date.
+            </span>
+          </div>
+        )}
 
         <div className="input-group">
           <label>Notes (optional)</label>

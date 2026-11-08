@@ -38,6 +38,10 @@ export interface Subscription {
   nextCharge: string | null;
   splitBy: number;
   status: string | null;
+  /** null while active; paused and cancelled bills stay listed but aren't counted or expected */
+  state?: "paused" | "cancelled" | null;
+  /** When it was paused or cancelled (YYYY-MM-DD) */
+  stateSince?: string | null;
   notes: string | null;
   priceHistory: { date: string; amount: number }[];
   createdAt: string;
@@ -266,6 +270,7 @@ export interface RecurringCharge {
   status: "active" | "new" | "late" | "stopped";
   billId: string | null;
   billName: string | null;
+  billState: "active" | "paused" | "cancelled" | null;
   history: { date: string; amount: number }[];
 }
 
@@ -282,6 +287,10 @@ export interface BillVsActual {
   avgAmount: number | null;
   diff: number | null;
   notSeenRecently: boolean;
+  state: "active" | "paused" | "cancelled";
+  stateSince: string | null;
+  /** Charges dated after the bill was paused or cancelled */
+  chargedSinceStopped: number;
 }
 
 export interface CardPayments {

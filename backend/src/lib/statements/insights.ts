@@ -7,6 +7,7 @@
  */
 import { db } from "../../db/index.js";
 import { payees, settings, statementAccounts, subscriptions, transactions, type Transaction } from "../../db/schema.js";
+import { billState, isActiveBill } from "../bills.js";
 import { eq } from "drizzle-orm";
 import { today } from "../date.js";
 import { merchantKey } from "./merchant.js";
@@ -92,7 +93,8 @@ export function computeInsights(month?: string) {
   const payeeById = new Map(payeeList.map((p) => [p.id, p]));
   // Bills linked to a payee match by that link; the rest fall back to words in the bill's name
   const linkedBillIds = new Set(payeeList.map((p) => p.billId).filter(Boolean));
-  const unlinkedBills = bills.filter((b) => !linkedBillIds.has(b.id));
+  // Name matching only looks at bills still being paid
+  const unlinkedBills = bills.filter((b) => !linkedBillIds.has(b.id) && isActiveBill(b));
   const paycheckSetting = db.select().from(settings).where(eq(settings.key, "paycheck")).get();
   const expectedPaycheck = paycheckSetting ? Number(JSON.parse(paycheckSetting.value)) || 0 : 0;
 
@@ -215,6 +217,7 @@ export function computeInsights(month?: string) {
       status,
       billId: bill?.id ?? null,
       billName: bill?.name ?? null,
+      billState: bill ? billState(bill) : null,
       history: rows.slice(-12).map((t) => ({ date: t.date, amount: round(-t.amount) })),
     });
   }
@@ -234,6 +237,7 @@ export function computeInsights(month?: string) {
     const last = charges[charges.length - 1];
     const recentAmounts = charges.slice(-6).map((t) => -t.amount);
     const window = b.frequency === "annual" ? 380 : b.frequency === "quarterly" ? 100 : 40;
+    const state = billState(b);
     return {
       id: b.id,
       name: b.name,
@@ -245,7 +249,11 @@ export function computeInsights(month?: string) {
       lastAmount: last ? round(-last.amount) : null,
       avgAmount: recentAmounts.length ? round(recentAmounts.reduce((s, n) => s + n, 0) / recentAmounts.length) : null,
       diff: last ? round(-last.amount - b.amount) : null,
-      notSeenRecently: !last || dayNumber(latestData) - dayNumber(last.date) > window,
+      state,
+      stateSince: b.stateSince ?? null,
+      // Paused and cancelled bills aren't expected, so silence is fine; a charge after stopping is not
+      notSeenRecently: state === "active" && (!last || dayNumber(latestData) - dayNumber(last.date) > window),
+      chargedSinceStopped: state !== "active" && b.stateSince ? charges.filter((t) => t.date > b.stateSince!).length : 0,
     };
   });
 

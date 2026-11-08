@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db } from "../db/index.js";
 import { settings, accounts, subscriptions, expenses, goals } from "../db/schema.js";
+import { isActiveBill } from "../lib/bills.js";
 import { eq } from "drizzle-orm";
 import { today as todayStr } from "../lib/date.js";
 
@@ -53,7 +54,7 @@ router.get("/dashboard/summary", (_req, res) => {
 
   const netWorth = allAccounts.reduce((s, a) => s + (a.balance || 0), 0);
 
-  const monthlyBills = allSubs.reduce((s, sub) => {
+  const monthlyBills = allSubs.filter(isActiveBill).reduce((s, sub) => {
     const my = (sub.amount || 0) / (sub.splitBy || 1);
     if (sub.frequency === "monthly") return s + my;
     if (sub.frequency === "quarterly") return s + my / 3;
@@ -160,6 +161,8 @@ router.post("/data/import", (req, res) => {
               nextCharge: s.nextCharge || null,
               splitBy: s.splitBy || 1,
               status: s.status || null,
+              state: s.state === "paused" || s.state === "cancelled" ? s.state : null,
+              stateSince: s.stateSince || null,
               notes: s.notes || null,
               priceHistory: s.priceHistory
                 ? JSON.stringify(s.priceHistory)

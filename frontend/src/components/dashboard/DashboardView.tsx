@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import { fmt, fmtP, fmtDate } from "../../lib/formatters";
-import { computeEffectiveNextCharge } from "../../lib/billing";
+import { computeEffectiveNextCharge, isActiveBill } from "../../lib/billing";
 import { goalProgress, sortGoals } from "../../lib/goals";
 import StatCard from "../layout/StatCard";
 import type { Account, Goal, Subscription } from "../../types";
@@ -61,7 +61,8 @@ export default function DashboardView({ onOpenGoals }: { onOpenGoals: () => void
   const totalAssets = Object.values(groupTotals).reduce((s, v) => s + v, 0);
 
   // Top bills
-  const topBills = [...subs]
+  const activeSubs = subs.filter(isActiveBill);
+  const topBills = [...activeSubs]
     .map((s) => ({ ...s, me: monthlyEquiv(s) }))
     .sort((a, b) => b.me - a.me)
     .slice(0, 6);
@@ -74,7 +75,7 @@ export default function DashboardView({ onOpenGoals }: { onOpenGoals: () => void
   today.setHours(0, 0, 0, 0);
   const future = new Date(today);
   future.setDate(future.getDate() + 30);
-  const upcoming = subs
+  const upcoming = activeSubs
     .filter((s) => s.frequency !== "monthly")
     .map((s) => ({ ...s, due: computeEffectiveNextCharge(s.nextCharge, s.frequency) }))
     .filter((s) => {
@@ -165,7 +166,7 @@ export default function DashboardView({ onOpenGoals }: { onOpenGoals: () => void
           <div className="text-[14px] font-semibold uppercase tracking-wider text-text-dim mb-5">
             Top Bills
           </div>
-          {subs.length === 0 ? (
+          {activeSubs.length === 0 ? (
             <div className="text-center py-8 text-text-dim text-sm">Add bills to see top costs</div>
           ) : (
             topBills.map((s) => (

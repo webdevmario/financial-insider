@@ -24,6 +24,10 @@ export const subscriptions = sqliteTable("subscriptions", {
   nextCharge: text("next_charge"),
   splitBy: integer("split_by").notNull().default(1),
   status: text("status"), // essential | review | null
+  /** Whether the bill is still being paid: null (active) | paused | cancelled */
+  state: text("state"),
+  /** When it was paused or cancelled (YYYY-MM-DD) */
+  stateSince: text("state_since"),
   notes: text("notes"),
   priceHistory: text("price_history"), // JSON string: [{date, amount}]
   createdAt: text("created_at").notNull(),

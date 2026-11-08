@@ -13,7 +13,7 @@ import PayeeModal from "./PayeeModal";
 import {
   Badge, Card, Empty, CADENCE_LABEL, KIND_BADGE, KIND_LABELS, STATUS_BADGE, STATUS_LABEL,
 } from "./shared";
-import type { Insights, Payee, RecurringCharge, StatementAccount, Transaction, TxnKind } from "../../types";
+import type { BillVsActual, Insights, Payee, RecurringCharge, StatementAccount, Transaction, TxnKind } from "../../types";
 
 interface ActivityViewProps {
   onToast: (msg: string, err?: boolean) => void;
@@ -391,7 +391,9 @@ function Recurring({ items, asOf, onPayee }: { items: RecurringCharge[]; asOf: s
                       </Badge>
                     )}
                     {r.billName
-                      ? <Badge className="bg-white/[0.06] text-text-dim">Bill: {r.billName}</Badge>
+                      ? r.billState && r.billState !== "active" && r.status !== "stopped"
+                        ? <Badge className="bg-red-dim text-red">Still charging · bill {r.billState}</Badge>
+                        : <Badge className="bg-white/[0.06] text-text-dim">Bill: {r.billName}{r.billState && r.billState !== "active" ? ` (${r.billState})` : ""}</Badge>
                       : r.status !== "stopped" && <Badge className="bg-amber-dim text-amber">Not on Bills</Badge>}
                   </div>
                   <div className="text-[11px] text-text-muted mt-1">
@@ -437,8 +439,13 @@ function Recurring({ items, asOf, onPayee }: { items: RecurringCharge[]; asOf: s
 // ── Bills check ───────────────────────────────────────────────────
 
 function BillsCheck({ insights }: { insights: Insights }) {
+  // Problems first: charged after stopping, then missing, then off; paused and cancelled bills sink to the bottom
+  const rank = (b: BillVsActual) => (b.chargedSinceStopped ? 0 : b.state !== "active" ? 2 : 1);
   const bills = [...insights.billsVsActual].sort(
-    (a, b) => Number(b.notSeenRecently) - Number(a.notSeenRecently) || Math.abs(b.diff ?? 0) - Math.abs(a.diff ?? 0)
+    (a, b) =>
+      rank(a) - rank(b) ||
+      Number(b.notSeenRecently) - Number(a.notSeenRecently) ||
+      Math.abs(b.diff ?? 0) - Math.abs(a.diff ?? 0)
   );
   return (
     <div>
@@ -452,12 +459,21 @@ function BillsCheck({ insights }: { insights: Insights }) {
         <div className="bg-bg-card border border-border rounded-xl divide-y divide-border/50">
           {bills.map((b) => {
             const off = b.diff != null && Math.abs(b.diff) >= Math.max(1, b.listedAmount * 0.02);
+            const stopped = b.state !== "active";
             return (
-              <div key={b.id} className="flex items-center gap-3 px-4 py-3">
+              <div key={b.id} className={`flex items-center gap-3 px-4 py-3 ${stopped && !b.chargedSinceStopped ? "opacity-60" : ""}`}>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium text-sm">{b.name}</span>
-                    {b.matched === 0 ? (
+                    {stopped ? (
+                      b.chargedSinceStopped ? (
+                        <Badge className="bg-red-dim text-red">
+                          Charged {b.chargedSinceStopped}× since {b.state === "paused" ? "pausing" : "cancelling"}
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-white/[0.06] text-text-dim">{b.state === "paused" ? "Paused" : "Cancelled"}</Badge>
+                      )
+                    ) : b.matched === 0 ? (
                       <Badge className="bg-white/[0.06] text-text-dim">No charge found</Badge>
                     ) : b.notSeenRecently ? (
                       <Badge className="bg-amber-dim text-amber">Not charged recently</Badge>
@@ -471,6 +487,7 @@ function BillsCheck({ insights }: { insights: Insights }) {
                   </div>
                   <div className="text-[11px] text-text-muted mt-1">
                     {b.frequency}{b.linkedPayee ? <> · via {b.linkedPayee}</> : b.matched > 0 && <> · matched by name</>}
+                    {stopped && b.stateSince && <> · {b.state} {fmtDate(b.stateSince)}</>}
                     {b.lastDate && <> · last charged {fmtDate(b.lastDate)}</>}
                     {b.avgAmount != null && b.matched > 1 && <> · avg {fmtP(b.avgAmount)}</>}
                   </div>

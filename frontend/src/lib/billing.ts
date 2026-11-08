@@ -33,3 +33,17 @@ export function computeEffectiveNextCharge(
   const nd = String(charge.getDate()).padStart(2, "0");
   return `${ny}-${nm}-${nd}`;
 }
+
+export type BillState = "active" | "paused" | "cancelled";
+
+export const BILL_STATE_LABEL: Record<BillState, string> = { active: "Active", paused: "Paused", cancelled: "Cancelled" };
+
+/** Stored as null while active */
+export function billState(s: Pick<Subscription, "state">): BillState {
+  return s.state === "paused" || s.state === "cancelled" ? s.state : "active";
+}
+
+/** Only active bills count toward totals, pay periods and upcoming charges */
+export function isActiveBill(s: Pick<Subscription, "state">): boolean {
+  return billState(s) === "active";
+}
