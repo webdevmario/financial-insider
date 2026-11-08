@@ -6,7 +6,7 @@ import { KINDS, type Kind } from "../lib/statements/formats.js";
 import { pairTransfers } from "../lib/statements/importer.js";
 import {
   addAlias, deletePayee, dismissSuggestion, findOrCreatePayee, listPayees, MATCH_TYPES, mergeInto,
-  payeeDetail, previewAlias, recomputeAll, suggestions, unassignedMerchants,
+  payeeDetail, previewAlias, recomputeAll, suggestions, unassignedMerchants, unassignedTransactions,
 } from "../lib/statements/payees.js";
 
 const router = Router();
@@ -43,6 +43,12 @@ router.get("/", (_req, res) => {
 // GET /api/payees/unassigned — bank names with no payee yet
 router.get("/unassigned", (_req, res) => {
   res.json(unassignedMerchants());
+});
+
+// GET /api/payees/unassigned/:key/transactions?limit= — the rows behind one bank name, newest first
+router.get("/unassigned/:key/transactions", (req, res) => {
+  const limit = Math.max(0, Math.floor(Number(req.query.limit) || 0));
+  res.json(unassignedTransactions(req.params.key, limit || undefined));
 });
 
 // GET /api/payees/suggestions — likely merges

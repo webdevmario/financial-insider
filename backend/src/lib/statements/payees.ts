@@ -9,7 +9,7 @@
 import { eq, inArray } from "drizzle-orm";
 import { db } from "../../db/index.js";
 import {
-  importBatches, merchantRules, payeeAliases, payees, settings, transactions,
+  importBatches, merchantRules, payeeAliases, payees, settings, statementAccounts, transactions,
   type Payee, type PayeeAlias, type Transaction,
 } from "../../db/schema.js";
 import { KINDS, parseRow, type Kind } from "./formats.js";
@@ -395,6 +395,32 @@ export function unassignedMerchants() {
   return [...groups.values()]
     .map(({ kinds, ...g }) => ({ ...g, spent: round(g.spent), received: round(g.received), kinds: [...kinds] }))
     .sort((a, b) => b.spent - a.spent || b.received - a.received || b.count - a.count);
+}
+
+/**
+ * The transactions behind one "No payee yet" bank name (same key and filter as
+ * unassignedMerchants), newest first. limit caps the rows; total is the full count.
+ */
+export function unassignedTransactions(key: string, limit?: number) {
+  const accountName = new Map(db.select().from(statementAccounts).all().map((a) => [a.id, a.name]));
+  const rows = db
+    .select()
+    .from(transactions)
+    .all()
+    .filter((t) => !t.payeeId && t.kind !== "transfer" && merchantKey(t.baseMerchant || t.merchant) === key)
+    .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  return {
+    total: rows.length,
+    rows: rows.slice(0, limit && limit > 0 ? limit : undefined).map((t) => ({
+      id: t.id,
+      date: t.date,
+      description: t.description,
+      accountId: t.accountId,
+      account: accountName.get(t.accountId) ?? t.accountId,
+      amount: t.amount,
+      kind: t.kind,
+    })),
+  };
 }
 
 // ── Suggestions ───────────────────────────────────────────────────

@@ -1,17 +1,20 @@
 import { useEffect, useState } from "react";
 import Modal from "../layout/Modal";
 import { api } from "../../lib/api";
-import { fmtP } from "../../lib/formatters";
+import { fmtDate, fmtP } from "../../lib/formatters";
 import { money } from "./shared";
 import type { Payee } from "../../types";
 
 export interface MergeMember {
-  /** "p:<payeeId>" or "m:<bank name key>" */
+  /** "p:<payeeId>", "m:<bank name key>", or "t:<transactionId>" for one transaction */
   key: string;
   name: string;
   count?: number;
   spent?: number;
   received?: number;
+  /** One transaction's date and signed amount */
+  date?: string;
+  amount?: number;
 }
 
 interface Props {
@@ -24,7 +27,11 @@ interface Props {
   onToast: (msg: string, err?: boolean) => void;
 }
 
-/** Put bank names (and/or payees) under one payee: a new one or an existing one */
+/**
+ * Put bank names (and/or payees) under one payee: a new one or an existing one.
+ * With only "t:" members, assigns just those transactions by hand instead: each is
+ * locked to the payee, and other rows with the same bank name stay where they are.
+ */
 export default function MergeModal({ members, payees, suggestedName, categories, onClose, onDone, onToast }: Props) {
   const [mode, setMode] = useState<"new" | "existing">("new");
   const [name, setName] = useState("");
@@ -43,10 +50,37 @@ export default function MergeModal({ members, payees, suggestedName, categories,
   }, [members]);
 
   if (!members) return null;
+  const txnIds = members.every((m) => m.key.startsWith("t:")) ? members.map((m) => m.key.slice(2)) : null;
+
+  /** One PUT per transaction, the same hand assignment as the transaction editor */
+  async function assignTransactions(ids: string[]) {
+    let payeeId = targetId;
+    let payeeName = payees.find((p) => p.id === targetId)?.name ?? "";
+    if (mode === "new") {
+      const created = await api.payees.create({ name: name.trim(), category: category.trim() || undefined });
+      payeeId = created.id;
+      payeeName = created.name;
+    }
+    let moved = 0;
+    try {
+      for (const id of ids) {
+        await api.transactions.update(id, { payeeId });
+        moved++;
+      }
+    } catch (err) {
+      // Some may have moved already: refresh the lists so they show it
+      if (moved) onDone(payeeId);
+      throw new Error(`${moved ? `Moved ${moved} of ${ids.length}. ` : ""}${err instanceof Error ? err.message : "Failed"}`);
+    }
+    onToast(`${ids.length} transaction${ids.length === 1 ? "" : "s"} now under ${payeeName}`);
+    onDone(payeeId);
+    onClose();
+  }
 
   async function save() {
     setSaving(true);
     try {
+      if (txnIds) return await assignTransactions(txnIds);
       const result = await api.payees.merge(
         mode === "existing"
           ? { payeeId: targetId, members: members!.map((m) => m.key) }
@@ -66,7 +100,10 @@ export default function MergeModal({ members, payees, suggestedName, categories,
     <Modal
       open={!!members}
       onClose={onClose}
-      title={members.length === 1 ? "Name This Payee" : `Group ${members.length} Names`}
+      title={
+        txnIds ? `Assign ${txnIds.length} Transaction${txnIds.length === 1 ? "" : "s"}`
+        : members.length === 1 ? "Name This Payee" : `Group ${members.length} Names`
+      }
       footer={
         <>
           <button className="btn" onClick={onClose}>Cancel</button>
@@ -83,10 +120,16 @@ export default function MergeModal({ members, payees, suggestedName, categories,
       <div className="flex flex-col gap-1 mb-4 max-h-[180px] scroll-list">
         {members.map((m) => (
           <div key={m.key} className="flex justify-between gap-3 text-xs py-1 border-b border-border/30 last:border-0">
-            <span className="truncate">
+            <span className={`truncate ${txnIds ? "font-mono" : ""}`} title={m.name}>
               {m.name}
               {m.key.startsWith("p:") && <span className="text-accent"> · payee</span>}
             </span>
+            {m.amount != null && (
+              <span className="text-text-muted shrink-0 tabular-nums">
+                {m.date && <>{fmtDate(m.date)} · </>}
+                <span className={`font-mono ${m.amount > 0 ? "text-green" : ""}`}>{m.amount > 0 ? "+" : ""}{fmtP(m.amount)}</span>
+              </span>
+            )}
             {m.count != null && (
               <span className="text-text-muted shrink-0">{m.count}× · <span className="font-mono">{money(m.spent ?? 0, m.received ?? 0, fmtP)}</span></span>
             )}
@@ -133,7 +176,9 @@ export default function MergeModal({ members, payees, suggestedName, categories,
       )}
 
       <p className="text-[11px] text-text-muted mt-3">
-        Each bank name becomes an alias, so future imports land here too. Payees in the list are folded into this one.
+        {txnIds
+          ? "Only these transactions move, picked by hand. Other transactions with the same bank name keep no payee, and no alias is added."
+          : "Each bank name becomes an alias, so future imports land here too. Payees in the list are folded into this one."}
       </p>
 
     </Modal>

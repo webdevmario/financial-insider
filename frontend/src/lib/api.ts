@@ -1,6 +1,6 @@
 import type {
   Account, Subscription, Expense, Goal, AppSettings, Transaction, StatementAccount, ScanResult,
-  ImportBatch, Insights, Payee, PayeeDetail, UnassignedMerchant, PayeeSuggestion, AliasPreview,
+  ImportBatch, Insights, Payee, PayeeDetail, UnassignedMerchant, UnassignedTxn, PayeeSuggestion, AliasPreview,
 } from "../types";
 import { today } from "./formatters";
 import { offlineDb } from "./offline/db";
@@ -287,6 +287,10 @@ export const api = {
     list: () => cachedGet<Payee[]>("/payees"),
     get: (id: string) => cachedGet<PayeeDetail>(`/payees/${id}`),
     unassigned: () => cachedGet<UnassignedMerchant[]>("/payees/unassigned"),
+    unassignedTransactions: (key: string, limit?: number) =>
+      cachedGet<{ total: number; rows: UnassignedTxn[] }>(
+        `/payees/unassigned/${encodeURIComponent(key)}/transactions${limit ? `?limit=${limit}` : ""}`
+      ),
     suggestions: () => cachedGet<PayeeSuggestion[]>("/payees/suggestions"),
     dismissSuggestion: (id: string) =>
       request<{ success: boolean }>(`/payees/suggestions/${encodeURIComponent(id)}/dismiss`, { method: "POST" }),
