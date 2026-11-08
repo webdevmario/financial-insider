@@ -203,6 +203,18 @@ export interface UnassignedMerchant {
   kinds: TxnKind[];
 }
 
+/** One transaction behind a "No payee yet" bank name */
+export interface UnassignedTxn {
+  id: string;
+  date: string;
+  /** As the bank wrote it: what aliases match on */
+  description: string;
+  accountId: string;
+  account: string;
+  amount: number;
+  kind: TxnKind;
+}
+
 export interface PayeeSuggestion {
   id: string;
   reason: string;
