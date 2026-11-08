@@ -56,6 +56,8 @@ export default function ActivityView({ onToast }: ActivityViewProps) {
   const [moreOpen, setMoreOpen] = useState(false);
 
   const reload = useCallback(() => setVersion((v) => v + 1), []);
+  /** Bumped after each successful grouping, so Merchants can reset its searches */
+  const [groupings, setGroupings] = useState(0);
 
   useEffect(() => {
     Promise.all([api.transactions.insights(month), api.transactions.accounts(), api.payees.list()])
@@ -178,6 +180,7 @@ export default function ActivityView({ onToast }: ActivityViewProps) {
             <MerchantsTab
               payees={payees}
               version={version}
+              groupings={groupings}
               onOpenPayee={setOpenPayee}
               onMerge={(members, name) => setMerging({ members, name })}
               onToast={onToast}
@@ -219,7 +222,7 @@ export default function ActivityView({ onToast }: ActivityViewProps) {
         payees={payees}
         categories={categories}
         onClose={() => setMerging(null)}
-        onDone={reload}
+        onDone={() => { reload(); setGroupings((n) => n + 1); }}
         onToast={onToast}
       />
     </div>
