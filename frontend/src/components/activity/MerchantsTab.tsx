@@ -2,7 +2,8 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import SearchInput from "../layout/SearchInput";
 import { api } from "../../lib/api";
 import { fmtDate } from "../../lib/formatters";
-import { Badge, Card, Empty, money, moneyInNote, shortDate, TxnRows } from "./shared";
+import { Badge, Card, Empty, money, moneyInNote, shortDate } from "./shared";
+import UnassignedModal from "./UnassignedModal";
 import type { MergeMember } from "./MergeModal";
 import type { Payee, PayeeSuggestion, UnassignedMerchant, UnassignedTxn } from "../../types";
 
@@ -130,86 +131,15 @@ function openStat(u: UnassignedMerchant, sort: OpenSort): { main: React.ReactNod
   return { main: amount, sub: [`${u.count}×`, extra] };
 }
 
-// ── One bank name's transactions, inline ─────────────────────────
-const PREVIEW_ROWS = 10;
-
-function Chevron({ open }: { open: boolean }) {
+/** Small "list" glyph for the inspect button */
+function ListIcon() {
   return (
-    <svg aria-hidden viewBox="0 0 16 16" className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 6l4 4 4-4" />
+    <svg aria-hidden viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+      <path d="M5.5 4h7M5.5 8h7M5.5 12h7" />
+      <circle cx="2.75" cy="4" r=".6" fill="currentColor" />
+      <circle cx="2.75" cy="8" r=".6" fill="currentColor" />
+      <circle cx="2.75" cy="12" r=".6" fill="currentColor" />
     </svg>
-  );
-}
-
-/**
- * The transactions behind one No payee yet row, loaded when it opens: the latest
- * few, then all. Ticking some offers to give just those a payee by hand.
- */
-function GroupTxns({ id, group, version, onAssign, onToast }: {
-  id: string;
-  group: UnassignedMerchant;
-  version: number;
-  onAssign: (rows: UnassignedTxn[]) => void;
-  onToast: (msg: string, err?: boolean) => void;
-}) {
-  const [data, setData] = useState<{ total: number; rows: UnassignedTxn[] } | null>(null);
-  const [all, setAll] = useState(false);
-  const [picked, setPicked] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    let live = true;
-    api.payees.unassignedTransactions(group.key, all ? undefined : PREVIEW_ROWS)
-      .then((d) => {
-        if (!live) return;
-        setData(d);
-        // Keep only ticks on rows still shown (assigned or hidden rows drop out)
-        setPicked((p) => new Set(d.rows.filter((r) => p.has(r.id)).map((r) => r.id)));
-      })
-      .catch((err) => live && onToast(err instanceof Error ? err.message : "Couldn't load transactions", true));
-    return () => { live = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [group.key, all, version]);
-
-  function toggle(txnId: string) {
-    setPicked((s) => {
-      const next = new Set(s);
-      if (next.has(txnId)) next.delete(txnId);
-      else next.add(txnId);
-      return next;
-    });
-  }
-
-  return (
-    <div id={id} className="ml-1.5 mb-2 pl-3 border-l border-border/60">
-      {data === null ? (
-        <Empty>Loading…</Empty>
-      ) : data.rows.length === 0 ? (
-        <Empty>No transactions left here.</Empty>
-      ) : (
-        <>
-          <TxnRows rows={data.rows} select={{ picked, onToggle: toggle }} />
-          <div className="flex items-center justify-between gap-x-3 gap-y-2 flex-wrap mt-1.5">
-            {data.total > PREVIEW_ROWS ? (
-              <button type="button" className="text-[11px] text-accent hover:underline" onClick={() => setAll((v) => !v)}>
-                {all ? `Show latest ${PREVIEW_ROWS}` : `Show all ${data.total}`}
-              </button>
-            ) : (
-              <span className="text-[11px] text-text-muted">{data.total === 1 ? "1 transaction" : `All ${data.total}`}</span>
-            )}
-            {picked.size > 0 ? (
-              <span className="flex items-center gap-2 ml-auto">
-                <button type="button" className="text-[11px] text-text-muted hover:text-text" onClick={() => setPicked(new Set())}>Clear</button>
-                <button type="button" className="btn btn-sm btn-primary" onClick={() => onAssign(data.rows.filter((r) => picked.has(r.id)))}>
-                  Assign {picked.size} to payee…
-                </button>
-              </span>
-            ) : (
-              <span className="text-[11px] text-text-muted ml-auto">Tick rows to give just those a payee</span>
-            )}
-          </div>
-        </>
-      )}
-    </div>
   );
 }
 
@@ -218,7 +148,7 @@ export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, on
   const [unassigned, setUnassigned] = useState<UnassignedMerchant[] | null>(null);
   const [showAllSuggestions, setShowAllSuggestions] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [inspecting, setInspecting] = useState<UnassignedMerchant | null>(null);
   const [qPayees, setQPayees] = useState("");
   const [qUnassigned, setQUnassigned] = useState("");
   const [payeeSort, setPayeeSort] = useState<PayeeSort>(() => stored(PAYEE_SORT_KEY, PAYEE_SORTS));
@@ -230,6 +160,11 @@ export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, on
     setSelected(new Set());
   }, [version]);
 
+  // Keep the open bank name's header figures current after a refresh
+  useEffect(() => {
+    setInspecting((cur) => (cur && unassigned?.find((u) => u.key === cur.key)) || cur);
+  }, [unassigned]);
+
   // Search first, then sort what's left
   const filteredPayees = useMemo(
     () => sortPayees(payees.filter((p) => !qPayees || p.name.toLowerCase().includes(qPayees.toLowerCase()) || p.aliases.some((a) => a.pattern.toLowerCase().includes(qPayees.toLowerCase()))), payeeSort),
@@ -240,17 +175,13 @@ export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, on
     [unassigned, qUnassigned, openSort]
   );
 
-  function toggleExpanded(key: string) {
-    setExpanded((s) => {
-      const next = new Set(s);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-
   function assignSome(u: UnassignedMerchant, rows: UnassignedTxn[]) {
     onMerge(rows.map((t) => ({ key: `t:${t.id}`, name: t.description, date: t.date, amount: t.amount })), u.merchant);
+  }
+
+  function groupAll(u: UnassignedMerchant) {
+    setInspecting(null);
+    onMerge([{ key: `m:${u.key}`, name: u.merchant, count: u.count, spent: u.spent, received: u.received }]);
   }
 
   function toggle(key: string) {
@@ -389,38 +320,28 @@ export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, on
             <Empty>{unassigned.length ? "No match." : "Everything has a payee."}</Empty>
           ) : (
             <div className="flex flex-col max-h-[520px] scroll-list">
-              {filteredUnassigned.slice(0, 300).map((u) => {
-                const open = expanded.has(u.key);
-                const panelId = `open-txns-${u.key}`;
-                return (
-                  <div key={u.key} className="border-b border-border/30 last:border-0">
-                    <div className="flex items-center gap-1 hover:bg-white/[0.02]">
-                      <label className="flex flex-1 min-w-0 items-center gap-3 py-2 pl-1 cursor-pointer">
-                        <input type="checkbox" checked={selected.has(u.key)} onChange={() => toggle(u.key)} aria-label={`Select ${u.merchant}`} />
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm truncate">{u.merchant}</div>
-                          <div className="text-[11px] text-text-muted truncate font-mono" title={u.samples.join("\n")}>{u.samples[0]}</div>
-                        </div>
-                        <RowStat {...openStat(u, openSort)} />
-                      </label>
-                      <button
-                        type="button"
-                        aria-expanded={open}
-                        aria-controls={open ? panelId : undefined}
-                        aria-label={`${open ? "Hide" : "Show"} transactions for ${u.merchant}`}
-                        title={open ? "Hide transactions" : "Show transactions"}
-                        onClick={() => toggleExpanded(u.key)}
-                        className={`shrink-0 w-8 h-8 grid place-items-center rounded-md hover:text-text hover:bg-white/[0.05] ${open ? "text-text" : "text-text-muted"}`}
-                      >
-                        <Chevron open={open} />
-                      </button>
+              {filteredUnassigned.slice(0, 300).map((u) => (
+                <div key={u.key} className="flex items-center gap-1 border-b border-border/30 last:border-0 hover:bg-white/[0.02]">
+                  <label className="flex flex-1 min-w-0 items-center gap-3 py-2 pl-1 cursor-pointer">
+                    <input type="checkbox" checked={selected.has(u.key)} onChange={() => toggle(u.key)} aria-label={`Select ${u.merchant}`} />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm truncate">{u.merchant}</div>
+                      <div className="text-[11px] text-text-muted truncate font-mono" title={u.samples.join("\n")}>{u.samples[0]}</div>
                     </div>
-                    {open && (
-                      <GroupTxns id={panelId} group={u} version={version} onAssign={(rows) => assignSome(u, rows)} onToast={onToast} />
-                    )}
-                  </div>
-                );
-              })}
+                    <RowStat {...openStat(u, openSort)} />
+                  </label>
+                  <button
+                    type="button"
+                    aria-haspopup="dialog"
+                    aria-label={`Inspect transactions for ${u.merchant}`}
+                    title="Inspect transactions"
+                    onClick={() => setInspecting(u)}
+                    className="shrink-0 w-8 h-8 grid place-items-center rounded-md text-text-muted hover:text-text hover:bg-white/[0.05]"
+                  >
+                    <ListIcon />
+                  </button>
+                </div>
+              ))}
             </div>
           )}
           {selected.size > 0 && (
@@ -430,6 +351,15 @@ export default function MerchantsTab({ payees, version, onOpenPayee, onMerge, on
           )}
         </Card>
       </div>
+
+      <UnassignedModal
+        group={inspecting}
+        version={version}
+        onClose={() => setInspecting(null)}
+        onAssign={assignSome}
+        onGroupAll={groupAll}
+        onToast={onToast}
+      />
     </div>
   );
 }
