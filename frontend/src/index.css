@@ -52,11 +52,15 @@ body::before {
     @apply overflow-y-auto pr-2.5;
     scrollbar-gutter: stable;
   }
-  /* A row above a .scroll-list (search, sort) that keeps the same right edge
-     as the list's rows, scrollbar or not. Clips, so no focus shadows here */
-  .scroll-list-align {
-    @apply overflow-hidden pr-2.5;
+  /* A long list in its own inset box: the scrollbar runs inside the box's
+     border, and rows keep the same width whether or not it scrolls */
+  .scroll-well {
+    @apply overflow-y-auto rounded-lg border border-border/60 bg-black/10;
     scrollbar-gutter: stable;
+  }
+  /* Keep the thumb clear of the box's rounded corners */
+  .scroll-well::-webkit-scrollbar-track {
+    margin-block: 6px;
   }
   .input-group {
     @apply flex flex-col gap-1.5;
