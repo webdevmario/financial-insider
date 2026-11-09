@@ -13,17 +13,16 @@ import PayeeModal from "./PayeeModal";
 import {
   Badge, Card, Empty, CADENCE_LABEL, KIND_BADGE, KIND_LABELS, STATUS_BADGE, STATUS_LABEL,
 } from "./shared";
-import type { BillVsActual, Insights, Payee, RecurringCharge, StatementAccount, Transaction, TxnKind } from "../../types";
+import type { Insights, Payee, RecurringCharge, StatementAccount, Transaction, TxnKind } from "../../types";
 
 interface ActivityViewProps {
   onToast: (msg: string, err?: boolean) => void;
 }
 
-type Tab = "overview" | "recurring" | "bills" | "merchants" | "watch" | "payments" | "all";
+type Tab = "overview" | "recurring" | "merchants" | "watch" | "payments" | "all";
 const TABS: { id: Tab; label: string; hint: string }[] = [
   { id: "overview", label: "Overview", hint: "" },
   { id: "recurring", label: "Recurring", hint: "" },
-  { id: "bills", label: "Bills Check", hint: "Your Bills list against real charges" },
   { id: "merchants", label: "Merchants", hint: "Payees and the bank names behind them" },
   { id: "watch", label: "Watchlist", hint: "Possible duplicates, fees and interest" },
   { id: "payments", label: "Card Payments", hint: "Which account paid each card" },
@@ -186,7 +185,6 @@ export default function ActivityView({ onToast }: ActivityViewProps) {
               onToast={onToast}
             />
           )}
-          {tab === "bills" && <BillsCheck insights={insights!} />}
           {tab === "watch" && <Watchlist insights={insights!} accountName={accountName} onEdit={setEditing} />}
           {tab === "payments" && <Payments insights={insights!} />}
           {tab === "all" && (
@@ -433,75 +431,6 @@ function Recurring({ items, asOf, onPayee }: { items: RecurringCharge[]; asOf: s
               )}
             </div>
           ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Bills check ───────────────────────────────────────────────────
-
-function BillsCheck({ insights }: { insights: Insights }) {
-  // Problems first: charged after stopping, then missing, then off; paused and cancelled bills sink to the bottom
-  const rank = (b: BillVsActual) => (b.chargedSinceStopped ? 0 : b.state !== "active" ? 2 : 1);
-  const bills = [...insights.billsVsActual].sort(
-    (a, b) =>
-      rank(a) - rank(b) ||
-      Number(b.notSeenRecently) - Number(a.notSeenRecently) ||
-      Math.abs(b.diff ?? 0) - Math.abs(a.diff ?? 0)
-  );
-  return (
-    <div>
-      <p className="text-xs text-text-muted mb-4">
-        Each bill on your Bills list compared with its most recent real charge. A bill linked to a payee (Merchants tab →
-        payee → Bill) matches exactly; the rest are matched by words in the bill's name.
-      </p>
-      {bills.length === 0 ? (
-        <Empty>No bills on your Bills list yet.</Empty>
-      ) : (
-        <div className="bg-bg-card border border-border rounded-xl divide-y divide-border/50">
-          {bills.map((b) => {
-            const off = b.diff != null && Math.abs(b.diff) >= Math.max(1, b.listedAmount * 0.02);
-            const stopped = b.state !== "active";
-            return (
-              <div key={b.id} className={`flex items-center gap-3 px-4 py-3 ${stopped && !b.chargedSinceStopped ? "opacity-60" : ""}`}>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-sm">{b.name}</span>
-                    {stopped ? (
-                      b.chargedSinceStopped ? (
-                        <Badge className="bg-red-dim text-red">
-                          Charged {b.chargedSinceStopped}× since {b.state === "paused" ? "pausing" : "cancelling"}
-                        </Badge>
-                      ) : (
-                        <Badge className="bg-white/[0.06] text-text-dim">{b.state === "paused" ? "Paused" : "Cancelled"}</Badge>
-                      )
-                    ) : b.matched === 0 ? (
-                      <Badge className="bg-white/[0.06] text-text-dim">No charge found</Badge>
-                    ) : b.notSeenRecently ? (
-                      <Badge className="bg-amber-dim text-amber">Not charged recently</Badge>
-                    ) : off ? (
-                      <Badge className={b.diff! > 0 ? "bg-red-dim text-red" : "bg-green-dim text-green"}>
-                        {b.diff! > 0 ? "Charged more" : "Charged less"}
-                      </Badge>
-                    ) : (
-                      <Badge className="bg-green-dim text-green">Matches</Badge>
-                    )}
-                  </div>
-                  <div className="text-[11px] text-text-muted mt-1">
-                    {b.frequency}{b.linkedPayee ? <> · via {b.linkedPayee}</> : b.matched > 0 && <> · matched by name</>}
-                    {stopped && b.stateSince && <> · {b.state} {fmtDate(b.stateSince)}</>}
-                    {b.lastDate && <> · last charged {fmtDate(b.lastDate)}</>}
-                    {b.avgAmount != null && b.matched > 1 && <> · avg {fmtP(b.avgAmount)}</>}
-                  </div>
-                </div>
-                <div className="text-right shrink-0 font-mono text-sm">
-                  <div>{b.lastAmount != null ? fmtP(b.lastAmount) : "—"}</div>
-                  <div className="text-[11px] text-text-muted">listed {fmtP(b.listedAmount)}</div>
-                </div>
-              </div>
-            );
-          })}
         </div>
       )}
     </div>
