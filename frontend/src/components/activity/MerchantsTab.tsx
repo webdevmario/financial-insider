@@ -198,24 +198,12 @@ export default function MerchantsTab({ payees, version, groupings, onOpenPayee, 
     });
   }
 
-  const assignedShare = useMemo(() => {
-    const assigned = payees.reduce((s, p) => s + p.spent, 0);
-    const rest = (unassigned ?? []).reduce((s, u) => s + u.spent, 0);
-    if (assigned + rest <= 0) return "0%";
-    const pct = (assigned / (assigned + rest)) * 100;
-    return pct > 0 && pct < 1 ? "<1%" : `${Math.round(pct)}%`;
-  }, [payees, unassigned]);
 
   return (
     <div className="flex flex-col gap-5">
-      <p className="text-xs text-text-muted -mb-1">
-        A payee is the one name you want to see for a merchant, however it shows up on statements. Group bank names under
-        a payee here, or from any transaction. {payees.length > 0 && <>Payees cover <span className="text-text">{assignedShare}</span> of your spending so far.</>}
-      </p>
-
       <div className="grid grid-cols-2 max-lg:grid-cols-1 gap-5">
         <Card title={`Payees (${payees.length})`} actionRow>
-          <div className="flex gap-2 mb-2 scroll-list-align">
+          <div className="flex gap-2 mb-3">
             <SearchInput placeholder="Search payee or alias" value={qPayees} onChange={setQPayees} className="flex-1 min-w-0" />
             <SortSelect
               label="Sort payees"
@@ -227,12 +215,12 @@ export default function MerchantsTab({ payees, version, groupings, onOpenPayee, 
           {filteredPayees.length === 0 ? (
             <Empty>{payees.length ? "No match." : "No payees yet. Pick bank names under No payee yet to group them."}</Empty>
           ) : (
-            <div className="flex flex-col max-h-[520px] scroll-list">
+            <div className="flex flex-col max-h-[520px] scroll-well">
               {filteredPayees.map((p) => (
                 <button
                   key={p.id}
                   onClick={() => onOpenPayee(p.id)}
-                  className="flex items-center gap-3 text-left py-2 px-1 border-b border-border/30 last:border-0 hover:bg-white/[0.02]"
+                  className="flex items-center gap-3 text-left py-2 px-3 border-b border-border/30 last:border-0 hover:bg-white/[0.02]"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
@@ -273,7 +261,7 @@ export default function MerchantsTab({ payees, version, groupings, onOpenPayee, 
             </div>
           }
         >
-          <div className="flex gap-2 mb-2 scroll-list-align">
+          <div className="flex gap-2 mb-3">
             <SearchInput placeholder="Search bank names" value={qUnassigned} onChange={setQUnassigned} className="flex-1 min-w-0" />
             <SortSelect
               label="Sort bank names"
@@ -287,10 +275,10 @@ export default function MerchantsTab({ payees, version, groupings, onOpenPayee, 
           ) : filteredUnassigned.length === 0 ? (
             <Empty>{unassigned.length ? "No match." : "Everything has a payee."}</Empty>
           ) : (
-            <div className="flex flex-col max-h-[520px] scroll-list">
+            <div className="flex flex-col max-h-[520px] scroll-well">
               {filteredUnassigned.slice(0, 300).map((u) => (
-                <div key={u.key} className="flex items-center gap-1 border-b border-border/30 last:border-0 hover:bg-white/[0.02]">
-                  <label className="flex flex-1 min-w-0 items-center gap-3 py-2 pl-1 cursor-pointer">
+                <div key={u.key} className="flex items-center gap-1 pr-2 border-b border-border/30 last:border-0 hover:bg-white/[0.02]">
+                  <label className="flex flex-1 min-w-0 items-center gap-3 py-2 pl-3 cursor-pointer">
                     <input type="checkbox" checked={selected.has(u.key)} onChange={() => toggle(u.key)} aria-label={`Select ${u.merchant}`} />
                     <div className="min-w-0 flex-1">
                       <div className="text-sm truncate">{u.merchant}</div>
