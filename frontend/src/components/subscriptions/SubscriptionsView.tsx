@@ -4,7 +4,28 @@ import { fmtP, curMo, fmtDate } from "../../lib/formatters";
 import { BILL_STATE_LABEL, billState, computeEffectiveNextCharge, isActiveBill } from "../../lib/billing";
 import StatCard from "../layout/StatCard";
 import SubscriptionForm from "./SubscriptionForm";
-import type { Subscription } from "../../types";
+import type { BillVsActual, Subscription } from "../../types";
+
+/** What, if anything, about a bill's real charges needs a look. Matching bills return null */
+function billIssue(c: BillVsActual | undefined): { text: string; className: string } | null {
+  if (!c) return null;
+  if (c.state !== "active") {
+    // Paused and cancelled bills are expected to go quiet; a charge after stopping is the problem
+    return c.chargedSinceStopped
+      ? { text: `Charged ${c.chargedSinceStopped}× since ${c.state === "paused" ? "pausing" : "cancelling"}`, className: "text-red" }
+      : null;
+  }
+  if (c.matched === 0) return { text: "No charge found in your statements", className: "text-text-muted" };
+  if (c.notSeenRecently) return { text: `Not charged since ${fmtDate(c.lastDate!)}`, className: "text-amber" };
+  const diff = c.diff ?? 0;
+  if (c.lastAmount != null && Math.abs(diff) >= Math.max(1, c.listedAmount * 0.02)) {
+    return {
+      text: `Last charge ${fmtP(c.lastAmount)}, ${fmtP(Math.abs(diff))} ${diff > 0 ? "more" : "less"} than listed`,
+      className: diff > 0 ? "text-red" : "text-amber",
+    };
+  }
+  return null;
+}
 
 interface SubscriptionsViewProps {
   onToast: (msg: string, err?: boolean) => void;
@@ -19,6 +40,7 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
   const [freqFilter, setFreqFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [showStopped, setShowStopped] = useState(false);
+  const [checks, setChecks] = useState<Map<string, BillVsActual>>(new Map());
   const [ppPopover, setPpPopover] = useState<"pp1" | "pp2" | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -35,6 +57,10 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
   }, [ppPopover]);
 
   const load = useCallback(() => {
+    // Each bill against its real charges; the list still works without statements
+    api.transactions.billChecks()
+      .then((rows) => setChecks(new Map(rows.map((r) => [r.id, r]))))
+      .catch(() => setChecks(new Map()));
     return api.subscriptions.list().then(setSubs).catch(() => {});
   }, []);
 
@@ -89,7 +115,10 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
   let filtered = subs;
   if (catFilter) filtered = filtered.filter((s) => (s.category || "General") === catFilter);
   if (freqFilter) filtered = filtered.filter((s) => s.frequency === freqFilter);
-  if (statusFilter) filtered = filtered.filter((s) => (s.status || "") === statusFilter);
+  const needsLook = subs.filter((s) => billIssue(checks.get(s.id))).length;
+  if (statusFilter === "attention") filtered = filtered.filter((s) => billIssue(checks.get(s.id)));
+  else if (statusFilter) filtered = filtered.filter((s) => (s.status || "") === statusFilter);
+  const stoppedOpen = showStopped || statusFilter === "attention";
   filtered = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
   const activeRows = filtered.filter(isActiveBill);
   const stoppedRows = filtered.filter((s) => !isActiveBill(s));
@@ -98,6 +127,7 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
     const state = billState(s);
     const isSplit = s.splitBy > 1;
     const myCost = s.amount / (s.splitBy || 1);
+    const issue = billIssue(checks.get(s.id));
     const freqClass =
       s.frequency === "monthly"
         ? "bg-accent-glow text-accent"
@@ -108,7 +138,7 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
     return (
       <div
         key={s.id}
-        className={`grid grid-cols-[1fr_120px_100px_110px_32px] max-md:flex max-md:gap-2 items-center px-4 py-3 border-b border-border/40 text-sm cursor-pointer hover:bg-accent/[0.04] transition-all ${state !== "active" ? "opacity-60" : ""}`}
+        className={`grid grid-cols-[1fr_120px_100px_110px_32px] max-md:flex max-md:gap-2 items-center px-4 py-3 border-b border-border/40 text-sm cursor-pointer hover:bg-accent/[0.04] transition-all ${state !== "active" && !issue ? "opacity-60" : ""}`}
         onClick={() => openEdit(s)}
       >
         <div className="min-w-0">
@@ -128,6 +158,7 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
               </span>
             )}
           </div>
+          {issue && <div className={`text-[11px] mt-1 ${issue.className}`}>{issue.text}</div>}
           {s.notes && (
             <div className="text-[11px] text-text-muted mt-1 truncate max-w-[300px]">
               {s.notes}
@@ -298,6 +329,7 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
           <option value="">All Statuses</option>
           <option value="essential">Essential</option>
           <option value="review">Under Review</option>
+          <option value="attention">Needs a look ({needsLook})</option>
         </select>
       </div>
 
@@ -328,13 +360,13 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
                 <button
                   type="button"
                   className="w-full flex items-center justify-between px-4 py-2.5 border-b border-border/40 text-[11px] font-semibold uppercase tracking-wider text-text-muted hover:bg-white/[0.02]"
-                  aria-expanded={showStopped}
+                  aria-expanded={stoppedOpen}
                   onClick={() => setShowStopped((v) => !v)}
                 >
                   <span>Paused &amp; cancelled ({stoppedRows.length})</span>
-                  <span className={`transition-transform ${showStopped ? "rotate-90" : ""}`}>›</span>
+                  <span className={`transition-transform ${stoppedOpen ? "rotate-90" : ""}`}>›</span>
                 </button>
-                {showStopped && stoppedRows.map(renderRow)}
+                {stoppedOpen && stoppedRows.map(renderRow)}
               </>
             )}
           </>

@@ -60,6 +60,11 @@ router.get("/insights", (req, res) => {
   res.json(computeInsights(req.query.month as string | undefined));
 });
 
+// GET /api/transactions/bill-checks: each bill against its most recent real charge, for the Bills page
+router.get("/bill-checks", (_req, res) => {
+  res.json(computeInsights().billsVsActual);
+});
+
 // ── Accounts ──────────────────────────────────────────────────────
 
 router.get("/accounts", (_req, res) => {
