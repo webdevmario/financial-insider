@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import { fmt, fmtDate, fmtP, moLabel } from "../../lib/formatters";
-import type { RecurringCharge, TxnKind } from "../../types";
+import type { TxnKind } from "../../types";
 
 // ── Money out vs money in ─────────────────────────────────────────
 
@@ -34,28 +34,6 @@ export const KIND_BADGE: Record<TxnKind, string> = {
   transfer: "bg-white/[0.06] text-text-dim",
   fee: "bg-red-dim text-red",
   interest: "bg-red-dim text-red",
-};
-
-export const STATUS_BADGE: Record<RecurringCharge["status"], string> = {
-  active: "bg-green-dim text-green",
-  new: "bg-accent/[0.12] text-accent",
-  late: "bg-amber-dim text-amber",
-  stopped: "bg-white/[0.06] text-text-dim",
-};
-
-export const STATUS_LABEL: Record<RecurringCharge["status"], string> = {
-  active: "Active",
-  new: "New",
-  late: "Late",
-  stopped: "Stopped?",
-};
-
-export const CADENCE_LABEL: Record<RecurringCharge["cadence"], string> = {
-  weekly: "Weekly",
-  biweekly: "Every 2 wks",
-  monthly: "Monthly",
-  quarterly: "Quarterly",
-  annual: "Yearly",
 };
 
 export function Badge({ className, children }: { className: string; children: React.ReactNode }) {

@@ -11,25 +11,23 @@ import MerchantsTab from "./MerchantsTab";
 import MergeModal, { type MergeMember } from "./MergeModal";
 import PayeeModal from "./PayeeModal";
 import {
-  Badge, Card, Empty, CADENCE_LABEL, KIND_BADGE, KIND_LABELS, STATUS_BADGE, STATUS_LABEL,
+  Badge, Card, Empty, KIND_BADGE, KIND_LABELS, 
 } from "./shared";
-import type { Insights, Payee, RecurringCharge, StatementAccount, Transaction, TxnKind } from "../../types";
+import type { Insights, Payee, StatementAccount, Transaction, TxnKind } from "../../types";
 
 interface ActivityViewProps {
   onToast: (msg: string, err?: boolean) => void;
 }
 
-type Tab = "overview" | "recurring" | "merchants" | "watch" | "payments" | "all";
+type Tab = "overview" | "merchants" | "payments" | "all";
 const TABS: { id: Tab; label: string; hint: string }[] = [
   { id: "overview", label: "Overview", hint: "" },
-  { id: "recurring", label: "Recurring", hint: "" },
   { id: "merchants", label: "Merchants", hint: "Payees and the bank names behind them" },
-  { id: "watch", label: "Watchlist", hint: "Possible duplicates, fees and interest" },
   { id: "payments", label: "Card Payments", hint: "Which account paid each card" },
   { id: "all", label: "Transactions", hint: "" },
 ];
 /** On phones only these get a segment; the rest sit behind "More" */
-const PHONE_TABS: Tab[] = ["overview", "all", "recurring"];
+const PHONE_TABS: Tab[] = ["overview", "all", "merchants"];
 const TAB_KEY = "activity.tab";
 
 function storedTab(): Tab {
@@ -91,10 +89,6 @@ export default function ActivityView({ onToast }: ActivityViewProps) {
       ].sort(),
     [insights, payees]
   );
-  const mergeFromRecurring = useCallback((r: RecurringCharge) => {
-    if (r.payeeId) setOpenPayee(r.payeeId);
-    else setMerging({ members: [{ key: r.key, name: r.merchant, count: r.count }], name: r.merchant });
-  }, []);
 
   if (loading) return <LoadingState />;
 
@@ -174,7 +168,6 @@ export default function ActivityView({ onToast }: ActivityViewProps) {
           />
 
           {tab === "overview" && <Overview insights={insights!} />}
-          {tab === "recurring" && <Recurring items={insights!.recurring} asOf={insights!.asOf} onPayee={mergeFromRecurring} />}
           {tab === "merchants" && (
             <MerchantsTab
               payees={payees}
@@ -185,7 +178,6 @@ export default function ActivityView({ onToast }: ActivityViewProps) {
               onToast={onToast}
             />
           )}
-          {tab === "watch" && <Watchlist insights={insights!} accountName={accountName} onEdit={setEditing} />}
           {tab === "payments" && <Payments insights={insights!} />}
           {tab === "all" && (
             <AllTransactions
@@ -326,153 +318,6 @@ function Overview({ insights }: { insights: Insights }) {
           ) : <Empty>No deposits that look like payroll yet.</Empty>}
         </Card>
       </div>
-    </div>
-  );
-}
-
-// ── Recurring ─────────────────────────────────────────────────────
-
-type RecurringFilter = "all" | "changed" | "late" | "unlisted";
-
-function Recurring({ items, asOf, onPayee }: { items: RecurringCharge[]; asOf: string; onPayee: (r: RecurringCharge) => void }) {
-  const [filter, setFilter] = useState<RecurringFilter>("all");
-  const [openKey, setOpenKey] = useState<string | null>(null);
-
-  const counts = {
-    all: items.length,
-    changed: items.filter((r) => r.priceChanged).length,
-    late: items.filter((r) => r.status === "late" || r.status === "stopped").length,
-    unlisted: items.filter((r) => !r.billName && r.status !== "stopped").length,
-  };
-  const shown = items.filter((r) =>
-    filter === "changed" ? r.priceChanged
-    : filter === "late" ? r.status === "late" || r.status === "stopped"
-    : filter === "unlisted" ? !r.billName && r.status !== "stopped"
-    : true
-  );
-  const yearly = items.filter((r) => r.status !== "stopped").reduce((s, r) => s + r.yearlyCost, 0);
-
-  const labels: Record<RecurringFilter, string> = {
-    all: "All", changed: "Price changed", late: "Late / stopped", unlisted: "Not on Bills",
-  };
-
-  return (
-    <div>
-      <div className="flex items-center gap-2 flex-wrap mb-4">
-        {(Object.keys(labels) as RecurringFilter[]).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-3 py-1 rounded-2xl text-xs font-medium border transition-all ${
-              filter === f ? "border-accent text-accent bg-accent/[0.08]" : "border-border text-text-dim hover:text-text"
-            }`}
-          >
-            {labels[f]} ({counts[f]})
-          </button>
-        ))}
-        <span className="ml-auto text-xs text-text-muted">
-          Still active: <span className="font-mono text-text">{fmt(yearly)}</span>/yr · data through {fmtDate(asOf)}
-        </span>
-      </div>
-
-      {shown.length === 0 ? (
-        <Empty>Nothing here.</Empty>
-      ) : (
-        <div className="bg-bg-card border border-border rounded-xl divide-y divide-border/50">
-          {shown.map((r) => (
-            <div key={r.key} className="px-4 py-3 cursor-pointer hover:bg-white/[0.02]" onClick={() => setOpenKey(openKey === r.key ? null : r.key)}>
-              <div className="flex items-start gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-sm truncate">{r.merchant}</span>
-                    <Badge className={STATUS_BADGE[r.status]}>{STATUS_LABEL[r.status]}</Badge>
-                    {r.priceChanged && (
-                      <Badge className={r.change > 0 ? "bg-red-dim text-red" : "bg-green-dim text-green"}>
-                        {r.change > 0 ? "▲" : "▼"} {fmtP(Math.abs(r.change))} since {fmtDate(r.changeDate).replace(/,.*$/, "")}
-                      </Badge>
-                    )}
-                    {r.billName
-                      ? r.billState && r.billState !== "active" && r.status !== "stopped"
-                        ? <Badge className="bg-red-dim text-red">Still charging · bill {r.billState}</Badge>
-                        : <Badge className="bg-white/[0.06] text-text-dim">Bill: {r.billName}{r.billState && r.billState !== "active" ? ` (${r.billState})` : ""}</Badge>
-                      : r.status !== "stopped" && <Badge className="bg-amber-dim text-amber">Not on Bills</Badge>}
-                  </div>
-                  <div className="text-[11px] text-text-muted mt-1">
-                    {CADENCE_LABEL[r.cadence]} · {r.accounts.join(", ")} · last {fmtDate(r.lastDate)}
-                    {r.status !== "stopped" && <> · next ~{fmtDate(r.nextExpected)}</>}
-                  </div>
-                </div>
-                <div className="text-right shrink-0">
-                  <div className="font-mono text-sm">{fmtP(r.lastAmount)}</div>
-                  <div className="text-[11px] text-text-muted font-mono">
-                    {r.variable ? `${fmtP(r.minAmount)}–${fmtP(r.maxAmount)}` : `${fmt(r.yearlyCost)}/yr`}
-                  </div>
-                </div>
-              </div>
-              {openKey === r.key && (
-                <div className="mt-3 flex justify-end">
-                  <button className="btn btn-sm" onClick={(e) => { e.stopPropagation(); onPayee(r); }}>
-                    {r.payeeId ? "Edit Payee" : "Name This Payee…"}
-                  </button>
-                </div>
-              )}
-              {openKey === r.key && (
-                <div className="mt-3 flex gap-1 items-end h-16" title="Recent charges">
-                  {(() => {
-                    const max = Math.max(...r.history.map((h) => h.amount), 1);
-                    return r.history.map((h, i) => (
-                      <div key={i} className="flex-1 flex flex-col items-center gap-1 min-w-0">
-                        <div className="w-full max-w-[28px] rounded-sm bg-accent/70" style={{ height: `${Math.max(4, (h.amount / max) * 44)}px` }} title={`${fmtDate(h.date)} · ${fmtP(h.amount)}`} />
-                        <span className="text-[9px] text-text-muted">{h.date.slice(5, 7)}/{h.date.slice(8)}</span>
-                      </div>
-                    ));
-                  })()}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Watchlist ─────────────────────────────────────────────────────
-
-function TxnLine({ t, accountName, onEdit }: { t: Transaction; accountName: Map<string, string>; onEdit: (t: Transaction) => void }) {
-  return (
-    <div className="flex items-center gap-3 text-xs py-2 border-b border-border/30 last:border-0 cursor-pointer hover:bg-white/[0.02]" onClick={() => onEdit(t)}>
-      <span className="text-text-muted w-[84px] shrink-0">{fmtDate(t.date)}</span>
-      <span className="min-w-0 flex-1 truncate">
-        {t.merchant} <span className="text-text-muted">· {accountName.get(t.accountId) || t.accountId}</span>
-      </span>
-      <span className={`font-mono shrink-0 ${t.amount > 0 ? "text-green" : ""}`}>{fmtP(t.amount)}</span>
-    </div>
-  );
-}
-
-function Watchlist({ insights, accountName, onEdit }: { insights: Insights; accountName: Map<string, string>; onEdit: (t: Transaction) => void }) {
-  return (
-    <div className="grid grid-cols-2 max-md:grid-cols-1 gap-5">
-      <Card title={`Possible duplicate charges (${insights.duplicates.length})`}>
-        <p className="text-[11px] text-text-muted mb-2">Same card, merchant and amount within 3 days, last 120 days, $10 and up.</p>
-        {insights.duplicates.length ? (
-          insights.duplicates.map(({ a, b }) => (
-            <div key={a.id + b.id} className="mb-2 pb-1 border-b border-border last:border-0">
-              <TxnLine t={a} accountName={accountName} onEdit={onEdit} />
-              <TxnLine t={b} accountName={accountName} onEdit={onEdit} />
-            </div>
-          ))
-        ) : <Empty>None found.</Empty>}
-      </Card>
-      <Card
-        title="Fees and interest"
-        extra={<span className="font-mono text-xs text-red">{fmtP(insights.feesAndInterestTotal)}</span>}
-      >
-        {insights.feesAndInterest.length ? (
-          insights.feesAndInterest.slice(0, 30).map((t) => <TxnLine key={t.id} t={t} accountName={accountName} onEdit={onEdit} />)
-        ) : <Empty>None in your imported history.</Empty>}
-      </Card>
     </div>
   );
 }
