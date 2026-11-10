@@ -4,8 +4,8 @@
  * full-year totals, and the categories that moved most since last year.
  *
  * Spending is net of refunds. Two categories are kept out of it:
- * "Work (Reimbursed)" is paid back, and "Savings" is money set aside (extra
- * mortgage principal, for example), so neither makes spending look higher.
+ * "Work (Reimbursed)" is paid back, and "Savings" is money set aside (an extra
+ * loan payment, for example), so neither makes spending look higher.
  */
 import { db } from "../../db/index.js";
 import { payees, transactions, type Transaction } from "../../db/schema.js";
