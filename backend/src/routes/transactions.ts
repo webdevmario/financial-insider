@@ -8,6 +8,7 @@ import {
   statementsDir, undoBatch,
 } from "../lib/statements/importer.js";
 import { computeInsights } from "../lib/statements/insights.js";
+import { computePulse } from "../lib/statements/pulse.js";
 import { addAlias, findOrCreatePayee, recomputeAll } from "../lib/statements/payees.js";
 
 const router = Router();
@@ -58,6 +59,11 @@ router.get("/", (req, res) => {
 // GET /api/transactions/insights?month=YYYY-MM
 router.get("/insights", (req, res) => {
   res.json(computeInsights(req.query.month as string | undefined));
+});
+
+// GET /api/transactions/pulse: this month's pace and the year-over-year view, for the Dashboard
+router.get("/pulse", (_req, res) => {
+  res.json(computePulse());
 });
 
 // GET /api/transactions/bill-checks: each bill against its most recent real charge, for the Bills page

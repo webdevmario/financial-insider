@@ -4,7 +4,9 @@ import { fmt, fmtP, fmtDate } from "../../lib/formatters";
 import { billAmount, computeEffectiveNextCharge, isActiveBill } from "../../lib/billing";
 import { goalProgress, sortGoals } from "../../lib/goals";
 import StatCard from "../layout/StatCard";
-import type { Account, Goal, Subscription } from "../../types";
+import PulseSection from "./PulseSection";
+import YearOverYear from "./YearOverYear";
+import type { Account, Goal, Pulse, Subscription } from "../../types";
 
 const ASSET_GROUPS: Record<string, string[]> = {
   Investments: ["401k", "Roth 401k", "IRA", "Roth IRA", "Rollover IRA", "Brokerage", "Crypto", "IUL"],
@@ -38,6 +40,8 @@ export default function DashboardView({ onOpenGoals }: { onOpenGoals: () => void
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [subs, setSubs] = useState<Subscription[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
+  // Needs imported statements; the Dashboard works without it
+  const [pulse, setPulse] = useState<Pulse | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -46,6 +50,7 @@ export default function DashboardView({ onOpenGoals }: { onOpenGoals: () => void
       api.accounts.list().then(setAccounts).catch(() => {}),
       api.subscriptions.list().then(setSubs).catch(() => {}),
       api.goals.list().then(setGoals).catch(() => {}),
+      api.transactions.pulse().then(setPulse).catch(() => setPulse(null)),
     ]).finally(() => setLoading(false));
   }, []);
 
@@ -102,6 +107,8 @@ export default function DashboardView({ onOpenGoals }: { onOpenGoals: () => void
         <StatCard label="Monthly Income" value={fmt(summary.income)} color="green" />
         <StatCard label="Monthly Bills" value={fmt(summary.monthlyBills)} color="amber" />
       </div>
+
+      {pulse && pulse.pulse.split.length > 1 && <PulseSection data={pulse.pulse} />}
 
       {/* Upcoming callout */}
       {upcoming.length > 0 && (
@@ -219,6 +226,8 @@ export default function DashboardView({ onOpenGoals }: { onOpenGoals: () => void
           </div>
         </button>
       )}
+
+      {pulse && <YearOverYear data={pulse.yoy} />}
     </div>
   );
 }
