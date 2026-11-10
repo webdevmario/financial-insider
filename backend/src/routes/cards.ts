@@ -10,7 +10,7 @@ const router: Router = Router();
 const UNITS = ["percent", "points"];
 
 function parse(row: CreditCard) {
-  return { ...row, inUse: !!row.inUse, rewardRates: parseRates(row.rewardRates) };
+  return { ...row, inUse: !!row.inUse, rewardRates: parseRates(row.rewardRates), rewardCaps: parseRates(row.rewardCaps) };
 }
 
 function find(id: string) {
@@ -81,6 +81,7 @@ router.post("/", (req, res) => {
     rewardUnit: UNITS.includes(body.rewardUnit) ? body.rewardUnit : "percent",
     pointValue: num(body.pointValue, null),
     rewardRates: JSON.stringify(cleanRates(body.rewardRates)),
+    rewardCaps: JSON.stringify(cleanRates(body.rewardCaps)),
     benefits: body.benefits?.trim() || null,
     lastReviewed: date(body.lastReviewed),
     inUse: body.inUse === false ? 0 : 1,
@@ -109,6 +110,7 @@ router.put("/:id", (req, res) => {
       rewardUnit: UNITS.includes(body.rewardUnit) ? body.rewardUnit : existing.rewardUnit,
       pointValue: body.pointValue !== undefined ? num(body.pointValue, null) : existing.pointValue,
       rewardRates: body.rewardRates !== undefined ? JSON.stringify(cleanRates(body.rewardRates)) : existing.rewardRates,
+      rewardCaps: body.rewardCaps !== undefined ? JSON.stringify(cleanRates(body.rewardCaps)) : existing.rewardCaps,
       benefits: body.benefits !== undefined ? body.benefits?.trim() || null : existing.benefits,
       lastReviewed: body.lastReviewed !== undefined ? date(body.lastReviewed) : existing.lastReviewed,
       inUse: body.inUse !== undefined ? (body.inUse ? 1 : 0) : existing.inUse,

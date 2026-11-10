@@ -160,7 +160,8 @@ export const creditCards = sqliteTable("credit_cards", {
   annualFee: real("annual_fee").notNull().default(0),
   rewardUnit: text("reward_unit").notNull().default("percent"), // percent (cash back) | points (per dollar)
   pointValue: real("point_value"), // Cents one point is worth, for comparing points cards with cash back (default 1)
-  rewardRates: text("reward_rates"), // JSON: { "Dining": 3, "Grocery": 2, "*": 1 }, "*" = everything else
+  rewardRates: text("reward_rates"), // JSON: { "Dining": 3, "Grocery": 2, "*": 1 }, "*" = everything else, "@Payee" = one store
+  rewardCaps: text("reward_caps"), // JSON: { "Grocery": 6000 }: yearly spend a bonus rate applies to before the "*" rate takes over
   benefits: text("benefits"), // Benefits and notes, free text
   lastReviewed: text("last_reviewed"), // YYYY-MM-DD the terms were last checked
   inUse: integer("in_use").notNull().default(1),

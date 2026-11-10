@@ -8,6 +8,9 @@
  *  - the "Rewards" category holds cash-back redemptions, statement credits and
  *    adjustments, not purchases, so those are totalled apart as reward credits.
  *
+ * Store rates ("@Payee") beat category rates, and a bonus rate can carry a
+ * yearly cap: spending past it (scaled to the window) earns the "*" rate.
+ *
  * Numbers only: nothing here suggests opening, closing or switching cards.
  */
 import { db } from "../../db/index.js";
@@ -34,11 +37,26 @@ export function parseRates(raw: string | null): RewardRates {
   }
 }
 
-/** The card's rate for a category: an exact (case-insensitive) match, else "*", else 0 */
-export function rateFor(rates: RewardRates, category: string): number {
+/**
+ * The card's rate for a purchase: a store rate written "@Payee" (for bonus
+ * merchants like a store card's own store) wins, then the category, then "*",
+ * else 0. Matches ignore case.
+ */
+export function rateFor(rates: RewardRates, category: string, payee?: string): number {
+  const key = rateKey(rates, category, payee);
+  return key ? rates[key] : 0;
+}
+
+/** Which rate entry applies: the "@Payee" key, the category key, "*", or null */
+function rateKey(rates: RewardRates, category: string, payee?: string): string | null {
+  const keys = Object.keys(rates);
+  if (payee) {
+    const store = `@${payee}`.toLowerCase();
+    const k = keys.find((x) => x.toLowerCase() === store);
+    if (k) return k;
+  }
   const want = category.toLowerCase();
-  for (const [k, v] of Object.entries(rates)) if (k.toLowerCase() === want) return v;
-  return rates[OTHER] ?? 0;
+  return keys.find((x) => x.toLowerCase() === want) ?? (OTHER in rates ? OTHER : null);
 }
 
 /** Cents a point is worth; cash back is always 1 cent per "point" (one percent of a dollar) */
@@ -54,6 +72,11 @@ function earn(card: CreditCard, rate: number, spend: number) {
   return { earned: dollars, value: dollars };
 }
 
+/** The rate actually earned on a category, in the card's unit: percent back, or points per dollar */
+function blendedRate(card: CreditCard, earned: number, value: number, spend: number): number {
+  return card.rewardUnit === "points" ? Math.round((earned / spend) * 10) / 10 : Math.round((value / spend) * 1000) / 10;
+}
+
 const isRefund = (t: Transaction) => t.kind === "refund" || (t.kind === "spend" && t.amount > 0);
 
 /** The window: the 12 months up to and including today */
@@ -67,8 +90,8 @@ function window(months: number) {
 }
 
 type CardTotals = {
-  /** Net spending that earns rewards, by category */
-  byCategory: Map<string, number>;
+  /** Net spending that earns rewards, by category and then payee (store rates are per payee) */
+  byCategory: Map<string, Map<string, number>>;
   feesAndInterest: number;
   rewardCredits: number;
   firstDate: string | null;
@@ -89,7 +112,8 @@ function totalsFor(rows: Transaction[]): CardTotals {
       continue;
     }
     if ((isCost(r) && r.kind === "spend") || isRefund(r)) {
-      t.byCategory.set(r.category, (t.byCategory.get(r.category) ?? 0) - r.amount);
+      const byPayee = t.byCategory.get(r.category) ?? t.byCategory.set(r.category, new Map()).get(r.category)!;
+      byPayee.set(r.merchant, (byPayee.get(r.merchant) ?? 0) - r.amount);
     }
   }
   return t;
@@ -115,8 +139,38 @@ export function cardAnalysis(months = 12) {
     else rowsByAccount.set(r.accountId, [r]);
   }
 
-  // Combined spending on every linked card, by category, and what was actually earned on it
-  const combined = new Map<string, { spend: number; value: number }>();
+  // Combined spending on every linked card, by category (and payee), and what was actually earned on it
+  const combined = new Map<string, { spend: number; value: number; byPayee: Map<string, number> }>();
+
+  /**
+   * Rewards on one category's spending, payee by payee, so store rates apply.
+   * `budget` tracks how much capped spending is left per rate key; one map per
+   * card shares a cap across every category it covers.
+   */
+  const earnOn = (card: CreditCard, rates: RewardRates, category: string, byPayee: Map<string, number>, budget = new Map<string, number>()) => {
+    const caps = parseRates(card.rewardCaps);
+    let earned = 0;
+    let value = 0;
+    const add = (e: { earned: number; value: number }) => {
+      earned += e.earned;
+      value += e.value;
+    };
+    for (const [payee, raw] of byPayee) {
+      const key = rateKey(rates, category, payee);
+      const rate = key ? rates[key] : 0;
+      const capKey = key && key !== OTHER ? Object.keys(caps).find((c) => c.toLowerCase() === key.toLowerCase()) : undefined;
+      if (!capKey || raw <= 0) {
+        add(earn(card, rate, raw));
+        continue;
+      }
+      const left = budget.get(capKey) ?? (caps[capKey] * months) / 12;
+      const inCap = Math.min(raw, Math.max(0, left));
+      budget.set(capKey, left - inCap);
+      add(earn(card, rate, inCap));
+      add(earn(card, rates[OTHER] ?? 0, raw - inCap));
+    }
+    return { earned: card.rewardUnit === "points" ? Math.round(earned) : round(earned), value: round(value) };
+  };
 
   const cardResults = cards.map((card) => {
     const rates = parseRates(card.rewardRates);
@@ -134,14 +188,17 @@ export function cardAnalysis(months = 12) {
     if (!card.statementAccountId) return { ...base, linked: false as const };
 
     const totals = totalsFor(rowsByAccount.get(card.statementAccountId) ?? []);
+    const budget = new Map<string, number>();
     const categories = [...totals.byCategory.entries()]
-      .map(([category, raw]) => {
-        const spend = round(raw);
-        const rate = rateFor(rates, category);
-        const { earned, value } = earn(card, rate, spend);
-        const c = combined.get(category) ?? { spend: 0, value: 0 };
+      .map(([category, byPayee]) => {
+        const spend = round([...byPayee.values()].reduce((s, v) => s + v, 0));
+        const { earned, value } = earnOn(card, rates, category, byPayee, budget);
+        // With store rates in play the category's rate is the blend actually earned
+        const rate = spend > 0 ? blendedRate(card, earned, value, spend) : rateFor(rates, category);
+        const c = combined.get(category) ?? { spend: 0, value: 0, byPayee: new Map() };
         c.spend += spend;
         c.value += value;
+        for (const [payee, v] of byPayee) c.byPayee.set(payee, (c.byPayee.get(payee) ?? 0) + v);
         combined.set(category, c);
         return { category, spend, rate, earned, value };
       })
@@ -176,8 +233,10 @@ export function cardAnalysis(months = 12) {
       const spend = round(c.spend);
       const options = candidates
         .map((card) => {
-          const rate = rateFor(parseRates(card.rewardRates), category);
-          return { cardId: card.id, name: card.name, rate, rewardUnit: card.rewardUnit as RewardUnit, ...earn(card, rate, spend) };
+          const r = parseRates(card.rewardRates);
+          const e = earnOn(card, r, category, c.byPayee);
+          const rate = spend > 0 ? blendedRate(card, e.earned, e.value, spend) : rateFor(r, category);
+          return { cardId: card.id, name: card.name, rate, rewardUnit: card.rewardUnit as RewardUnit, ...e };
         })
         .sort((a, b) => b.value - a.value);
       const best = options[0] && options[0].value > 0 ? options[0] : null;

@@ -374,8 +374,10 @@ export interface CreditCard {
   rewardUnit: RewardUnit;
   /** Cents one point is worth (points cards only; 1 when unset) */
   pointValue: number | null;
-  /** Category → rate; "*" is everything else */
+  /** Category → rate; "*" is everything else; "@Payee" is one store */
   rewardRates: Record<string, number>;
+  /** Rate key → yearly spend the bonus rate covers before "*" applies */
+  rewardCaps?: Record<string, number>;
   benefits: string | null;
   lastReviewed: string | null;
   inUse: boolean;

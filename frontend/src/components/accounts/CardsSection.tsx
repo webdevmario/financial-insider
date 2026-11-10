@@ -16,7 +16,10 @@ const earnedLabel = (earned: number, unit: RewardUnit) =>
 
 function ratesSummary(card: CreditCard): string {
   const entries = Object.entries(card.rewardRates).sort((a, b) => b[1] - a[1]);
-  const named = entries.filter(([k]) => k !== "*").map(([k, v]) => `${k} ${rateLabel(v, card.rewardUnit)}`);
+  const caps = card.rewardCaps ?? {};
+  const named = entries
+    .filter(([k]) => k !== "*")
+    .map(([k, v]) => `${k} ${rateLabel(v, card.rewardUnit)}${caps[k] ? ` (first ${fmt(caps[k])}/yr)` : ""}`);
   const other = card.rewardRates["*"];
   if (other != null) named.push(`Everything else ${rateLabel(other, card.rewardUnit)}`);
   return named.join(" · ");
