@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { fmt } from "../../lib/formatters";
-import type { Pulse } from "../../types";
+import type { YearOverYear as YoyData } from "../../types";
 import { CHART, ChartTooltip, Swatch, niceTicks, shortMoney, useWidth } from "./charts";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-type Year = Pulse["yoy"]["years"][number];
+type Year = YoyData["years"][number];
 
 /** Newest year takes the first hue, so this year is always blue */
 function colorFor(years: Year[], year: number): string {
@@ -103,7 +103,7 @@ function CumulativeChart({ years }: { years: Year[] }) {
   );
 }
 
-export default function YearOverYear({ data }: { data: Pulse["yoy"] }) {
+export default function YearOverYear({ data }: { data: YoyData }) {
   const years = data.years;
   if (years.length < 2) return null;
   const [mm, dd] = data.through.split("-").map(Number);
