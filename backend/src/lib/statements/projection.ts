@@ -3,11 +3,15 @@
  * instead of the amount typed on the bill, unless the bill is pinned to it.
  *
  * - Monthly bills are summed per calendar month (a per-visit bill can charge
- *   several times a month), using complete months only.
- *   - Steady ones project last month's total, so price changes carry forward.
- *   - Variable ones (utilities) project the same month last year, scaled by
- *     how the last three months compare with a year earlier, or failing that
- *     the average of the last 12 months.
+ *   several times a month), using complete months only. In order:
+ *   1. The last three months charged about the same (within 3%): that's the
+ *      current price, so it's what the bill costs. Price changes carry forward,
+ *      and an odd month further back (a one-off extra, a short billing month)
+ *      doesn't matter.
+ *   2. A real yearly pattern (utilities): two years of history whose months
+ *      rise and fall together, with a sizable swing. Then the same month last
+ *      year, scaled by how the last three months compare with a year earlier.
+ *   3. Otherwise a typical month: the median of the last 12.
  * - Quarterly and annual bills project their last charge.
  * - With no usable history, or charges that don't fit the bill's frequency
  *   (a name match catching the wrong merchant), the listed amount stands.
@@ -56,28 +60,49 @@ function median(values: number[]): number {
   return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
 }
 
-/** Spread relative to the mean */
-function variation(values: number[]): number {
-  const mean = values.reduce((s, n) => s + n, 0) / values.length;
-  if (!mean) return 0;
-  const sd = Math.sqrt(values.reduce((s, n) => s + (n - mean) ** 2, 0) / values.length);
-  return sd / mean;
+/** The last three months within 3% of each other: the bill has a current price */
+function settled(values: number[]): boolean {
+  if (values.length < 3) return values.length > 0 && values.every((v) => Math.abs(v - values[0]) <= values[0] * 0.03);
+  const last3 = values.slice(-3);
+  const hi = Math.max(...last3);
+  const lo = Math.min(...last3);
+  return lo > 0 && (hi - lo) / hi <= 0.03;
+}
+
+/** Pearson correlation of two equal-length series */
+function correlation(a: number[], b: number[]): number {
+  const n = a.length;
+  const ma = a.reduce((s, v) => s + v, 0) / n;
+  const mb = b.reduce((s, v) => s + v, 0) / n;
+  let num = 0, da = 0, db2 = 0;
+  for (let i = 0; i < n; i++) {
+    num += (a[i] - ma) * (b[i] - mb);
+    da += (a[i] - ma) ** 2;
+    db2 += (b[i] - mb) ** 2;
+  }
+  return da && db2 ? num / Math.sqrt(da * db2) : 0;
 }
 
 /**
- * A fixed bill: barely moves across the year, or has settled on one amount for
- * the last three months after a price change, without big swings (a seasonal
- * bill can sit flat for a few summer months, so swings rule that out). The
- * single highest month is left out of the swing check: a one-off extra (a
- * year-end gift, a double charge) shouldn't make a fixed bill look seasonal.
+ * A genuine yearly pattern: the last 12 months and the 12 before them move
+ * together month by month (correlation 0.6 or more over at least 10 matching
+ * months), and the swing is sizable (top-to-bottom at least 30% of a typical
+ * month). One unusual month in one year can't pass this.
  */
-function isSteady(values: number[]): boolean {
-  if (values.length < 3 || variation(values) < 0.08) return true;
-  const last = values[values.length - 1];
-  let run = 0;
-  for (let i = values.length - 1; i >= 0 && Math.abs(values[i] - last) <= last * 0.02; i--) run++;
-  const withoutSpike = [...values].sort((a, b) => a - b).slice(0, -1);
-  return run >= 3 && withoutSpike[withoutSpike.length - 1] / withoutSpike[0] < 1.4;
+function seasonal(totals: Map<string, number>, lastComplete: string): boolean {
+  const recent: number[] = [];
+  const before: number[] = [];
+  for (let i = 0; i < 12; i++) {
+    const m = shiftMonth(lastComplete, -i);
+    const prev = shiftMonth(m, -12);
+    if (totals.has(m) && totals.has(prev)) {
+      recent.push(totals.get(m)!);
+      before.push(totals.get(prev)!);
+    }
+  }
+  if (recent.length < 10) return false;
+  const swing = (Math.max(...recent) - Math.min(...recent)) / median(recent);
+  return swing >= 0.3 && correlation(recent, before) >= 0.6;
 }
 
 /** Median days between charges that fits each frequency */
@@ -129,14 +154,14 @@ export function projectBill(
 
   const values = recentMonths.map((m) => totals.get(m)!);
   const lastMonth = recentMonths[recentMonths.length - 1];
-  if (isSteady(values)) {
-    return { amount: round(values[values.length - 1]), method: "last", basis: `${monthLabel(lastMonth)} charges`, reason: null, history };
+  if (settled(values)) {
+    return { amount: round(values[values.length - 1]), method: "last", basis: `Current price: ${monthLabel(lastMonth)} charges`, reason: null, history };
   }
 
-  // Variable: same month last year, nudged by the recent trend
+  // A real yearly pattern: same month last year, nudged by the recent trend
   const yearAgo = shiftMonth(target, -12);
   const sameMonth = totals.get(yearAgo);
-  if (sameMonth) {
+  if (sameMonth && seasonal(totals, lastComplete)) {
     const last3 = [0, 1, 2].map((i) => shiftMonth(lastComplete, -i));
     const prior3 = last3.map((m) => shiftMonth(m, -12));
     let factor = 1;
