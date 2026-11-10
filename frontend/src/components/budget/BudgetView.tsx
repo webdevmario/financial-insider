@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "../../lib/api";
 import { fmt, fmtP, fmtDate, curMo, moLabel, today } from "../../lib/formatters";
 import Modal from "../layout/Modal";
+import MidMonthPlan from "./MidMonthPlan";
 import { useOnRefresh } from "../../lib/offline/status";
 import type { Expense } from "../../types";
 
@@ -26,6 +27,8 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
 
   // Budget target modal
   const [targetOpen, setTargetOpen] = useState(false);
+  // Mid-month scratchpad for working out the 16th-to-month-end number
+  const [planOpen, setPlanOpen] = useState(false);
   const [targetAmt, setTargetAmt] = useState("");
 
   // Edit expense modal
@@ -369,7 +372,7 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
       </div>
 
       {/* Month selector + target button */}
-      <div className="flex items-center gap-2.5 mb-5">
+      <div className="flex items-center gap-2.5 mb-5 flex-wrap">
         <select
           value={selectedMonth}
           onChange={(e) => setSelectedMonth(e.target.value)}
@@ -388,6 +391,9 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
         >
           Set Target
         </button>
+        <button className="btn btn-sm" onClick={() => setPlanOpen(true)}>
+          Plan the 16th
+        </button>
         <button
           className="btn btn-sm"
           onClick={() => setReimbOpen(true)}
@@ -403,6 +409,23 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
           </button>
         )}
       </div>
+
+      <MidMonthPlan
+        open={planOpen}
+        onClose={() => setPlanOpen(false)}
+        month={selectedMonth}
+        onToast={onToast}
+        onUse={async (amount) => {
+          const newTargets = { ...budgetTargets, [selectedMonth]: amount };
+          try {
+            await api.settings.set("budgetTargets", newTargets);
+            setBudgetTargets(newTargets);
+            onToast(`Budget set to ${fmt(amount)}`);
+          } catch {
+            onToast("Failed to save", true);
+          }
+        }}
+      />
 
       {/* Budget Summary */}
       <div className="bg-bg-card border border-border rounded-xl p-6 mb-5">

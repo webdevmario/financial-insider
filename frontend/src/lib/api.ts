@@ -1,6 +1,6 @@
 import type {
   Account, Subscription, Expense, Goal, AppSettings, Transaction, StatementAccount, ScanResult,
-  BillVsActual, ImportBatch, CreditCard, CardAnalysis, Insights, Pulse, Payee, PayeeDetail, UnassignedMerchant, UnassignedTxn, AliasPreview,
+  BillVsActual, ImportBatch, CreditCard, CardAnalysis, Insights, MidMonthPlan, Pulse, Payee, PayeeDetail, UnassignedMerchant, UnassignedTxn, AliasPreview,
 } from "../types";
 import { today } from "./formatters";
 import { offlineDb } from "./offline/db";
@@ -269,6 +269,7 @@ export const api = {
       cachedGet<Insights>(`/transactions/insights${month ? `?month=${month}` : ""}`),
     billChecks: () => cachedGet<BillVsActual[]>("/transactions/bill-checks"),
     pulse: () => cachedGet<Pulse>("/transactions/pulse"),
+    midmonth: (month: string) => cachedGet<MidMonthPlan>(`/transactions/midmonth?month=${month}`),
     accounts: () => cachedGet<StatementAccount[]>("/transactions/accounts"),
     renameAccount: (id: string, name: string) =>
       request<{ success: boolean }>(`/transactions/accounts/${id}`, {
