@@ -152,42 +152,43 @@ export default function Modal({ open, onClose, title, titleExtra, footer, classN
         className={`flex flex-col bg-bg-card border border-border rounded-2xl w-[520px] max-w-[90vw] max-h-[85%] shadow-[0_24px_48px_rgba(0,0,0,0.4)]
           max-md:w-full max-md:max-w-full max-md:max-h-[calc(100%-max(24px,env(safe-area-inset-top)))] max-md:rounded-b-none max-md:border-x-0 max-md:border-b-0 max-md:animate-[sheetUp_0.25s_ease-out] ${className}`}
       >
-        {/* Header (doubles as the drag handle on phones) */}
+        {/* Header: title tight to the top, close pinned to the corner. Doubles as the drag handle on phones */}
         <div
-          className="shrink-0 px-8 pt-8 pb-5 max-md:px-5 max-md:pt-2.5 max-md:pb-4 max-md:touch-none"
+          className="relative shrink-0 pl-6 pr-14 pt-5 pb-4 border-b border-border/60 max-md:pl-5 max-md:pt-2.5 max-md:touch-none"
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
           onTouchCancel={onTouchEnd}
         >
-          <div className="hidden max-md:block w-9 h-1 rounded-full bg-white/20 mx-auto mb-3.5" />
-          <div className="flex items-center justify-between gap-3">
-            <h2 id={`${id}-title`} className="text-[22px] max-md:text-xl font-semibold flex items-center gap-2 min-w-0">
-              <span className="truncate">{title}</span>
-              {titleExtra}
-            </h2>
-            <button
-              onClick={onClose}
-              aria-label="Close"
-              className="shrink-0 p-1.5 px-2.5 border border-border rounded-lg text-text-dim hover:border-accent hover:text-text transition-all text-base"
-            >
-              ✕
-            </button>
-          </div>
+          <div className="hidden max-md:block w-9 h-1 rounded-full bg-white/20 mx-auto mb-3" />
+          <h2 id={`${id}-title`} className="text-lg font-semibold flex items-center gap-2 min-w-0 leading-tight">
+            <span className="truncate">{title}</span>
+            {titleExtra}
+          </h2>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute top-3 right-3 max-md:top-4 w-8 h-8 grid place-items-center rounded-lg text-text-dim hover:text-text hover:bg-white/[0.06] transition-colors"
+          >
+            <svg aria-hidden viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
+              <path d="M4 4l8 8M12 4l-8 8" />
+            </svg>
+          </button>
         </div>
 
         {/* Content: the only part that scrolls */}
         <div
           ref={bodyRef}
-          className={`flex-1 min-h-0 overflow-y-auto overscroll-contain px-8 max-md:px-5 ${
-            footer ? "pb-5" : "pb-8 max-md:pb-[max(20px,env(safe-area-inset-bottom))]"
+          className={`flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 pt-5 max-md:px-5 ${
+            footer ? "pb-5" : "pb-6 max-md:pb-[max(20px,env(safe-area-inset-bottom))]"
           }`}
         >
           {children}
         </div>
 
         {footer && (
-          <div className="shrink-0 flex items-center justify-end gap-2.5 mx-8 pt-4 pb-8 border-t border-border max-md:mx-5 max-md:pb-[max(16px,env(safe-area-inset-bottom))]">
+          // A bar flush with the bottom edge, not floating above it
+          <div className="shrink-0 flex items-center justify-end gap-2.5 px-6 py-3.5 border-t border-border bg-bg-input/60 rounded-b-2xl max-md:px-5 max-md:rounded-none max-md:pb-[max(14px,env(safe-area-inset-bottom))]">
             {footer}
           </div>
         )}
