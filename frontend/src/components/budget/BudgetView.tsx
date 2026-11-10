@@ -392,7 +392,7 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
           Set Target
         </button>
         <button className="btn btn-sm" onClick={() => setPlanOpen(true)}>
-          Plan the 16th
+          Mid-month plan
         </button>
         <button
           className="btn btn-sm"

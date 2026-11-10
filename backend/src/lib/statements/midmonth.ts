@@ -1,14 +1,14 @@
 /**
  * The mid-month plan: what's really free to spend from the 16th to month-end.
  *
- * The household budgets the second half of each month. On the 15th they take
- * the Ally balance and set aside:
+ * The second half of each month gets its own budget. On the 15th you take the
+ * checking balance and set aside:
  * - bills due from the 16th to month-end (projected amounts, by due date)
  * - card charges from the first half that haven't posted yet. Cards are paid
  *   as soon as charges post, so these are what still has to leave checking.
  *   Most of them are bills charged on or just before the 15th; the rest is the
  *   last day or two of everyday card spending, which hasn't posted yet
- * - the extra mortgage principal reserve (a setting on the page, $2,300 to start)
+ * - money set aside for savings first (entered on the page; carries forward)
  * Work expenses due in the window are listed but left out: they're reimbursed
  * on the 1st.
  *

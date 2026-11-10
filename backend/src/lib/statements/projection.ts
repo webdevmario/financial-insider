@@ -67,14 +67,17 @@ function variation(values: number[]): number {
 /**
  * A fixed bill: barely moves across the year, or has settled on one amount for
  * the last three months after a price change, without big swings (a seasonal
- * bill can sit flat for a few summer months, so swings rule that out)
+ * bill can sit flat for a few summer months, so swings rule that out). The
+ * single highest month is left out of the swing check: a one-off extra (a
+ * year-end gift, a double charge) shouldn't make a fixed bill look seasonal.
  */
 function isSteady(values: number[]): boolean {
   if (values.length < 3 || variation(values) < 0.08) return true;
   const last = values[values.length - 1];
   let run = 0;
   for (let i = values.length - 1; i >= 0 && Math.abs(values[i] - last) <= last * 0.02; i--) run++;
-  return run >= 3 && Math.max(...values) / Math.min(...values) < 1.6;
+  const withoutSpike = [...values].sort((a, b) => a - b).slice(0, -1);
+  return run >= 3 && withoutSpike[withoutSpike.length - 1] / withoutSpike[0] < 1.4;
 }
 
 /** Median days between charges that fits each frequency */
@@ -152,8 +155,8 @@ export function projectBill(
     };
   }
 
-  const avg = values.reduce((s, n) => s + n, 0) / values.length;
-  return { amount: round(avg), method: "average", basis: `Average of the last ${values.length} months`, reason: null, history };
+  // A typical month, not the mean, so one unusual month doesn't drag the number
+  return { amount: round(median(values)), method: "average", basis: `Typical month of the last ${values.length}`, reason: null, history };
 }
 
 /** Every bill's projection, keyed by bill id */

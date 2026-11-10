@@ -6,8 +6,12 @@ import type { MidMonthPlan as PlanData, PlanLine } from "../../types";
 
 /** What the household saves for a month's plan; the data suggests the lines, these are the edits */
 interface SavedPlan {
-  ally: number | null;
+  /** Checking balance on the 15th */
+  balance: number | null;
+  /** Set aside for savings before anything else */
   reserve: number;
+  /** Leftover you'd like to keep; the footer compares the result against it */
+  cushion: number;
   /** Amount changes by line key */
   amounts: Record<string, number>;
   /** Suggested lines switched off */
@@ -26,10 +30,16 @@ const localDay = (iso: string) => {
   return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
 };
 const PLANS_KEY = "budgetPlans";
-const DEFAULT_RESERVE = 2300;
-const CUSHION = 1000;
+/** A new month starts from the savings set-aside and cushion of the latest earlier plan */
+function blankPlan(carry?: Pick<SavedPlan, "reserve" | "cushion">): SavedPlan {
+  return { balance: null, reserve: carry?.reserve ?? 0, cushion: carry?.cushion ?? 0, amounts: {}, off: [], workOn: [], extras: [] };
+}
 
-const blankPlan = (): SavedPlan => ({ ally: null, reserve: DEFAULT_RESERVE, amounts: {}, off: [], workOn: [], extras: [] });
+/** Plans saved before the balance field was renamed */
+function upgrade(p: Partial<SavedPlan> & { ally?: number | null }): Partial<SavedPlan> {
+  const { ally, ...rest } = p;
+  return rest.balance === undefined && ally !== undefined ? { ...rest, balance: ally } : rest;
+}
 
 function AmountInput({ value, onChange, disabled }: { value: number; onChange: (n: number) => void; disabled?: boolean }) {
   const [text, setText] = useState(String(value));
@@ -113,7 +123,9 @@ export default function MidMonthPlan({ open, onClose, month, onUse, onToast }: {
       .then((res) => {
         const all = res.value || {};
         setPlans(all);
-        setPlan({ ...blankPlan(), ...(all[month] ?? {}) });
+        const earlier = Object.keys(all).filter((m) => m < month).sort().pop();
+        const carry = earlier ? all[earlier] : undefined;
+        setPlan({ ...blankPlan(carry), ...upgrade(all[month] ?? {}) });
       })
       .catch(() => setPlan(blankPlan()));
   }, [open, month]);
@@ -152,7 +164,7 @@ export default function MidMonthPlan({ open, onClose, month, onUse, onToast }: {
         : { ...p, off: p.off.includes(l.key) ? p.off.filter((k) => k !== l.key) : [...p.off, l.key] }
     );
   const setAmount = (l: PlanLine, n: number) => edit((p) => ({ ...p, amounts: { ...p.amounts, [l.key]: n } }));
-  const edited = Object.keys(plan.amounts).length + plan.off.length + plan.workOn.length + plan.extras.length > 0 || plan.reserve !== DEFAULT_RESERVE;
+  const edited = Object.keys(plan.amounts).length + plan.off.length + plan.workOn.length + plan.extras.length > 0;
 
   const totals = useMemo(() => {
     if (!data) return null;
@@ -162,7 +174,7 @@ export default function MidMonthPlan({ open, onClose, month, onUse, onToast }: {
     const work = sum(data.work, true);
     const extras = plan.extras.reduce((s, e) => s + (e.amount || 0), 0);
     const out = bills + pending + work + extras + (plan.reserve || 0);
-    return { bills, pending, work, extras, out, available: plan.ally == null ? null : plan.ally - out };
+    return { bills, pending, work, extras, out, available: plan.balance == null ? null : plan.balance - out };
   }, [data, plan]);
 
   const windowLabel = data ? `${MONTHS[Number(month.slice(5, 7)) - 1]} 16–${Number(data.window.end.slice(8, 10))}` : "";
@@ -178,16 +190,18 @@ export default function MidMonthPlan({ open, onClose, month, onUse, onToast }: {
         <div className="text-[11px] text-text-dim truncate">
           {available == null
             ? totals ? `Enter the balance · ${fmt(totals.out)} set aside` : ""
-            : available >= CUSHION
-              ? `${fmt(available - CUSHION)} beyond your ${fmt(CUSHION)} cushion`
-              : `${fmt(CUSHION - Math.max(available, 0))} short of your ${fmt(CUSHION)} cushion`}
+            : plan.cushion <= 0
+              ? "Free to spend through month-end"
+              : available >= plan.cushion
+                ? `${fmt(available - plan.cushion)} beyond your ${fmt(plan.cushion)} cushion`
+                : `${fmt(plan.cushion - Math.max(available, 0))} short of your ${fmt(plan.cushion)} cushion`}
         </div>
       </div>
       <button
         className="btn btn-primary"
         onClick={async () => {
           if (available == null || available <= 0) {
-            onToast(available == null ? "Enter the Ally balance first" : "Nothing available to budget", true);
+            onToast(available == null ? "Enter your checking balance first" : "Nothing available to budget", true);
             return;
           }
           if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -205,7 +219,7 @@ export default function MidMonthPlan({ open, onClose, month, onUse, onToast }: {
     <Modal
       open={open}
       onClose={onClose}
-      title="Plan the 16th"
+      title="Mid-month plan"
       titleExtra={<span className="text-[13px] font-normal text-text-muted">{windowLabel || moLabel(month)}</span>}
       footer={footer}
       className="!w-[640px]"
@@ -222,16 +236,16 @@ export default function MidMonthPlan({ open, onClose, month, onUse, onToast }: {
           )}
 
           <div className="flex items-end justify-between gap-3 mb-5 flex-wrap">
-            <div className="input-group w-[220px] max-w-full">
-              <label htmlFor="ally-balance">Ally checking on the 15th</label>
+            <div className="input-group flex-1 min-w-[240px] max-w-[360px]">
+              <label htmlFor="checking-balance">Bank checking balance</label>
               <input
-                id="ally-balance"
+                id="checking-balance"
                 type="number"
                 step="0.01"
                 inputMode="decimal"
                 placeholder="Balance after the paycheck"
-                value={plan.ally ?? ""}
-                onChange={(e) => edit((p) => ({ ...p, ally: e.target.value === "" ? null : parseFloat(e.target.value) }))}
+                value={plan.balance ?? ""}
+                onChange={(e) => edit((p) => ({ ...p, balance: e.target.value === "" ? null : parseFloat(e.target.value) }))}
                 className="font-mono"
               />
             </div>
@@ -241,7 +255,7 @@ export default function MidMonthPlan({ open, onClose, month, onUse, onToast }: {
                 <button
                   type="button"
                   className="block ml-auto max-md:ml-0 mt-1 text-accent"
-                  onClick={() => edit((p) => ({ ...blankPlan(), ally: p.ally }))}
+                  onClick={() => edit((p) => ({ ...blankPlan(p), balance: p.balance }))}
                 >
                   Reset to suggestions
                 </button>
@@ -263,13 +277,20 @@ export default function MidMonthPlan({ open, onClose, month, onUse, onToast }: {
             ))}
           </Section>
 
-          <Section title="Extra principal" total={plan.reserve || 0}>
+          <Section title="Savings" total={plan.reserve || 0}>
             <div className="flex items-center gap-3 py-2">
               <div className="min-w-0 flex-1">
-                <div className="text-sm">Pennymac extra payment</div>
-                <div className="text-[11px] text-text-muted">Set aside first; counts as savings</div>
+                <div className="text-sm">Set aside first</div>
+                <div className="text-[11px] text-text-muted">Like an extra loan payment. Carries over to next month</div>
               </div>
               <AmountInput value={plan.reserve} onChange={(n) => edit((p) => ({ ...p, reserve: n }))} />
+            </div>
+            <div className="flex items-center gap-3 py-2 border-t border-border/30">
+              <div className="min-w-0 flex-1">
+                <div className="text-sm">Cushion to keep</div>
+                <div className="text-[11px] text-text-muted">Not subtracted; the total is compared against it</div>
+              </div>
+              <AmountInput value={plan.cushion} onChange={(n) => edit((p) => ({ ...p, cushion: n }))} />
             </div>
           </Section>
 
