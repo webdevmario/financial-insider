@@ -1,6 +1,6 @@
 import type {
   Account, Subscription, Expense, Goal, AppSettings, Transaction, StatementAccount, ScanResult,
-  BillVsActual, ImportBatch, CreditCard, CardAnalysis, Insights, MidMonthPlan, YearOverYear, Payee, PayeeDetail, UnassignedMerchant, UnassignedTxn, AliasPreview,
+  BillVsActual, ImportBatch, Insights, MidMonthPlan, YearOverYear, Payee, PayeeDetail, UnassignedMerchant, UnassignedTxn, AliasPreview,
 } from "../types";
 import { today } from "./formatters";
 import { offlineDb } from "./offline/db";
@@ -238,24 +238,6 @@ export const api = {
   },
 
   // ── Credit cards ─────────────────────────────────────────────
-  cards: {
-    list: () => cachedGet<CreditCard[]>("/cards"),
-    analysis: () => cachedGet<CardAnalysis>("/cards/analysis"),
-    create: (data: Partial<CreditCard>) =>
-      request<CreditCard>("/cards", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
-    update: (id: string, data: Partial<CreditCard>) =>
-      request<CreditCard>(`/cards/${id}`, {
-        method: "PUT",
-        body: JSON.stringify(data),
-      }),
-    delete: (id: string) =>
-      request<{ success: boolean }>(`/cards/${id}`, {
-        method: "DELETE",
-      }),
-  },
 
   // ── Imported transactions ────────────────────────────────────
   transactions: {
