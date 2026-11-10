@@ -130,7 +130,6 @@ export default function YearOverYear({ data }: { data: YoyData }) {
         {newestFirst.map((y) => (
           <span key={y.year} className="flex items-center gap-1.5"><Swatch color={colorFor(years, y.year)} />{y.year}</span>
         ))}
-        <span className="text-text-muted">· running total of spending</span>
       </div>
       <CumulativeChart years={years} />
 
@@ -158,7 +157,6 @@ export default function YearOverYear({ data }: { data: YoyData }) {
               ))}
             </tbody>
           </table>
-          <div className="text-[11px] text-text-muted mt-2">Spent, income and net cover Jan 1 – {through} of each year. Full year is total spending.</div>
         </div>
         <div className="min-w-0">
           <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-1">Biggest changes vs {prev.year}</div>
