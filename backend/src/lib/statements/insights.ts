@@ -1,6 +1,6 @@
 /**
  * What the imported transactions say: monthly totals, bills vs what was
- * actually charged, paychecks, and card payments.
+ * actually charged, and paychecks.
  *
  * Amounts in the output are positive costs unless the field says otherwise.
  */
@@ -114,39 +114,6 @@ export function computeInsights(month?: string) {
     .sort((a, b) => b.date.localeCompare(a.date))
     .map((t) => ({ id: t.id, date: t.date, amount: t.amount, description: t.description, accountId: t.accountId }));
 
-  // Card payments: when each card was paid, and from where
-  const byId = new Map(all.map((t) => [t.id, t]));
-  const cardPayments = accounts
-    .filter((a) => a.kind === "credit")
-    .map((a) => {
-      const pays = all
-        .filter((t) => t.accountId === a.id && t.kind === "transfer" && t.amount > 0)
-        .sort((x, y) => y.date.localeCompare(x.date));
-      const sources = new Map<string, { name: string; count: number; total: number }>();
-      for (const p of pays) {
-        const from = p.transferPeerId ? byId.get(p.transferPeerId)?.accountId ?? null : null;
-        const name = from ? accountName.get(from) || from : "Not in imported accounts";
-        const s = sources.get(name) ?? { name, count: 0, total: 0 };
-        s.count++;
-        s.total = round(s.total + p.amount);
-        sources.set(name, s);
-      }
-      return {
-        accountId: a.id,
-        name: a.name,
-        count: pays.length,
-        total: round(pays.reduce((s, p) => s + p.amount, 0)),
-        lastDate: pays[0]?.date ?? null,
-        sources: [...sources.values()].sort((x, y) => y.total - x.total),
-        recent: pays.slice(0, 8).map((p) => ({
-          date: p.date,
-          amount: p.amount,
-          from: p.transferPeerId ? accountName.get(byId.get(p.transferPeerId)?.accountId ?? "") ?? null : null,
-        })),
-      };
-    })
-    .filter((c) => c.count);
-
   return {
     months,
     month: selected,
@@ -168,6 +135,5 @@ export function computeInsights(month?: string) {
     billsVsActual,
     paychecks,
     expectedPaycheck,
-    cardPayments,
   };
 }

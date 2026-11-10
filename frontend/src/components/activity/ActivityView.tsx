@@ -4,7 +4,6 @@ import { api } from "../../lib/api";
 import { fmt, fmtDate, fmtP, moLabel } from "../../lib/formatters";
 import StatCard from "../layout/StatCard";
 import LoadingState from "../layout/LoadingState";
-import OptionSheet from "../layout/OptionSheet";
 import ImportPanel from "./ImportPanel";
 import TransactionEditModal from "./TransactionEditModal";
 import MerchantsTab from "./MerchantsTab";
@@ -19,15 +18,12 @@ interface ActivityViewProps {
   onToast: (msg: string, err?: boolean) => void;
 }
 
-type Tab = "overview" | "merchants" | "payments" | "all";
-const TABS: { id: Tab; label: string; hint: string }[] = [
-  { id: "overview", label: "Overview", hint: "" },
-  { id: "merchants", label: "Merchants", hint: "Payees and the bank names behind them" },
-  { id: "payments", label: "Card Payments", hint: "Which account paid each card" },
-  { id: "all", label: "Transactions", hint: "" },
+type Tab = "overview" | "merchants" | "all";
+const TABS: { id: Tab; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "merchants", label: "Merchants" },
+  { id: "all", label: "Transactions" },
 ];
-/** On phones only these get a segment; the rest sit behind "More" */
-const PHONE_TABS: Tab[] = ["overview", "all", "merchants"];
 const TAB_KEY = "activity.tab";
 
 function storedTab(): Tab {
@@ -50,7 +46,6 @@ export default function ActivityView({ onToast }: ActivityViewProps) {
   const [payees, setPayees] = useState<Payee[]>([]);
   const [openPayee, setOpenPayee] = useState<string | null>(null);
   const [merging, setMerging] = useState<{ members: MergeMember[]; name?: string } | null>(null);
-  const [moreOpen, setMoreOpen] = useState(false);
 
   const reload = useCallback(() => setVersion((v) => v + 1), []);
   /** Bumped after each successful grouping, so Merchants can reset its searches */
@@ -121,13 +116,13 @@ export default function ActivityView({ onToast }: ActivityViewProps) {
         </div>
       ) : (
         <>
-          {/* Desktop: every tab */}
-          <div className="max-md:hidden flex gap-0.5 p-0.5 bg-bg-card border border-border rounded-lg mb-5 w-fit">
+          {/* Every tab fits, so phones get the same bar at full width */}
+          <div className="flex max-md:grid max-md:grid-cols-3 gap-0.5 p-0.5 bg-bg-card border border-border rounded-lg mb-5 w-fit max-md:w-full">
             {TABS.map((t) => (
               <button
                 key={t.id}
                 onClick={() => pick(t.id)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-all ${
+                className={`px-3 max-md:px-1 py-1.5 max-md:py-2 rounded-md text-xs font-medium whitespace-nowrap truncate transition-all ${
                   tab === t.id ? "text-accent bg-accent/[0.1]" : "text-text-dim hover:text-text"
                 }`}
               >
@@ -135,37 +130,6 @@ export default function ActivityView({ onToast }: ActivityViewProps) {
               </button>
             ))}
           </div>
-
-          {/* Phone: three tabs + More */}
-          <div className="md:hidden grid grid-cols-4 gap-0.5 p-0.5 bg-bg-card border border-border rounded-lg mb-5">
-            {PHONE_TABS.map((id) => (
-              <button
-                key={id}
-                onClick={() => pick(id)}
-                className={`px-1 py-2 rounded-md text-xs font-medium truncate transition-all ${
-                  tab === id ? "text-accent bg-accent/[0.1]" : "text-text-dim"
-                }`}
-              >
-                {TABS.find((t) => t.id === id)!.label}
-              </button>
-            ))}
-            <button
-              onClick={() => setMoreOpen(true)}
-              className={`px-1 py-2 rounded-md text-xs font-medium truncate transition-all ${
-                PHONE_TABS.includes(tab) ? "text-text-dim" : "text-accent bg-accent/[0.1]"
-              }`}
-            >
-              {PHONE_TABS.includes(tab) ? "More" : TABS.find((t) => t.id === tab)!.label} ▾
-            </button>
-          </div>
-          <OptionSheet
-            open={moreOpen}
-            onClose={() => setMoreOpen(false)}
-            title="More Activity"
-            options={TABS.filter((t) => !PHONE_TABS.includes(t.id))}
-            active={tab}
-            onPick={pick}
-          />
 
           {tab === "overview" && <Overview insights={insights!} />}
           {tab === "merchants" && (
@@ -178,7 +142,6 @@ export default function ActivityView({ onToast }: ActivityViewProps) {
               onToast={onToast}
             />
           )}
-          {tab === "payments" && <Payments insights={insights!} />}
           {tab === "all" && (
             <AllTransactions
               month={insights!.month}
@@ -318,37 +281,6 @@ function Overview({ insights }: { insights: Insights }) {
           ) : <Empty>No deposits that look like payroll yet.</Empty>}
         </Card>
       </div>
-    </div>
-  );
-}
-
-// ── Card payments ─────────────────────────────────────────────────
-
-function Payments({ insights }: { insights: Insights }) {
-  if (!insights.cardPayments.length) return <Empty>No card payments found.</Empty>;
-  return (
-    <div className="grid grid-cols-3 max-lg:grid-cols-2 max-md:grid-cols-1 gap-5">
-      {insights.cardPayments.map((c) => (
-        <Card key={c.accountId} title={c.name} extra={<span className="font-mono text-xs">{fmt(c.total)}</span>}>
-          <div className="text-[11px] text-text-muted mb-3">
-            {c.count} payments{c.lastDate && <> · last {fmtDate(c.lastDate)}</>}
-          </div>
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted mb-1">Paid from</div>
-          {c.sources.map((s) => (
-            <div key={s.name} className="flex justify-between text-xs py-1">
-              <span className={s.name.startsWith("Not ") ? "text-text-muted" : ""}>{s.name} <span className="text-text-muted">· {s.count}</span></span>
-              <span className="font-mono">{fmtP(s.total)}</span>
-            </div>
-          ))}
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted mt-3 mb-1">Recent</div>
-          {c.recent.map((p, i) => (
-            <div key={i} className="flex justify-between text-xs py-1 border-b border-border/30 last:border-0">
-              <span>{fmtDate(p.date)} <span className="text-text-muted">· {p.from ?? "unknown source"}</span></span>
-              <span className="font-mono">{fmtP(p.amount)}</span>
-            </div>
-          ))}
-        </Card>
-      ))}
     </div>
   );
 }
