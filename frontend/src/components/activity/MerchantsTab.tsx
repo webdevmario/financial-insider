@@ -86,18 +86,15 @@ function SortSelect<T extends string>({ label, value, options, onChange }: {
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="relative shrink-0">
-      <select
-        aria-label={label}
-        title={label}
-        value={value}
-        onChange={(e) => onChange(e.target.value as T)}
-        className="!w-[110px] !text-xs !py-1.5 !pl-2.5 !pr-6 h-full cursor-pointer"
-      >
-        {options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
-      </select>
-      <span aria-hidden className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-text-muted">▾</span>
-    </div>
+    <select
+      aria-label={label}
+      title={label}
+      value={value}
+      onChange={(e) => onChange(e.target.value as T)}
+      className="!w-[110px] shrink-0 !text-xs !py-1.5 !pl-2.5"
+    >
+      {options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+    </select>
   );
 }
 
