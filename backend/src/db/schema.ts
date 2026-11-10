@@ -150,6 +150,23 @@ export const merchantRules = sqliteTable("merchant_rules", {
   createdAt: text("created_at").notNull(),
 });
 
+// ── Credit cards (the ones in regular use, for comparing rewards with real spending) ──
+// Reward and benefit terms are typed in by hand; nothing here is fetched from the web
+export const creditCards = sqliteTable("credit_cards", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(), // "Apple Card"
+  issuer: text("issuer"), // Apple / Goldman Sachs, Chase, Amex
+  statementAccountId: text("statement_account_id"), // statement_accounts.id: ties the card to its imported spending
+  annualFee: real("annual_fee").notNull().default(0),
+  rewardUnit: text("reward_unit").notNull().default("percent"), // percent (cash back) | points (per dollar)
+  pointValue: real("point_value"), // Cents one point is worth, for comparing points cards with cash back (default 1)
+  rewardRates: text("reward_rates"), // JSON: { "Dining": 3, "Grocery": 2, "*": 1 }, "*" = everything else
+  benefits: text("benefits"), // Benefits and notes, free text
+  lastReviewed: text("last_reviewed"), // YYYY-MM-DD the terms were last checked
+  inUse: integer("in_use").notNull().default(1),
+  createdAt: text("created_at").notNull(),
+});
+
 // ── Settings (key-value store) ─────────────────────────────────────
 // Stores: paycheck, income, paycheckHistory, budgetTargets
 export const settings = sqliteTable("settings", {
@@ -173,3 +190,4 @@ export type NewTransaction = typeof transactions.$inferInsert;
 export type MerchantRule = typeof merchantRules.$inferSelect;
 export type Payee = typeof payees.$inferSelect;
 export type PayeeAlias = typeof payeeAliases.$inferSelect;
+export type CreditCard = typeof creditCards.$inferSelect;

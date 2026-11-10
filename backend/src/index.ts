@@ -12,6 +12,7 @@ import transactionsRouter from "./routes/transactions.js";
 import { watchStatements } from "./lib/statements/importer.js";
 import { migratePayees } from "./lib/statements/payees.js";
 import payeesRouter from "./routes/payees.js";
+import cardsRouter from "./routes/cards.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -54,6 +55,7 @@ app.use("/api/subscriptions", subscriptionsRouter);
 app.use("/api/goals", goalsRouter);
 app.use("/api/transactions", transactionsRouter);
 app.use("/api/payees", payeesRouter);
+app.use("/api/cards", cardsRouter);
 app.use("/api", settingsRouter); // settings, dashboard, data routes
 
 // Serve frontend in production
