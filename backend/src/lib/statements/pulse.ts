@@ -46,14 +46,18 @@ type Bucket = {
 const emptyBucket = (): Bucket => ({ spent: 0, income: 0, saved: 0, reimbursed: 0, fixed: 0, byCategory: new Map(), flexByCategory: new Map() });
 
 function add(b: Bucket, t: Transaction, fixedIds: Set<string>) {
+  // Money set aside counts as saved whatever its kind (a payee can mark it a transfer to keep it out of spending everywhere)
+  if (t.category === SAVINGS) {
+    b.saved -= t.amount;
+    return;
+  }
   if (t.kind === "income" && t.amount > 0) {
     b.income += t.amount;
     return;
   }
   const s = spendOf(t);
   if (!s) return;
-  if (t.category === SAVINGS) b.saved += s;
-  else if (t.category === REIMBURSED) b.reimbursed += s;
+  if (t.category === REIMBURSED) b.reimbursed += s;
   else {
     b.spent += s;
     b.byCategory.set(t.category, (b.byCategory.get(t.category) || 0) + s);
