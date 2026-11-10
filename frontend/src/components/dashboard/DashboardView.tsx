@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import { fmt, fmtP, fmtDate } from "../../lib/formatters";
-import { billAmount, computeEffectiveNextCharge, isActiveBill } from "../../lib/billing";
+import { billAmount, isActiveBill } from "../../lib/billing";
 import { goalProgress, sortGoals } from "../../lib/goals";
 import StatCard from "../layout/StatCard";
-import PulseSection from "./PulseSection";
 import YearOverYear from "./YearOverYear";
-import type { Account, Goal, Pulse, Subscription } from "../../types";
+import type { Account, Goal, Subscription, YearOverYear as YoyData } from "../../types";
 
 const ASSET_GROUPS: Record<string, string[]> = {
   Investments: ["401k", "Roth 401k", "IRA", "Roth IRA", "Rollover IRA", "Brokerage", "Crypto", "IUL"],
@@ -41,7 +40,7 @@ export default function DashboardView({ onOpenGoals }: { onOpenGoals: () => void
   const [subs, setSubs] = useState<Subscription[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   // Needs imported statements; the Dashboard works without it
-  const [pulse, setPulse] = useState<Pulse | null>(null);
+  const [yoy, setYoy] = useState<YoyData | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -50,7 +49,7 @@ export default function DashboardView({ onOpenGoals }: { onOpenGoals: () => void
       api.accounts.list().then(setAccounts).catch(() => {}),
       api.subscriptions.list().then(setSubs).catch(() => {}),
       api.goals.list().then(setGoals).catch(() => {}),
-      api.transactions.pulse().then(setPulse).catch(() => setPulse(null)),
+      api.transactions.yearOverYear().then(setYoy).catch(() => setYoy(null)),
     ]).finally(() => setLoading(false));
   }, []);
 
@@ -75,21 +74,6 @@ export default function DashboardView({ onOpenGoals }: { onOpenGoals: () => void
   // Top in-progress goals, by priority
   const topGoals = sortGoals(goals.filter((g) => !goalProgress(g).done), "priority").slice(0, 4);
 
-  // Upcoming non-monthly charges (next 30 days, including today)
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const future = new Date(today);
-  future.setDate(future.getDate() + 30);
-  const upcoming = activeSubs
-    .filter((s) => s.frequency !== "monthly")
-    .map((s) => ({ ...s, due: computeEffectiveNextCharge(s.nextCharge, s.frequency) }))
-    .filter((s) => {
-      if (!s.due) return false;
-      const d = new Date(s.due + "T00:00:00");
-      return d >= today && d <= future;
-    })
-    .sort((a, b) => a.due!.localeCompare(b.due!));
-
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
@@ -107,28 +91,6 @@ export default function DashboardView({ onOpenGoals }: { onOpenGoals: () => void
         <StatCard label="Monthly Income" value={fmt(summary.income)} color="green" />
         <StatCard label="Monthly Bills" value={fmt(summary.monthlyBills)} color="amber" />
       </div>
-
-      {pulse && pulse.pulse.split.length > 1 && <PulseSection data={pulse.pulse} />}
-
-      {/* Upcoming callout */}
-      {upcoming.length > 0 && (
-        <div className="bg-amber-dim border border-amber/20 rounded-xl px-5 py-4 mb-5 flex items-start gap-3">
-          <span className="text-lg flex-shrink-0 mt-0.5">⚠️</span>
-          <div>
-            <div className="text-[13px] font-semibold text-amber mb-1">
-              Upcoming Non-Monthly Charges
-            </div>
-            <div className="text-[13px] text-text-dim leading-relaxed">
-              {upcoming.map((s, i) => (
-                <span key={s.id}>
-                  <strong>{s.name}</strong> — {fmtP(billAmount(s))} on {fmtDate(s.due)}
-                  {i < upcoming.length - 1 && <br />}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Two-column layout */}
       <div className="grid grid-cols-2 max-md:grid-cols-1 gap-5">
@@ -227,7 +189,7 @@ export default function DashboardView({ onOpenGoals }: { onOpenGoals: () => void
         </button>
       )}
 
-      {pulse && <YearOverYear data={pulse.yoy} />}
+      {yoy && <YearOverYear data={yoy} />}
     </div>
   );
 }

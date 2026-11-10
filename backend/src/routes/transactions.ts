@@ -8,7 +8,7 @@ import {
   statementsDir, undoBatch,
 } from "../lib/statements/importer.js";
 import { computeInsights } from "../lib/statements/insights.js";
-import { computePulse } from "../lib/statements/pulse.js";
+import { computeYearOverYear } from "../lib/statements/yoy.js";
 import { computeMidMonthPlan } from "../lib/statements/midmonth.js";
 import { addAlias, findOrCreatePayee, recomputeAll } from "../lib/statements/payees.js";
 
@@ -62,9 +62,9 @@ router.get("/insights", (req, res) => {
   res.json(computeInsights(req.query.month as string | undefined));
 });
 
-// GET /api/transactions/pulse: this month's pace and the year-over-year view, for the Dashboard
-router.get("/pulse", (_req, res) => {
-  res.json(computePulse());
+// GET /api/transactions/year-over-year: this year against the two before, for the Dashboard
+router.get("/year-over-year", (_req, res) => {
+  res.json(computeYearOverYear());
 });
 
 // GET /api/transactions/midmonth?month=YYYY-MM: suggested lines for planning the 16th to month-end

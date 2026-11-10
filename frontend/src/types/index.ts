@@ -71,35 +71,18 @@ export interface MidMonthPlan {
   work: PlanLine[];
 }
 
-/** Dashboard pulse: this month's pace, fixed vs flexible, and year over year */
-export interface Pulse {
-  pulse: {
-    month: string;
-    asOf: string;
-    spent: number;
-    usualSpentByNow: number;
-    spentOnPace: number;
-    usualMonth: number;
-    income: number;
-    incomeOnPace: number;
-    netOnPace: number;
-    saved: number;
-    reimbursed: number;
-    hot: { category: string; current: number; usual: number; diff: number }[];
-    split: { month: string; fixed: number; flexible: number; partial: boolean }[];
-  };
-  yoy: {
-    /** MM-DD the year-to-date comparison runs through */
-    through: string;
-    years: {
-      year: number;
-      /** Spending per month; null for months still ahead */
-      monthly: (number | null)[];
-      ytd: { spent: number; income: number; saved: number; net: number };
-      fullYear: { spent: number; income: number; net: number } | null;
-    }[];
-    changes: { category: string; before: number; now: number; diff: number }[];
-  };
+/** Dashboard: this year's spending against the two years before */
+export interface YearOverYear {
+  /** MM-DD the year-to-date comparison runs through */
+  through: string;
+  years: {
+    year: number;
+    /** Spending per month; null for months still ahead */
+    monthly: (number | null)[];
+    ytd: { spent: number; income: number; saved: number; net: number };
+    fullYear: { spent: number; income: number; net: number } | null;
+  }[];
+  changes: { category: string; before: number; now: number; diff: number }[];
 }
 
 export interface BillProjection {

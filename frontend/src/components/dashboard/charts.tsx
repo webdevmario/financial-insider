@@ -45,13 +45,6 @@ export function niceTicks(max: number, count = 3): number[] {
   return ticks;
 }
 
-/** Path for a column whose top corners are rounded and whose base stays square */
-export function columnPath(x: number, y: number, w: number, h: number, r = 4): string {
-  if (h <= 0) return "";
-  const rr = Math.min(r, w / 2, h);
-  return `M${x},${y + h}V${y + rr}Q${x},${y} ${x + rr},${y}H${x + w - rr}Q${x + w},${y} ${x + w},${y + rr}V${y + h}Z`;
-}
-
 export function Swatch({ color }: { color: string }) {
   return <span className="inline-block w-2.5 h-2.5 rounded-[3px] shrink-0" style={{ background: color }} />;
 }
