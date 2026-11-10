@@ -40,7 +40,6 @@ export default function GoalForm({ open, onClose, onSaved, onToast, goal }: Goal
 
   async function handleSave() {
     if (!name.trim()) return onToast("Enter a goal name", true);
-    if (target <= 0) return onToast("Enter a target amount", true);
 
     const payload = {
       name: name.trim(),
@@ -127,12 +126,12 @@ export default function GoalForm({ open, onClose, onSaved, onToast, goal }: Goal
 
         <div className="grid grid-cols-2 max-md:grid-cols-1 gap-3">
           <div className="input-group">
-            <label>Target Amount</label>
+            <label>Target Amount (optional)</label>
             <input
               type="number"
               step="0.01"
               inputMode="decimal"
-              placeholder="0.00"
+              placeholder="Not set yet"
               value={targetAmount}
               onChange={(e) => setTargetAmount(e.target.value)}
             />

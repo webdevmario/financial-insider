@@ -167,8 +167,14 @@ export default function DashboardView({ onOpenGoals }: { onOpenGoals: () => void
                   <div className="flex items-center justify-between gap-3 text-sm mb-1.5">
                     <span className="truncate">{g.name}</span>
                     <span className="font-mono text-[13px] shrink-0">
-                      {p.pct.toFixed(0)}%
-                      <span className="text-text-muted"> of {fmt(g.targetAmount)}</span>
+                      {p.hasTarget ? (
+                        <>
+                          {p.pct.toFixed(0)}%
+                          <span className="text-text-muted"> of {fmt(g.targetAmount)}</span>
+                        </>
+                      ) : (
+                        <span className="text-text-muted">Amount not set</span>
+                      )}
                     </span>
                   </div>
                   <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
