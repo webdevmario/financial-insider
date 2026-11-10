@@ -20,7 +20,7 @@ export const PRIORITY_DOT: Record<GoalPriority, string> = {
   low: "bg-accent",
 };
 
-export type GoalStatus = "done" | "overdue" | "behind" | "on-track" | "no-deadline";
+export type GoalStatus = "done" | "overdue" | "behind" | "on-track" | "no-deadline" | "no-amount";
 
 export const STATUS_LABELS: Record<GoalStatus, string> = {
   done: "Reached",
@@ -28,6 +28,7 @@ export const STATUS_LABELS: Record<GoalStatus, string> = {
   behind: "Behind pace",
   "on-track": "On track",
   "no-deadline": "No deadline",
+  "no-amount": "Amount not set",
 };
 
 export const STATUS_STYLES: Record<GoalStatus, string> = {
@@ -36,6 +37,7 @@ export const STATUS_STYLES: Record<GoalStatus, string> = {
   behind: "bg-amber-dim text-amber",
   "on-track": "bg-green-dim text-green",
   "no-deadline": "bg-white/[0.06] text-text-dim",
+  "no-amount": "bg-white/[0.06] text-text-dim",
 };
 
 const DAY = 86_400_000;
@@ -54,6 +56,8 @@ export interface GoalProgress {
   daysLeft: number | null;
   /** Amount to set aside each month to hit the deadline */
   perMonth: number | null;
+  /** False for a goal still being shaped: no amount yet, so no percentage or pace */
+  hasTarget: boolean;
   status: GoalStatus;
 }
 
@@ -63,18 +67,22 @@ export function goalProgress(g: Goal, now = new Date()): GoalProgress {
   const done = target > 0 && saved >= target;
   const pct = target > 0 ? Math.min(100, Math.max(0, (saved / target) * 100)) : 0;
   const remaining = Math.max(0, target - saved);
-
-  if (!g.deadline) {
-    return { pct, remaining, done, daysLeft: null, perMonth: null, status: done ? "done" : "no-deadline" };
-  }
+  const hasTarget = target > 0;
 
   const today = new Date(now);
   today.setHours(0, 0, 0, 0);
-  const due = dayStart(g.deadline);
-  const daysLeft = Math.round((due - today.getTime()) / DAY);
+  const due = g.deadline ? dayStart(g.deadline) : null;
+  const daysLeft = due == null ? null : Math.round((due - today.getTime()) / DAY);
 
-  if (done) return { pct, remaining, done, daysLeft, perMonth: null, status: "done" };
-  if (daysLeft < 0) return { pct, remaining, done, daysLeft, perMonth: null, status: "overdue" };
+  // No amount yet: nothing to measure progress or pace against
+  if (!hasTarget) return { pct, remaining, done, daysLeft, perMonth: null, hasTarget, status: "no-amount" };
+
+  if (due == null || daysLeft == null) {
+    return { pct, remaining, done, daysLeft: null, perMonth: null, hasTarget, status: done ? "done" : "no-deadline" };
+  }
+
+  if (done) return { pct, remaining, done, daysLeft, perMonth: null, hasTarget, status: "done" };
+  if (daysLeft < 0) return { pct, remaining, done, daysLeft, perMonth: null, hasTarget, status: "overdue" };
 
   // Less than a month left means the whole remainder is due "this month"
   const perMonth = remaining / Math.max(1, daysLeft / AVG_MONTH_DAYS);
@@ -85,7 +93,7 @@ export function goalProgress(g: Goal, now = new Date()): GoalProgress {
   const elapsed = span > 0 ? Math.min(1, Math.max(0, (today.getTime() - start) / span)) : 1;
   const status: GoalStatus = pct + 5 >= elapsed * 100 ? "on-track" : "behind";
 
-  return { pct, remaining, done, daysLeft, perMonth, status };
+  return { pct, remaining, done, daysLeft, perMonth, hasTarget, status };
 }
 
 /** "12 days left", "3 mo left", "1.5 yr left", "5 days ago" */

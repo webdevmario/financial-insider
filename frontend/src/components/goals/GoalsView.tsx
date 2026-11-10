@@ -222,14 +222,22 @@ function GoalCard({
         </span>
       </div>
 
-      <div className="flex items-baseline justify-between gap-3 mb-2">
-        <span className="font-mono text-[22px] font-semibold tracking-tight">{p.pct.toFixed(0)}%</span>
-        <span className="text-xs text-text-muted">
-          <span className="font-mono text-text">{fmtP(goal.savedAmount)}</span> of {fmtP(goal.targetAmount)}
-        </span>
-      </div>
+      {p.hasTarget ? (
+        <div className="flex items-baseline justify-between gap-3 mb-2">
+          <span className="font-mono text-[22px] font-semibold tracking-tight">{p.pct.toFixed(0)}%</span>
+          <span className="text-xs text-text-muted">
+            <span className="font-mono text-text">{fmtP(goal.savedAmount)}</span> of {fmtP(goal.targetAmount)}
+          </span>
+        </div>
+      ) : (
+        <div className="flex items-baseline justify-between gap-3 mb-2">
+          <span className="font-mono text-[22px] font-semibold tracking-tight">{goal.savedAmount > 0 ? fmtP(goal.savedAmount) : "—"}</span>
+          <span className="text-xs text-text-muted">{goal.savedAmount > 0 ? "saved so far" : "nothing saved yet"}</span>
+        </div>
+      )}
 
-      <div className="h-2 rounded-full bg-white/[0.06] overflow-hidden mb-3">
+      {/* No amount yet: an empty dashed track instead of a bar with nothing to measure */}
+      <div className={`h-2 rounded-full overflow-hidden mb-3 ${p.hasTarget ? "bg-white/[0.06]" : "border border-dashed border-border"}`}>
         <div
           className={`h-full rounded-full transition-all ${
             p.done ? "bg-green" : p.status === "overdue" ? "bg-red" : p.status === "behind" ? "bg-amber" : "bg-accent"
@@ -242,6 +250,16 @@ function GoalCard({
         <div className="text-[11px] text-text-muted leading-relaxed min-w-0">
           {p.done ? (
             <>Reached {fmtDate(goal.completedAt)}</>
+          ) : !p.hasTarget ? (
+            <>
+              Add an amount when you know it
+              {goal.deadline && p.daysLeft != null && (
+                <>
+                  <br />
+                  {fmtDate(goal.deadline)} · {timeLeftLabel(p.daysLeft)}
+                </>
+              )}
+            </>
           ) : (
             <>
               {fmtP(p.remaining)} to go

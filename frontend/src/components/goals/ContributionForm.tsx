@@ -125,7 +125,7 @@ export default function ContributionForm({ open, onClose, onSaved, onToast, goal
           <div className="flex justify-between mb-2">
             <span>After this</span>
             <span>
-              <span className="font-mono text-text">{fmtP(after)}</span> of {fmtP(goal.targetAmount)}
+              <span className="font-mono text-text">{fmtP(after)}</span>{goal.targetAmount > 0 ? <> of {fmtP(goal.targetAmount)}</> : " saved"}
             </span>
           </div>
           <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
