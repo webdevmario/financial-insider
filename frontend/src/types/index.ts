@@ -45,6 +45,20 @@ export interface Subscription {
   notes: string | null;
   priceHistory: { date: string; amount: number }[];
   createdAt: string;
+  /** "listed" pins totals to the typed amount; otherwise they use the projection */
+  amountMode?: "listed" | null;
+  /** What real charges say it will cost (from the server; absent offline for new bills) */
+  projection?: BillProjection | null;
+}
+
+export interface BillProjection {
+  /** Projected full charge: this month's for monthly bills, the next charge's otherwise */
+  amount: number;
+  method: "last" | "seasonal" | "average" | "listed";
+  basis: string;
+  reason: "no-history" | "mismatch" | null;
+  /** Monthly totals (monthly bills) or single charges (others), oldest first */
+  history: { label: string; amount: number }[];
 }
 
 // ── Expense ────────────────────────────────────────────────────

@@ -37,7 +37,7 @@ if (txnCols.length) {
 // Bill state (paused / cancelled), kept apart from the Essential / Review tag
 const subCols = sqlite.prepare("PRAGMA table_info(subscriptions)").all() as { name: string }[];
 if (subCols.length) {
-  for (const col of ["state", "state_since"]) {
+  for (const col of ["state", "state_since", "amount_mode"]) {
     if (!subCols.some((c) => c.name === col)) sqlite.exec(`ALTER TABLE subscriptions ADD COLUMN ${col} TEXT`);
   }
 }

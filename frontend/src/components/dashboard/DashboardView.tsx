@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import { fmt, fmtP, fmtDate } from "../../lib/formatters";
-import { computeEffectiveNextCharge, isActiveBill } from "../../lib/billing";
+import { billAmount, computeEffectiveNextCharge, isActiveBill } from "../../lib/billing";
 import { goalProgress, sortGoals } from "../../lib/goals";
 import StatCard from "../layout/StatCard";
 import type { Account, Goal, Subscription } from "../../types";
@@ -26,7 +26,7 @@ function getGroup(type: string): string {
 }
 
 function monthlyEquiv(s: Subscription): number {
-  const my = s.amount / (s.splitBy || 1);
+  const my = billAmount(s) / (s.splitBy || 1);
   if (s.frequency === "monthly") return my;
   if (s.frequency === "quarterly") return my / 3;
   return my / 12;
@@ -114,7 +114,7 @@ export default function DashboardView({ onOpenGoals }: { onOpenGoals: () => void
             <div className="text-[13px] text-text-dim leading-relaxed">
               {upcoming.map((s, i) => (
                 <span key={s.id}>
-                  <strong>{s.name}</strong> — {fmtP(s.amount)} on {fmtDate(s.due)}
+                  <strong>{s.name}</strong> — {fmtP(billAmount(s))} on {fmtDate(s.due)}
                   {i < upcoming.length - 1 && <br />}
                 </span>
               ))}

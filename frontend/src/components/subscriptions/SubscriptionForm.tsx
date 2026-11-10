@@ -2,10 +2,39 @@ import { useState, useEffect } from "react";
 import Modal from "../layout/Modal";
 import Confirm from "../layout/Confirm";
 import { api } from "../../lib/api";
-import { fmtP, today as todayStr } from "../../lib/formatters";
+import { fmtDate, fmtP, today as todayStr } from "../../lib/formatters";
 import { computeEffectiveNextCharge, billState, type BillState } from "../../lib/billing";
-import type { Subscription } from "../../types";
+import type { BillProjection, Subscription } from "../../types";
 import { SUB_CATEGORIES } from "../../types";
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "2026-10" → "Oct 2026"; full dates go through fmtDate */
+function historyLabel(label: string): string {
+  if (label.length === 7) {
+    const [y, m] = label.split("-").map(Number);
+    return `${MONTHS[m - 1]} ${y}`;
+  }
+  return fmtDate(label);
+}
+
+/** Recent charges as small bars, newest on the right; hover a bar for its month and amount */
+function ChargeBars({ history }: { history: BillProjection["history"] }) {
+  const max = Math.max(...history.map((h) => h.amount), 0);
+  if (!history.length || max <= 0) return null;
+  return (
+    <div className="flex items-end gap-[3px] h-9" role="img" aria-label={`Last ${history.length} charges`}>
+      {history.map((h) => (
+        <div
+          key={h.label}
+          title={`${historyLabel(h.label)}: ${fmtP(h.amount)}`}
+          className="flex-1 max-w-[18px] rounded-t-[3px] bg-accent/60 hover:bg-accent min-h-[2px]"
+          style={{ height: `${Math.max(6, (h.amount / max) * 100)}%` }}
+        />
+      ))}
+    </div>
+  );
+}
 
 interface SubscriptionFormProps {
   open: boolean;
@@ -28,6 +57,7 @@ export default function SubscriptionForm({
   const [state, setState] = useState<BillState>("active");
   const [stateSince, setStateSince] = useState("");
   const [notes, setNotes] = useState("");
+  const [pinned, setPinned] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
@@ -45,6 +75,7 @@ export default function SubscriptionForm({
       setState(billState(subscription));
       setStateSince(subscription.stateSince || "");
       setNotes(subscription.notes || "");
+      setPinned(subscription.amountMode === "listed");
     } else {
       setName("");
       setCategory("Other");
@@ -56,11 +87,16 @@ export default function SubscriptionForm({
       setState("active");
       setStateSince("");
       setNotes("");
+      setPinned(false);
     }
     setShowConfirm(false);
   }, [subscription, open]);
 
-  const myCost = (parseFloat(amount) || 0) / (splitBy || 1);
+  // Totals use what history projects, unless pinned to the typed amount (or there's no projection yet)
+  const projection = subscription?.projection ?? null;
+  const usesProjection = !pinned && !!projection && projection.method !== "listed";
+  const counted = usesProjection ? projection!.amount : parseFloat(amount) || 0;
+  const myCost = counted / (splitBy || 1);
 
   async function handleSave() {
     if (!name.trim()) {
@@ -78,6 +114,7 @@ export default function SubscriptionForm({
       state: state === "active" ? null : state,
       stateSince: state === "active" ? null : stateSince || todayStr(),
       notes: notes || null,
+      amountMode: pinned ? ("listed" as const) : null,
     };
 
     try {
@@ -170,7 +207,7 @@ export default function SubscriptionForm({
 
         <div className="grid grid-cols-2 max-md:grid-cols-1 gap-3">
           <div className="input-group">
-            <label>Charge Amount</label>
+            <label>Listed Amount</label>
             <input
               type="number"
               step="0.01"
@@ -188,6 +225,33 @@ export default function SubscriptionForm({
             />
           </div>
         </div>
+
+        {projection && (
+          <div className="rounded-lg border border-border bg-bg-input px-3.5 py-3 flex flex-col gap-2.5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+                  {usesProjection ? "Counts as (projected)" : "Counts as (listed)"}
+                </div>
+                <div className="text-[11px] text-text-muted mt-0.5">
+                  {projection.method === "listed"
+                    ? projection.basis
+                    : pinned
+                      ? `History projects ${fmtP(projection.amount)}: ${projection.basis}`
+                      : projection.basis}
+                </div>
+              </div>
+              <div className="font-mono text-sm shrink-0">{fmtP(counted)}</div>
+            </div>
+            <ChargeBars history={projection.history} />
+            {projection.method !== "listed" && (
+              <label className="flex items-center gap-2 text-xs text-text-dim cursor-pointer">
+                <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} />
+                Use the listed amount instead
+              </label>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-2 max-md:grid-cols-1 gap-3">
           <div className="input-group">

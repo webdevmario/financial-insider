@@ -43,6 +43,12 @@ export function billState(s: Pick<Subscription, "state">): BillState {
   return s.state === "paused" || s.state === "cancelled" ? s.state : "active";
 }
 
+/** What a bill counts for in totals: projected from its real charges, unless pinned to the listed amount */
+export function billAmount(s: Pick<Subscription, "amount" | "amountMode" | "projection">): number {
+  if (s.amountMode === "listed") return s.amount;
+  return s.projection?.amount ?? s.amount;
+}
+
 /** Only active bills count toward totals, pay periods and upcoming charges */
 export function isActiveBill(s: Pick<Subscription, "state">): boolean {
   return billState(s) === "active";

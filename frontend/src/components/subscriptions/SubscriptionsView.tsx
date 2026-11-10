@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "../../lib/api";
 import { fmtP, curMo, fmtDate } from "../../lib/formatters";
-import { BILL_STATE_LABEL, billState, computeEffectiveNextCharge, isActiveBill } from "../../lib/billing";
+import { BILL_STATE_LABEL, billAmount, billState, computeEffectiveNextCharge, isActiveBill } from "../../lib/billing";
 import StatCard from "../layout/StatCard";
 import SubscriptionForm from "./SubscriptionForm";
 import type { BillVsActual, Subscription } from "../../types";
 
 /** What, if anything, about a bill's real charges needs a look. Matching bills return null */
-function billIssue(c: BillVsActual | undefined): { text: string; className: string } | null {
+function billIssue(s: Subscription, c: BillVsActual | undefined): { text: string; className: string } | null {
   if (!c) return null;
   if (c.state !== "active") {
     // Paused and cancelled bills are expected to go quiet; a charge after stopping is the problem
@@ -15,10 +15,15 @@ function billIssue(c: BillVsActual | undefined): { text: string; className: stri
       ? { text: `Charged ${c.chargedSinceStopped}× since ${c.state === "paused" ? "pausing" : "cancelling"}`, className: "text-red" }
       : null;
   }
+  if (s.projection?.reason === "mismatch" && s.amountMode !== "listed") {
+    return { text: `Charges found don't look ${s.frequency}; link it to a payee to fix the match`, className: "text-text-muted" };
+  }
   if (c.matched === 0) return { text: "No charge found in your statements", className: "text-text-muted" };
   if (c.notSeenRecently) return { text: `Not charged since ${fmtDate(c.lastDate!)}`, className: "text-amber" };
+  // Projected bills follow their charges, so a gap from the typed amount only matters when it's what counts
+  const usesListed = s.amountMode === "listed" || !s.projection || s.projection.method === "listed";
   const diff = c.diff ?? 0;
-  if (c.lastAmount != null && Math.abs(diff) >= Math.max(1, c.listedAmount * 0.02)) {
+  if (usesListed && c.lastAmount != null && Math.abs(diff) >= Math.max(1, c.listedAmount * 0.02)) {
     return {
       text: `Last charge ${fmtP(c.lastAmount)}, ${fmtP(Math.abs(diff))} ${diff > 0 ? "more" : "less"} than listed`,
       className: diff > 0 ? "text-red" : "text-amber",
@@ -78,7 +83,7 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
   // Calculations
   let mT = 0, qT = 0, aT = 0;
   activeSubs.forEach((s) => {
-    const my = s.amount / (s.splitBy || 1);
+    const my = billAmount(s) / (s.splitBy || 1);
     if (s.frequency === "monthly") mT += my;
     else if (s.frequency === "quarterly") qT += my / 3;
     else if (s.frequency === "annual") aT += my / 12;
@@ -90,7 +95,7 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
   const pp1Items: { name: string; amount: number; actualAmount: number; day: number; frequency: string; thisMonth: boolean }[] = [];
   const pp2Items: { name: string; amount: number; actualAmount: number; day: number; frequency: string; thisMonth: boolean }[] = [];
   activeSubs.forEach((s) => {
-    const my = s.amount / (s.splitBy || 1);
+    const my = billAmount(s) / (s.splitBy || 1);
     const me = s.frequency === "monthly" ? my : s.frequency === "quarterly" ? my / 3 : my / 12;
     const effective = computeEffectiveNextCharge(s.nextCharge, s.frequency);
     if (!effective) return;
@@ -98,10 +103,10 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
     const thisMonth = s.frequency === "monthly" || effective.slice(0, 7) === currentMonth;
     if (day <= 15) {
       pp1 += me;
-      pp1Items.push({ name: s.name, amount: me, actualAmount: s.amount, day, frequency: s.frequency, thisMonth });
+      pp1Items.push({ name: s.name, amount: me, actualAmount: billAmount(s), day, frequency: s.frequency, thisMonth });
     } else {
       pp2 += me;
-      pp2Items.push({ name: s.name, amount: me, actualAmount: s.amount, day, frequency: s.frequency, thisMonth });
+      pp2Items.push({ name: s.name, amount: me, actualAmount: billAmount(s), day, frequency: s.frequency, thisMonth });
     }
   });
   // Sort items by day of month
@@ -115,8 +120,8 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
   let filtered = subs;
   if (catFilter) filtered = filtered.filter((s) => (s.category || "General") === catFilter);
   if (freqFilter) filtered = filtered.filter((s) => s.frequency === freqFilter);
-  const needsLook = subs.filter((s) => billIssue(checks.get(s.id))).length;
-  if (statusFilter === "attention") filtered = filtered.filter((s) => billIssue(checks.get(s.id)));
+  const needsLook = subs.filter((s) => billIssue(s, checks.get(s.id))).length;
+  if (statusFilter === "attention") filtered = filtered.filter((s) => billIssue(s, checks.get(s.id)));
   else if (statusFilter) filtered = filtered.filter((s) => (s.status || "") === statusFilter);
   const stoppedOpen = showStopped || statusFilter === "attention";
   filtered = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
@@ -126,8 +131,12 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
   function renderRow(s: Subscription) {
     const state = billState(s);
     const isSplit = s.splitBy > 1;
-    const myCost = s.amount / (s.splitBy || 1);
-    const issue = billIssue(checks.get(s.id));
+    const counted = billAmount(s);
+    const myCost = counted / (s.splitBy || 1);
+    // The typed amount, shown under the projection when they differ
+    const listedMine = s.amount / (s.splitBy || 1);
+    const showListed = counted !== s.amount && Math.abs(counted - s.amount) >= Math.max(1, s.amount * 0.01);
+    const issue = billIssue(s, checks.get(s.id));
     const freqClass =
       s.frequency === "monthly"
         ? "bg-accent-glow text-accent"
@@ -175,8 +184,9 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
             {s.frequency}
           </span>
         </span>
-        <span className={`font-mono text-right max-md:ml-auto max-md:flex-shrink-0 ${state !== "active" ? "line-through" : ""}`}>
-          {fmtP(myCost)}
+        <span className="text-right max-md:ml-auto max-md:flex-shrink-0">
+          <span className={`block font-mono ${state !== "active" ? "line-through" : ""}`}>{fmtP(myCost)}</span>
+          {showListed && <span className="block text-[10px] text-text-muted font-mono">listed {fmtP(listedMine)}</span>}
         </span>
         <span className="text-text-muted text-lg opacity-60 text-right">›</span>
       </div>

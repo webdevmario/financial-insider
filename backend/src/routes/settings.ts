@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "../db/index.js";
 import { settings, accounts, subscriptions, expenses, goals } from "../db/schema.js";
 import { isActiveBill } from "../lib/bills.js";
+import { computeBillProjections, projectedAmount } from "../lib/statements/projection.js";
 import { eq } from "drizzle-orm";
 import { today as todayStr } from "../lib/date.js";
 
@@ -54,8 +55,10 @@ router.get("/dashboard/summary", (_req, res) => {
 
   const netWorth = allAccounts.reduce((s, a) => s + (a.balance || 0), 0);
 
+  // Bills count at what their real charges project, not the typed amount
+  const projections = computeBillProjections();
   const monthlyBills = allSubs.filter(isActiveBill).reduce((s, sub) => {
-    const my = (sub.amount || 0) / (sub.splitBy || 1);
+    const my = (projectedAmount(sub, projections) || 0) / (sub.splitBy || 1);
     if (sub.frequency === "monthly") return s + my;
     if (sub.frequency === "quarterly") return s + my / 3;
     if (sub.frequency === "annual") return s + my / 12;
