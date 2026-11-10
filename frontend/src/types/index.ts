@@ -271,16 +271,6 @@ export interface BillVsActual {
   chargedSinceStopped: number;
 }
 
-export interface CardPayments {
-  accountId: string;
-  name: string;
-  count: number;
-  total: number;
-  lastDate: string | null;
-  sources: { name: string; count: number; total: number }[];
-  recent: { date: string; amount: number; from: string | null }[];
-}
-
 export interface Insights {
   months: string[];
   month: string;
@@ -296,7 +286,6 @@ export interface Insights {
   billsVsActual: BillVsActual[];
   paychecks: { id: string; date: string; amount: number; description: string; accountId: string }[];
   expectedPaycheck: number;
-  cardPayments: CardPayments[];
 }
 
 // ── Settings ───────────────────────────────────────────────────
