@@ -187,7 +187,7 @@ export default function MidMonthPlan({ open, onClose, month, onUse, onToast }: {
         className="btn btn-primary"
         onClick={async () => {
           if (available == null || available <= 0) {
-            onToast(available == null ? "Enter the Ally balance first" : "Nothing available to budget", true);
+            onToast(available == null ? "Enter your checking balance first" : "Nothing available to budget", true);
             return;
           }
           if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -205,7 +205,7 @@ export default function MidMonthPlan({ open, onClose, month, onUse, onToast }: {
     <Modal
       open={open}
       onClose={onClose}
-      title="Plan the 16th"
+      title="Mid-month plan"
       titleExtra={<span className="text-[13px] font-normal text-text-muted">{windowLabel || moLabel(month)}</span>}
       footer={footer}
       className="!w-[640px]"
@@ -222,8 +222,8 @@ export default function MidMonthPlan({ open, onClose, month, onUse, onToast }: {
           )}
 
           <div className="flex items-end justify-between gap-3 mb-5 flex-wrap">
-            <div className="input-group w-[220px] max-w-full">
-              <label htmlFor="ally-balance">Ally checking on the 15th</label>
+            <div className="input-group flex-1 min-w-[240px] max-w-[360px]">
+              <label htmlFor="ally-balance">Bank checking balance</label>
               <input
                 id="ally-balance"
                 type="number"
