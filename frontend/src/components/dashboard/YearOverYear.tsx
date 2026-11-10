@@ -135,7 +135,7 @@ export default function YearOverYear({ data }: { data: YoyData }) {
       <CumulativeChart years={years} />
 
       <div className="grid grid-cols-[1.3fr_1fr] max-lg:grid-cols-1 gap-6 mt-6">
-        <div className="min-w-0 overflow-x-auto">
+        <div className="min-w-0 self-start max-md:overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-[11px] uppercase tracking-wider text-text-muted">
