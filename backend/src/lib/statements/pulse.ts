@@ -45,9 +45,10 @@ type Bucket = {
 };
 const emptyBucket = (): Bucket => ({ spent: 0, income: 0, saved: 0, reimbursed: 0, fixed: 0, byCategory: new Map(), flexByCategory: new Map() });
 
-function add(b: Bucket, t: Transaction, fixedIds: Set<string>) {
-  // Money set aside counts as saved whatever its kind (a payee can mark it a transfer to keep it out of spending everywhere)
-  if (t.category === SAVINGS) {
+function add(b: Bucket, t: Transaction, fixedIds: Set<string>, savingsPayees: Set<string>) {
+  // Money set aside counts as saved whatever its kind. A Savings payee can be a transfer (out of spending
+  // everywhere), and transfers its aliases pick up are filed as "Transfer", so the payee decides too
+  if (t.category === SAVINGS || (t.payeeId && savingsPayees.has(t.payeeId))) {
     b.saved -= t.amount;
     return;
   }
@@ -75,6 +76,7 @@ export function computePulse() {
   const day = asOf.slice(8, 10);
 
   // Charges that belong to a bill count as fixed spending
+  const savingsPayees = new Set(payeeList.filter((p) => p.category === SAVINGS).map((p) => p.id));
   const fixedIds = new Set<string>();
   for (const b of bills) for (const t of billCharges(b, all, payeeList).charges) fixedIds.add(t.id);
 
@@ -83,10 +85,10 @@ export function computePulse() {
   const toDay = new Map<string, Bucket>();
   for (const t of all) {
     const f = full.get(t.month) ?? full.set(t.month, emptyBucket()).get(t.month)!;
-    add(f, t, fixedIds);
+    add(f, t, fixedIds, savingsPayees);
     if (t.date.slice(8, 10) <= day) {
       const d = toDay.get(t.month) ?? toDay.set(t.month, emptyBucket()).get(t.month)!;
-      add(d, t, fixedIds);
+      add(d, t, fixedIds, savingsPayees);
     }
   }
 
