@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import { api } from "../../lib/api";
 import { fmt, fmtDate } from "../../lib/formatters";
 import AccountForm from "./AccountForm";
-import CardsSection from "./CardsSection";
 import type { Account } from "../../types";
 import { ACCT_ICONS } from "../../types";
 
@@ -133,8 +132,6 @@ export default function AccountsView({ onToast }: AccountsViewProps) {
           })}
         </div>
       )}
-
-      <CardsSection onToast={onToast} />
 
       <AccountForm
         open={formOpen}
