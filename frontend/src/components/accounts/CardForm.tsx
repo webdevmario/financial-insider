@@ -18,7 +18,7 @@ interface CardFormProps {
   categories: string[];
 }
 
-type RateRow = { category: string; rate: string };
+type RateRow = { category: string; rate: string; cap: string };
 
 export default function CardForm({ open, onClose, onSaved, onToast, card, cards, statementAccounts, categories }: CardFormProps) {
   const [name, setName] = useState("");
@@ -47,7 +47,7 @@ export default function CardForm({ open, onClose, onSaved, onToast, card, cards,
     setRates(
       Object.entries(r)
         .filter(([k]) => k !== "*")
-        .map(([category, rate]) => ({ category, rate: String(rate) }))
+        .map(([category, rate]) => ({ category, rate: String(rate), cap: card?.rewardCaps?.[category] ? String(card.rewardCaps[category]) : "" }))
     );
     setBenefits(card?.benefits || "");
     setLastReviewed(card?.lastReviewed || "");
@@ -67,6 +67,7 @@ export default function CardForm({ open, onClose, onSaved, onToast, card, cards,
     if (!name.trim()) return onToast("Enter a card name", true);
 
     const rewardRates: Record<string, number> = {};
+    const rewardCaps: Record<string, number> = {};
     for (const r of rates) {
       const category = r.category.trim();
       if (!category && !r.rate) continue;
@@ -77,6 +78,11 @@ export default function CardForm({ open, onClose, onSaved, onToast, card, cards,
         return onToast(`${category} is listed twice`, true);
       }
       rewardRates[category] = rate;
+      if (r.cap.trim() !== "") {
+        const cap = parseFloat(r.cap);
+        if (!Number.isFinite(cap) || cap <= 0) return onToast(`Enter a yearly cap for ${category}, or leave it blank`, true);
+        rewardCaps[category] = cap;
+      }
     }
     if (otherRate !== "") {
       const rate = parseFloat(otherRate);
@@ -92,6 +98,7 @@ export default function CardForm({ open, onClose, onSaved, onToast, card, cards,
       rewardUnit: unit,
       pointValue: unit === "points" && pointValue !== "" ? parseFloat(pointValue) : null,
       rewardRates,
+      rewardCaps,
       benefits: benefits.trim() || null,
       lastReviewed: lastReviewed || null,
       inUse,
@@ -222,6 +229,9 @@ export default function CardForm({ open, onClose, onSaved, onToast, card, cards,
 
         <div className="input-group">
           <label>Reward Rates by Category</label>
+          <span className="text-[11px] text-text-muted -mt-0.5">
+            For a store-specific rate, type @ and the payee name, like @Amazon. Store rates beat category rates. The last box is an optional yearly cap in dollars, after which the everything-else rate applies.
+          </span>
           <datalist id="card-rate-categories">
             {categories.map((c) => (
               <option key={c} value={c} />
@@ -238,6 +248,17 @@ export default function CardForm({ open, onClose, onSaved, onToast, card, cards,
                   onChange={(e) => setRow(i, { category: e.target.value })}
                 />
                 <RateInput value={r.rate} suffix={suffix} onChange={(rate) => setRow(i, { rate })} />
+                <input
+                  type="number"
+                  step="1"
+                  inputMode="decimal"
+                  placeholder="No cap"
+                  title="Yearly spend this rate covers, then everything-else rate"
+                  aria-label={`Yearly cap for ${r.category || "this rate"}`}
+                  className="!w-[104px] shrink-0"
+                  value={r.cap}
+                  onChange={(e) => setRow(i, { cap: e.target.value })}
+                />
                 <button
                   className="btn btn-sm shrink-0 !px-2.5"
                   title="Remove"
@@ -250,15 +271,16 @@ export default function CardForm({ open, onClose, onSaved, onToast, card, cards,
             <div className="flex items-center gap-2">
               <div className="flex-1 text-sm text-text-dim px-1">Everything else</div>
               <RateInput value={otherRate} suffix={suffix} onChange={setOtherRate} />
+              <div className="w-[104px] shrink-0" aria-hidden />
               <button className="btn btn-sm shrink-0 !px-2.5 invisible" tabIndex={-1} aria-hidden>
                 ✕
               </button>
             </div>
             <button
               className="btn btn-sm self-start"
-              onClick={() => setRates((rs) => [...rs, { category: "", rate: "" }])}
+              onClick={() => setRates((rs) => [...rs, { category: "", rate: "", cap: "" }])}
             >
-              + Add category
+              + Add category or store
             </button>
           </div>
           <p className="text-[11px] text-text-muted leading-relaxed">

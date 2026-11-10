@@ -158,5 +158,11 @@ sqlite.exec(`
   );
 `);
 
+// Yearly caps on bonus reward rates, added after the cards table shipped
+const cardCols = sqlite.prepare("PRAGMA table_info(credit_cards)").all() as { name: string }[];
+if (cardCols.length && !cardCols.some((c) => c.name === "reward_caps")) {
+  sqlite.exec("ALTER TABLE credit_cards ADD COLUMN reward_caps TEXT");
+}
+
 export const db = drizzle(sqlite, { schema });
 export { sqlite };
