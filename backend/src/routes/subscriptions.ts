@@ -4,16 +4,21 @@ import { subscriptions } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 import { today as todayStr } from "../lib/date.js";
 import { cleanState } from "../lib/bills.js";
+import { computeBillProjections } from "../lib/statements/projection.js";
+
+const cleanAmountMode = (v: unknown) => (v === "listed" ? "listed" : null);
 
 const router = Router();
 
 // GET /api/subscriptions
 router.get("/", (_req, res) => {
   const rows = db.select().from(subscriptions).all();
-  // Parse priceHistory JSON for each row
+  const projections = computeBillProjections();
+  // Parse priceHistory JSON for each row, and attach what history says it will cost
   const parsed = rows.map((r) => ({
     ...r,
     priceHistory: r.priceHistory ? JSON.parse(r.priceHistory) : [],
+    projection: projections.get(r.id) ?? null,
   }));
   res.json(parsed);
 });
@@ -29,6 +34,7 @@ router.get("/:id", (req, res) => {
   res.json({
     ...row,
     priceHistory: row.priceHistory ? JSON.parse(row.priceHistory) : [],
+    projection: computeBillProjections().get(row.id) ?? null,
   });
 });
 
@@ -51,6 +57,7 @@ router.post("/", (req, res) => {
     state: cleanState(body.state),
     stateSince: cleanState(body.state) ? body.stateSince || today : null,
     notes: body.notes || null,
+    amountMode: cleanAmountMode(body.amountMode),
     priceHistory: JSON.stringify([{ date: today, amount: body.amount || 0 }]),
     createdAt: today,
   };
@@ -107,6 +114,7 @@ router.put("/:id", (req, res) => {
       state,
       stateSince,
       notes: body.notes !== undefined ? body.notes : existing.notes,
+      amountMode: body.amountMode !== undefined ? cleanAmountMode(body.amountMode) : existing.amountMode,
       priceHistory: JSON.stringify(priceHistory),
     })
     .where(eq(subscriptions.id, req.params.id))

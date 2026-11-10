@@ -28,6 +28,8 @@ export const subscriptions = sqliteTable("subscriptions", {
   state: text("state"),
   /** When it was paused or cancelled (YYYY-MM-DD) */
   stateSince: text("state_since"),
+  /** "listed" pins totals to the typed amount; null projects it from real charges */
+  amountMode: text("amount_mode"),
   notes: text("notes"),
   priceHistory: text("price_history"), // JSON string: [{date, amount}]
   createdAt: text("created_at").notNull(),

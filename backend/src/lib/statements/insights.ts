@@ -12,6 +12,7 @@ import { eq } from "drizzle-orm";
 import { today } from "../date.js";
 import { merchantKey } from "./merchant.js";
 import { groupKey } from "./payees.js";
+import { billCharges, billTokens, isCost, matchesBill } from "./bill-match.js";
 
 const round = (n: number) => Math.round(n * 100) / 100;
 
@@ -31,7 +32,6 @@ function median(values: number[]): number {
   return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
 }
 
-const isCost = (t: Transaction) => t.amount < 0 && (t.kind === "spend" || t.kind === "fee" || t.kind === "interest");
 
 // ── Monthly summary ───────────────────────────────────────────────
 
@@ -69,20 +69,6 @@ const CADENCES: { id: Cadence; min: number; max: number; perYear: number; minCou
   { id: "quarterly", min: 84, max: 97, perYear: 4, minCount: 2 },
   { id: "annual", min: 355, max: 376, perYear: 1, minCount: 2 },
 ];
-
-/** Words too generic to match a bill name against a merchant */
-const GENERIC = new Set(["bill", "bills", "insurance", "payment", "monthly", "annual", "service", "services", "plan", "home", "auto", "the", "and", "card", "online"]);
-
-function billTokens(name: string): string[] {
-  return name
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter((w) => w.length >= 4 && !GENERIC.has(w));
-}
-
-function matchesBill(key: string, tokens: string[]) {
-  return tokens.some((w) => key.includes(w));
-}
 
 export function computeInsights(month?: string) {
   const all = db.select().from(transactions).all();
@@ -225,15 +211,7 @@ export function computeInsights(month?: string) {
 
   // Bills list vs actual charges
   const billsVsActual = bills.map((b) => {
-    const linked = new Set(payeeList.filter((p) => p.billId === b.id).map((p) => p.id));
-    const tokens = billTokens(b.name);
-    const charges = (
-      linked.size
-        ? all.filter((t) => isCost(t) && t.payeeId && linked.has(t.payeeId))
-        : tokens.length
-          ? all.filter((t) => isCost(t) && matchesBill(merchantKey(t.merchant), tokens))
-          : []
-    ).sort((x, y) => x.date.localeCompare(y.date));
+    const { charges, linked } = billCharges(b, all, payeeList);
     const last = charges[charges.length - 1];
     const recentAmounts = charges.slice(-6).map((t) => -t.amount);
     const window = b.frequency === "annual" ? 380 : b.frequency === "quarterly" ? 100 : 40;
