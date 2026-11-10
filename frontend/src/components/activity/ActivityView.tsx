@@ -4,7 +4,7 @@ import { api } from "../../lib/api";
 import { fmt, fmtDate, fmtP, moLabel } from "../../lib/formatters";
 import StatCard from "../layout/StatCard";
 import LoadingState from "../layout/LoadingState";
-import ImportPanel from "./ImportPanel";
+import StatementsMenu from "./StatementsMenu";
 import TransactionEditModal from "./TransactionEditModal";
 import MerchantsTab from "./MerchantsTab";
 import MergeModal, { type MergeMember } from "./MergeModal";
@@ -93,18 +93,19 @@ export default function ActivityView({ onToast }: ActivityViewProps) {
     <div>
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <h2 className="text-[22px] font-semibold">Activity</h2>
-        {!empty && (tab === "overview" || tab === "all") && (
-          <select
-            value={insights!.month}
-            onChange={(e) => setMonth(e.target.value)}
-            className="!w-auto !text-sm !py-1.5 !px-3"
-          >
-            {insights!.months.map((m) => <option key={m} value={m}>{moLabel(m)}</option>)}
-          </select>
-        )}
+        <div className="flex items-center gap-2">
+          {!empty && (tab === "overview" || tab === "all") && (
+            <select
+              value={insights!.month}
+              onChange={(e) => setMonth(e.target.value)}
+              className="!w-auto !text-sm !py-1.5 !px-3"
+            >
+              {insights!.months.map((m) => <option key={m} value={m}>{moLabel(m)}</option>)}
+            </select>
+          )}
+          <StatementsMenu onToast={onToast} onChanged={reload} />
+        </div>
       </div>
-
-      <ImportPanel onToast={onToast} onChanged={reload} />
 
       {empty ? (
         <div className="text-center py-12 text-text-dim">
