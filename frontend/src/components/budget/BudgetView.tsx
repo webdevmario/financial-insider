@@ -27,6 +27,8 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
 
   // Budget target modal
   const [targetOpen, setTargetOpen] = useState(false);
+  // Mid-month scratchpad for working out the 16th-to-month-end number
+  const [planOpen, setPlanOpen] = useState(false);
   const [targetAmt, setTargetAmt] = useState("");
 
   // Edit expense modal
@@ -370,7 +372,7 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
       </div>
 
       {/* Month selector + target button */}
-      <div className="flex items-center gap-2.5 mb-5">
+      <div className="flex items-center gap-2.5 mb-5 flex-wrap">
         <select
           value={selectedMonth}
           onChange={(e) => setSelectedMonth(e.target.value)}
@@ -389,6 +391,9 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
         >
           Set Target
         </button>
+        <button className="btn btn-sm" onClick={() => setPlanOpen(true)}>
+          Plan the 16th
+        </button>
         <button
           className="btn btn-sm"
           onClick={() => setReimbOpen(true)}
@@ -406,8 +411,9 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
       </div>
 
       <MidMonthPlan
+        open={planOpen}
+        onClose={() => setPlanOpen(false)}
         month={selectedMonth}
-        currentTarget={budgetTargets[selectedMonth] || 0}
         onToast={onToast}
         onUse={async (amount) => {
           const newTargets = { ...budgetTargets, [selectedMonth]: amount };

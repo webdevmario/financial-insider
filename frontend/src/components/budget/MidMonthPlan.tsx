@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Modal from "../layout/Modal";
 import { api } from "../../lib/api";
 import { fmt, fmtDate, moLabel } from "../../lib/formatters";
 import type { MidMonthPlan as PlanData, PlanLine } from "../../types";
@@ -19,6 +20,11 @@ interface SavedPlan {
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const shortDate = (d: string) => `${MONTHS[Number(d.slice(5, 7)) - 1]} ${Number(d.slice(8, 10))}`;
+/** "Nov 9": the saved time is UTC, so read it back in local time */
+const localDay = (iso: string) => {
+  const d = new Date(iso);
+  return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
+};
 const PLANS_KEY = "budgetPlans";
 const DEFAULT_RESERVE = 2300;
 const CUSHION = 1000;
@@ -65,7 +71,7 @@ function Row({ line, on, amount, onToggle, onAmount }: {
 
 function Section({ title, total, children, hint }: { title: string; total: number; children: React.ReactNode; hint?: string }) {
   return (
-    <div className="mt-5">
+    <div className="mt-5 first:mt-0">
       <div className="flex items-baseline justify-between gap-3 mb-1">
         <div className="min-w-0 text-[11px] font-semibold uppercase tracking-wider text-text-muted">{title}</div>
         <div className="shrink-0 whitespace-nowrap font-mono text-[13px] text-text-dim">−{fmt(total)}</div>
@@ -76,9 +82,15 @@ function Section({ title, total, children, hint }: { title: string; total: numbe
   );
 }
 
-export default function MidMonthPlan({ month, currentTarget, onUse, onToast }: {
+/**
+ * Scratchpad for the 16th: start from what the data suggests, adjust until the
+ * number looks right, then use it as the month's budget. Every edit saves as you
+ * go, so it can be picked up again later.
+ */
+export default function MidMonthPlan({ open, onClose, month, onUse, onToast }: {
+  open: boolean;
+  onClose: () => void;
   month: string;
-  currentTarget: number;
   onUse: (amount: number) => Promise<void>;
   onToast: (msg: string, err?: boolean) => void;
 }) {
@@ -86,12 +98,15 @@ export default function MidMonthPlan({ month, currentTarget, onUse, onToast }: {
   const [failed, setFailed] = useState(false);
   const [plans, setPlans] = useState<Record<string, SavedPlan>>({});
   const [plan, setPlan] = useState<SavedPlan>(blankPlan());
-  const [open, setOpen] = useState(currentTarget <= 0);
-  const [dirty, setDirty] = useState(false);
+  const [status, setStatus] = useState<"" | "saving" | "saved" | "error">("");
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Fresh suggestions each time it opens: the data may have grown since last time
   useEffect(() => {
+    if (!open) return;
     setData(null);
     setFailed(false);
+    setStatus("");
     api.transactions.midmonth(month).then(setData).catch(() => setFailed(true));
     api.settings
       .get<Record<string, SavedPlan>>(PLANS_KEY)
@@ -101,14 +116,32 @@ export default function MidMonthPlan({ month, currentTarget, onUse, onToast }: {
         setPlan({ ...blankPlan(), ...(all[month] ?? {}) });
       })
       .catch(() => setPlan(blankPlan()));
-    setDirty(false);
-  }, [month]);
+  }, [open, month]);
 
-  useEffect(() => setOpen(currentTarget <= 0), [month, currentTarget]);
+  useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
 
+  async function persist(next: SavedPlan, all = plans): Promise<boolean> {
+    const saved = { ...all, [month]: { ...next, savedAt: new Date().toISOString() } };
+    setStatus("saving");
+    try {
+      await api.settings.set(PLANS_KEY, saved);
+      setPlans(saved);
+      setStatus("saved");
+      return true;
+    } catch {
+      setStatus("error");
+      return false;
+    }
+  }
+
+  // Every change saves shortly after you stop typing
   const edit = (fn: (p: SavedPlan) => SavedPlan) => {
-    setPlan((p) => fn(p));
-    setDirty(true);
+    setPlan((p) => {
+      const next = fn(p);
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(() => void persist(next), 700);
+      return next;
+    });
   };
   const amountOf = (l: PlanLine) => plan.amounts[l.key] ?? l.amount;
   const isOn = (l: PlanLine, work = false) => (work ? plan.workOn.includes(l.key) : !plan.off.includes(l.key));
@@ -119,6 +152,7 @@ export default function MidMonthPlan({ month, currentTarget, onUse, onToast }: {
         : { ...p, off: p.off.includes(l.key) ? p.off.filter((k) => k !== l.key) : [...p.off, l.key] }
     );
   const setAmount = (l: PlanLine, n: number) => edit((p) => ({ ...p, amounts: { ...p.amounts, [l.key]: n } }));
+  const edited = Object.keys(plan.amounts).length + plan.off.length + plan.workOn.length + plan.extras.length > 0 || plan.reserve !== DEFAULT_RESERVE;
 
   const totals = useMemo(() => {
     if (!data) return null;
@@ -131,63 +165,64 @@ export default function MidMonthPlan({ month, currentTarget, onUse, onToast }: {
     return { bills, pending, work, extras, out, available: plan.ally == null ? null : plan.ally - out };
   }, [data, plan]);
 
-  async function save(): Promise<boolean> {
-    const next = { ...plans, [month]: { ...plan, savedAt: new Date().toISOString() } };
-    try {
-      await api.settings.set(PLANS_KEY, next);
-      setPlans(next);
-      setDirty(false);
-      return true;
-    } catch {
-      onToast("Couldn't save the plan", true);
-      return false;
-    }
-  }
-
-  // "Nov 16–30": the month and year are already in the header
   const windowLabel = data ? `${MONTHS[Number(month.slice(5, 7)) - 1]} 16–${Number(data.window.end.slice(8, 10))}` : "";
   const available = totals?.available ?? null;
 
-  if (!open) {
-    return (
+  const footer = (
+    <>
+      <div className="mr-auto min-w-0">
+        <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Available</div>
+        <div className={`font-mono text-[22px] leading-tight font-semibold ${available == null ? "text-text-muted" : available >= 0 ? "text-green" : "text-red"}`}>
+          {available == null ? "—" : `${available < 0 ? "−" : ""}${fmt(Math.abs(available))}`}
+        </div>
+        <div className="text-[11px] text-text-dim truncate">
+          {available == null
+            ? totals ? `Enter the balance · ${fmt(totals.out)} set aside` : ""
+            : available >= CUSHION
+              ? `${fmt(available - CUSHION)} beyond your ${fmt(CUSHION)} cushion`
+              : `${fmt(CUSHION - Math.max(available, 0))} short of your ${fmt(CUSHION)} cushion`}
+        </div>
+      </div>
       <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="w-full flex items-center justify-between gap-3 bg-bg-card border border-border rounded-xl px-5 py-3.5 mb-5 text-left hover:border-[#363a50]"
+        className="btn btn-primary"
+        onClick={async () => {
+          if (available == null || available <= 0) {
+            onToast(available == null ? "Enter the Ally balance first" : "Nothing available to budget", true);
+            return;
+          }
+          if (saveTimer.current) clearTimeout(saveTimer.current);
+          if (!(await persist(plan))) return onToast("Couldn't save the plan", true);
+          await onUse(Math.round(available * 100) / 100);
+          onClose();
+        }}
       >
-        <span className="text-[13px] text-text-dim">
-          <span className="text-text font-medium">Plan the 16th</span>
-          {available != null ? <> · {fmt(available)} available</> : plans[month] ? " · saved" : ""}
-        </span>
-        <span className="text-[12px] text-accent">Open ›</span>
+        Use as budget
       </button>
-    );
-  }
+    </>
+  );
 
   return (
-    <div className="bg-bg-card border border-border rounded-xl p-6 max-md:p-5 mb-5">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <div className="text-[14px] font-semibold uppercase tracking-wider text-text-dim">Plan the 16th</div>
-          <div className="text-[12px] text-text-muted mt-0.5">{moLabel(month)} · what's free to spend {windowLabel}</div>
-        </div>
-        <button type="button" className="text-[12px] text-text-muted hover:text-text" onClick={() => setOpen(false)}>Close</button>
-      </div>
-
-      {failed && <div className="text-[13px] text-text-dim mt-4">Couldn't load your statement data. You're probably offline.</div>}
-      {!data && !failed && <div className="text-[13px] text-text-dim mt-4">Loading…</div>}
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Plan the 16th"
+      titleExtra={<span className="text-[13px] font-normal text-text-muted">{windowLabel || moLabel(month)}</span>}
+      footer={footer}
+      className="!w-[640px]"
+    >
+      {failed && <div className="text-[13px] text-text-dim py-4">Couldn't load your statement data. You're probably offline.</div>}
+      {!data && !failed && <div className="text-[13px] text-text-dim py-4">Loading…</div>}
 
       {data && totals && (
-        <>
+        <div className="pb-2">
           {!data.dataComplete && (
-            <div className="mt-4 rounded-lg bg-amber-dim border border-amber/20 px-3.5 py-2.5 text-[12px] text-amber">
+            <div className="mb-4 rounded-lg bg-amber-dim border border-amber/20 px-3.5 py-2.5 text-[12px] text-amber">
               Your statements run through {fmtDate(data.asOf)}. Upload them through the 15th for a tighter pending estimate.
             </div>
           )}
 
-          {/* The answer first */}
-          <div className="mt-5 grid grid-cols-[1fr_auto] max-md:grid-cols-1 gap-4 items-end">
-            <div className="input-group max-w-[260px]">
+          <div className="flex items-end justify-between gap-3 mb-5 flex-wrap">
+            <div className="input-group w-[220px] max-w-full">
               <label htmlFor="ally-balance">Ally checking on the 15th</label>
               <input
                 id="ally-balance"
@@ -200,18 +235,17 @@ export default function MidMonthPlan({ month, currentTarget, onUse, onToast }: {
                 className="font-mono"
               />
             </div>
-            <div className="text-right max-md:text-left">
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">Available</div>
-              <div className={`font-mono text-[34px] leading-tight font-semibold ${available == null ? "text-text-muted" : available >= 0 ? "text-green" : "text-red"}`}>
-                {available == null ? "—" : `${available < 0 ? "−" : ""}${fmt(Math.abs(available))}`}
-              </div>
-              <div className="text-[12px] text-text-dim">
-                {available == null
-                  ? `Enter the balance · ${fmt(totals.out)} set aside`
-                  : available >= CUSHION
-                    ? `${fmt(available - CUSHION)} beyond your ${fmt(CUSHION)} cushion`
-                    : `${fmt(CUSHION - Math.max(available, 0))} short of your ${fmt(CUSHION)} cushion`}
-              </div>
+            <div className="text-[11px] text-text-muted text-right max-md:text-left">
+              {status === "saving" ? "Saving…" : status === "saved" ? "Saved" : status === "error" ? <span className="text-red">Couldn't save</span> : plans[month]?.savedAt ? `Last saved ${localDay(plans[month].savedAt!)}` : "Changes save as you go"}
+              {edited && (
+                <button
+                  type="button"
+                  className="block ml-auto max-md:ml-0 mt-1 text-accent"
+                  onClick={() => edit((p) => ({ ...blankPlan(), ally: p.ally }))}
+                >
+                  Reset to suggestions
+                </button>
+              )}
             </div>
           </div>
 
@@ -223,6 +257,7 @@ export default function MidMonthPlan({ month, currentTarget, onUse, onToast }: {
           </Section>
 
           <Section title="Pending from the first half" total={totals.pending} hint="Charges through the 15th that haven't left checking yet. Cards are paid as charges post.">
+            {data.pending.length === 0 && <div className="text-[13px] text-text-dim py-2">Nothing pending.</div>}
             {data.pending.map((l) => (
               <Row key={l.key} line={l} on={isOn(l)} amount={amountOf(l)} onToggle={() => toggle(l)} onAmount={(n) => setAmount(l, n)} />
             ))}
@@ -275,28 +310,8 @@ export default function MidMonthPlan({ month, currentTarget, onUse, onToast }: {
               + Add a planned expense
             </button>
           </Section>
-
-          <div className="flex items-center justify-end gap-2.5 mt-6 flex-wrap">
-            <span className="text-[11px] text-text-muted mr-auto">
-              {plans[month]?.savedAt && !dirty ? `Saved ${fmtDate(plans[month].savedAt!.slice(0, 10))}` : dirty ? "Unsaved changes" : ""}
-            </span>
-            <button className="btn btn-sm" onClick={async () => { if (await save()) onToast("Plan saved"); }} disabled={!dirty}>
-              Save plan
-            </button>
-            <button
-              className="btn btn-sm btn-primary"
-              disabled={available == null || available <= 0}
-              onClick={async () => {
-                if (available == null) return;
-                if (!(await save())) return;
-                await onUse(Math.round(available * 100) / 100);
-              }}
-            >
-              {available != null && available > 0 ? `Use ${fmt(available)} as budget` : "Use as budget"}
-            </button>
-          </div>
-        </>
+        </div>
       )}
-    </div>
+    </Modal>
   );
 }
