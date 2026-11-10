@@ -51,6 +51,26 @@ export interface Subscription {
   projection?: BillProjection | null;
 }
 
+/** One suggested line in the mid-month plan */
+export interface PlanLine {
+  key: string;
+  label: string;
+  amount: number;
+  note: string;
+  date?: string;
+}
+
+/** Suggested lines for planning the 16th to month-end */
+export interface MidMonthPlan {
+  month: string;
+  window: { start: string; end: string };
+  asOf: string;
+  dataComplete: boolean;
+  bills: PlanLine[];
+  pending: PlanLine[];
+  work: PlanLine[];
+}
+
 /** Dashboard pulse: this month's pace, fixed vs flexible, and year over year */
 export interface Pulse {
   pulse: {

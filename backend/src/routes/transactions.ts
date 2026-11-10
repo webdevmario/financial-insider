@@ -9,6 +9,7 @@ import {
 } from "../lib/statements/importer.js";
 import { computeInsights } from "../lib/statements/insights.js";
 import { computePulse } from "../lib/statements/pulse.js";
+import { computeMidMonthPlan } from "../lib/statements/midmonth.js";
 import { addAlias, findOrCreatePayee, recomputeAll } from "../lib/statements/payees.js";
 
 const router = Router();
@@ -64,6 +65,12 @@ router.get("/insights", (req, res) => {
 // GET /api/transactions/pulse: this month's pace and the year-over-year view, for the Dashboard
 router.get("/pulse", (_req, res) => {
   res.json(computePulse());
+});
+
+// GET /api/transactions/midmonth?month=YYYY-MM: suggested lines for planning the 16th to month-end
+router.get("/midmonth", (req, res) => {
+  const month = typeof req.query.month === "string" && /^\d{4}-\d{2}$/.test(req.query.month) ? req.query.month : undefined;
+  res.json(computeMidMonthPlan(month));
 });
 
 // GET /api/transactions/bill-checks: each bill against its most recent real charge, for the Bills page

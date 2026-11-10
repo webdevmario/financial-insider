@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "../../lib/api";
 import { fmt, fmtP, fmtDate, curMo, moLabel, today } from "../../lib/formatters";
 import Modal from "../layout/Modal";
+import MidMonthPlan from "./MidMonthPlan";
 import { useOnRefresh } from "../../lib/offline/status";
 import type { Expense } from "../../types";
 
@@ -403,6 +404,22 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
           </button>
         )}
       </div>
+
+      <MidMonthPlan
+        month={selectedMonth}
+        currentTarget={budgetTargets[selectedMonth] || 0}
+        onToast={onToast}
+        onUse={async (amount) => {
+          const newTargets = { ...budgetTargets, [selectedMonth]: amount };
+          try {
+            await api.settings.set("budgetTargets", newTargets);
+            setBudgetTargets(newTargets);
+            onToast(`Budget set to ${fmt(amount)}`);
+          } catch {
+            onToast("Failed to save", true);
+          }
+        }}
+      />
 
       {/* Budget Summary */}
       <div className="bg-bg-card border border-border rounded-xl p-6 mb-5">
