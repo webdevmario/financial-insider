@@ -133,6 +133,21 @@ sqlite.exec(`
   );
   CREATE INDEX IF NOT EXISTS payee_aliases_payee ON payee_aliases(payee_id);
 
+  CREATE TABLE IF NOT EXISTS credit_cards (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    issuer TEXT,
+    statement_account_id TEXT,
+    annual_fee REAL DEFAULT 0 NOT NULL,
+    reward_unit TEXT DEFAULT 'percent' NOT NULL,
+    point_value REAL,
+    reward_rates TEXT,
+    benefits TEXT,
+    last_reviewed TEXT,
+    in_use INTEGER DEFAULT 1 NOT NULL,
+    created_at TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS merchant_rules (
     id TEXT PRIMARY KEY NOT NULL,
     pattern TEXT NOT NULL,
