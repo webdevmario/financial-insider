@@ -252,35 +252,6 @@ export interface MonthSummary {
   count: number;
 }
 
-export interface RecurringCharge {
-  key: string;
-  merchant: string;
-  payeeId: string | null;
-  category: string;
-  accounts: string[];
-  cadence: "weekly" | "biweekly" | "monthly" | "quarterly" | "annual";
-  count: number;
-  firstDate: string;
-  lastDate: string;
-  nextExpected: string;
-  lastAmount: number;
-  prevAmount: number;
-  avgAmount: number;
-  minAmount: number;
-  maxAmount: number;
-  /** Size and date of the most recent price change in the last 6 months */
-  change: number;
-  changeDate: string | null;
-  variable: boolean;
-  priceChanged: boolean;
-  yearlyCost: number;
-  status: "active" | "new" | "late" | "stopped";
-  billId: string | null;
-  billName: string | null;
-  billState: "active" | "paused" | "cancelled" | null;
-  history: { date: string; amount: number }[];
-}
-
 export interface BillVsActual {
   id: string;
   name: string;
@@ -322,11 +293,7 @@ export interface Insights {
   byCategory: { category: string; amount: number }[];
   topMerchants: { merchant: string; amount: number; count: number }[];
   byAccount: { accountId: string; name: string; spent: number; count: number }[];
-  recurring: RecurringCharge[];
   billsVsActual: BillVsActual[];
-  duplicates: { a: Transaction; b: Transaction }[];
-  feesAndInterest: Transaction[];
-  feesAndInterestTotal: number;
   paychecks: { id: string; date: string; amount: number; description: string; accountId: string }[];
   expectedPaycheck: number;
   cardPayments: CardPayments[];

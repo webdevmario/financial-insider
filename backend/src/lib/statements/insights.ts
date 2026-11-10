@@ -1,35 +1,22 @@
 /**
- * What the imported transactions say: monthly totals, recurring charges (and
- * their price changes, late or stopped ones), bills vs what was actually charged,
- * possible duplicates, fees and interest, paychecks, and card payments.
+ * What the imported transactions say: monthly totals, bills vs what was
+ * actually charged, paychecks, and card payments.
  *
  * Amounts in the output are positive costs unless the field says otherwise.
  */
 import { db } from "../../db/index.js";
 import { payees, settings, statementAccounts, subscriptions, transactions, type Transaction } from "../../db/schema.js";
-import { billState, isActiveBill } from "../bills.js";
+import { billState } from "../bills.js";
 import { eq } from "drizzle-orm";
 import { today } from "../date.js";
-import { merchantKey } from "./merchant.js";
 import { groupKey } from "./payees.js";
-import { billCharges, billTokens, isCost, matchesBill } from "./bill-match.js";
+import { billCharges, isCost } from "./bill-match.js";
 
 const round = (n: number) => Math.round(n * 100) / 100;
 
 function dayNumber(date: string): number {
   const [y, m, d] = date.split("-").map(Number);
   return Date.UTC(y, m - 1, d) / 86_400_000;
-}
-
-function addDays(date: string, days: number): string {
-  return new Date((dayNumber(date) + days) * 86_400_000).toISOString().slice(0, 10);
-}
-
-function median(values: number[]): number {
-  if (!values.length) return 0;
-  const s = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(s.length / 2);
-  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
 }
 
 
@@ -59,17 +46,6 @@ function summarize(rows: Transaction[]) {
   };
 }
 
-// ── Recurring charges ─────────────────────────────────────────────
-
-type Cadence = "weekly" | "biweekly" | "monthly" | "quarterly" | "annual";
-const CADENCES: { id: Cadence; min: number; max: number; perYear: number; minCount: number }[] = [
-  { id: "weekly", min: 6, max: 8, perYear: 52, minCount: 4 },
-  { id: "biweekly", min: 13, max: 16, perYear: 26, minCount: 4 },
-  { id: "monthly", min: 26, max: 35, perYear: 12, minCount: 3 },
-  { id: "quarterly", min: 84, max: 97, perYear: 4, minCount: 2 },
-  { id: "annual", min: 355, max: 376, perYear: 1, minCount: 2 },
-];
-
 export function computeInsights(month?: string) {
   const all = db.select().from(transactions).all();
   const accounts = db.select().from(statementAccounts).all();
@@ -77,10 +53,6 @@ export function computeInsights(month?: string) {
   const bills = db.select().from(subscriptions).all();
   const payeeList = db.select().from(payees).all();
   const payeeById = new Map(payeeList.map((p) => [p.id, p]));
-  // Bills linked to a payee match by that link; the rest fall back to words in the bill's name
-  const linkedBillIds = new Set(payeeList.map((p) => p.billId).filter(Boolean));
-  // Name matching only looks at bills still being paid
-  const unlinkedBills = bills.filter((b) => !linkedBillIds.has(b.id) && isActiveBill(b));
   const paycheckSetting = db.select().from(settings).where(eq(settings.key, "paycheck")).get();
   const expectedPaycheck = paycheckSetting ? Number(JSON.parse(paycheckSetting.value)) || 0 : 0;
 
@@ -110,105 +82,6 @@ export function computeInsights(month?: string) {
     byAccount.set(t.accountId, a);
   }
 
-  // Recurring: group costs by payee (or bank name), look for a steady rhythm
-  const groups = new Map<string, Transaction[]>();
-  for (const t of all) {
-    if (!isCost(t)) continue;
-    const k = groupKey(t);
-    (groups.get(k) ?? groups.set(k, []).get(k)!).push(t);
-  }
-
-  const recurring = [];
-  for (const [key, rows] of groups) {
-    if (rows.length < 2) continue;
-    rows.sort((a, b) => a.date.localeCompare(b.date));
-    const gaps = rows.slice(1).map((t, i) => dayNumber(t.date) - dayNumber(rows[i].date)).filter((g) => g > 2);
-    if (!gaps.length) continue;
-    const gap = median(gaps);
-    const cadence = CADENCES.find((c) => gap >= c.min && gap <= c.max);
-    if (!cadence) continue;
-    // Mostly on rhythm (not a store you happen to visit about that often)
-    const onRhythm = gaps.filter((g) => g >= cadence.min - 3 && g <= cadence.max + 3).length / gaps.length;
-    if (onRhythm < 0.6) continue;
-
-    const amounts = rows.map((t) => -t.amount);
-    const recent = amounts.slice(-6);
-    const avg = recent.reduce((s, n) => s + n, 0) / recent.length;
-    const sd = Math.sqrt(recent.reduce((s, n) => s + (n - avg) ** 2, 0) / recent.length);
-    const cv = avg ? sd / avg : 0;
-
-    // A price step (15.49 → 17.99) is one change; a utility bill changes nearly every time
-    const stepAt = (i: number) => Math.abs(amounts[i] - amounts[i - 1]) >= Math.max(0.5, amounts[i - 1] * 0.01);
-    const recentSteps = amounts.slice(-6).filter((_, i, arr) => i > 0 && stepAt(amounts.length - arr.length + i)).length;
-    const variable = recentSteps >= 3;
-    // Amounts all over the place: a store you shop at regularly, not a bill
-    if (variable && (cv > 0.35 || cadence.id === "weekly" || cadence.id === "biweekly")) continue;
-
-    const last = rows[rows.length - 1];
-    const daysSince = dayNumber(latestData) - dayNumber(last.date);
-    const isNew = rows.length < cadence.minCount;
-    // Two monthly charges is only "new" if it's recent; otherwise it's noise
-    if (isNew && (cadence.id !== "monthly" || rows.length !== 2 || daysSince > 45)) continue;
-
-    const lastAmount = -last.amount;
-    const prevAmount = -rows[rows.length - 2].amount;
-    // Most recent price change, if it happened in the last 6 months
-    let change = 0;
-    let changeDate: string | null = null;
-    if (!variable) {
-      for (let i = amounts.length - 1; i > 0; i--) {
-        if (stepAt(i)) {
-          if (dayNumber(latestData) - dayNumber(rows[i].date) <= 183) {
-            change = round(amounts[i] - amounts[i - 1]);
-            changeDate = rows[i].date;
-          }
-          break;
-        }
-      }
-    }
-    const priceChanged = changeDate !== null;
-
-    const slack = Math.max(7, gap * 0.25);
-    const status =
-      daysSince > gap * 2 + slack ? "stopped"
-      : daysSince > gap + slack ? "late"
-      : isNew ? "new"
-      : "active";
-
-    const payee = last.payeeId ? payeeById.get(last.payeeId) : undefined;
-    const bill = payee?.billId
-      ? bills.find((b) => b.id === payee.billId)
-      : unlinkedBills.find((b) => matchesBill(merchantKey(last.merchant), billTokens(b.name)));
-    recurring.push({
-      key,
-      merchant: last.merchant,
-      payeeId: last.payeeId ?? null,
-      category: last.category,
-      accounts: [...new Set(rows.map((t) => accountName.get(t.accountId) || t.accountId))],
-      cadence: cadence.id,
-      count: rows.length,
-      firstDate: rows[0].date,
-      lastDate: last.date,
-      nextExpected: addDays(last.date, Math.round(gap)),
-      lastAmount: round(lastAmount),
-      prevAmount: round(prevAmount),
-      avgAmount: round(avg),
-      minAmount: round(Math.min(...recent)),
-      maxAmount: round(Math.max(...recent)),
-      change,
-      changeDate,
-      variable,
-      priceChanged,
-      yearlyCost: round(avg * cadence.perYear),
-      status,
-      billId: bill?.id ?? null,
-      billName: bill?.name ?? null,
-      billState: bill ? billState(bill) : null,
-      history: rows.slice(-12).map((t) => ({ date: t.date, amount: round(-t.amount) })),
-    });
-  }
-  recurring.sort((a, b) => b.yearlyCost - a.yearlyCost);
-
   // Bills list vs actual charges
   const billsVsActual = bills.map((b) => {
     const { charges, linked } = billCharges(b, all, payeeList);
@@ -234,27 +107,6 @@ export function computeInsights(month?: string) {
       chargedSinceStopped: state !== "active" && b.stateSince ? charges.filter((t) => t.date > b.stateSince!).length : 0,
     };
   });
-
-  // Possible duplicate charges: same account, merchant and amount within 3 days
-  const recentCutoff = addDays(latestData, -120);
-  const dupCandidates = all
-    .filter((t) => isCost(t) && t.date >= recentCutoff && -t.amount >= 10)
-    .sort((a, b) => a.date.localeCompare(b.date));
-  const duplicates: { a: Transaction; b: Transaction }[] = [];
-  for (let i = 0; i < dupCandidates.length; i++) {
-    for (let j = i + 1; j < dupCandidates.length; j++) {
-      const a = dupCandidates[i], b = dupCandidates[j];
-      if (dayNumber(b.date) - dayNumber(a.date) > 3) break;
-      if (a.accountId === b.accountId && a.amount === b.amount && groupKey(a) === groupKey(b)) {
-        duplicates.push({ a, b });
-      }
-    }
-  }
-
-  // Fees and interest, newest first
-  const feesAndInterest = all
-    .filter((t) => (t.kind === "fee" || t.kind === "interest") && t.amount < 0)
-    .sort((a, b) => b.date.localeCompare(a.date));
 
   // Paychecks
   const paychecks = all
@@ -313,11 +165,7 @@ export function computeInsights(month?: string) {
     byCategory: [...byCategory].map(([category, amount]) => ({ category, amount: round(amount) })).sort((a, b) => b.amount - a.amount),
     topMerchants: [...byMerchant.values()].map((m) => ({ ...m, amount: round(m.amount) })).sort((a, b) => b.amount - a.amount).slice(0, 12),
     byAccount: [...byAccount.values()].map((a) => ({ ...a, spent: round(a.spent) })).sort((a, b) => b.spent - a.spent),
-    recurring,
     billsVsActual,
-    duplicates: duplicates.reverse(),
-    feesAndInterest,
-    feesAndInterestTotal: round(feesAndInterest.reduce((s, t) => s - t.amount, 0)),
     paychecks,
     expectedPaycheck,
     cardPayments,
