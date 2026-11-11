@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Modal from "../layout/Modal";
 import Confirm from "../layout/Confirm";
+import MoneyInput from "../layout/MoneyInput";
 import { api } from "../../lib/api";
 import { fmtDate, fmtP, today as todayStr } from "../../lib/formatters";
 import { computeEffectiveNextCharge, billState, type BillState } from "../../lib/billing";
@@ -144,179 +145,177 @@ export default function SubscriptionForm({
     }
   }
 
-  if (showConfirm) {
-    return (
-      <Confirm
+  return (
+    <>
+      <Modal
         open={open}
+        onClose={onClose}
+        variant="form"
+        title={subscription ? "Edit Bill" : "Add Bill"}
+        aside={
+          subscription && (
+            <button className="btn btn-danger btn-sm" onClick={() => setShowConfirm(true)}>
+              🗑️ Delete
+            </button>
+          )
+        }
+        footer={
+          <>
+            <button className="btn" onClick={onClose}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleSave}>
+              {subscription ? "Update" : "Add"}
+            </button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <div className="input-group">
+            <label>Service Name</label>
+            <input
+              type="text"
+              placeholder="e.g. Netflix, Allstate"
+              autoCapitalize="words"
+              autoCorrect="off"
+              enterKeyHint="next"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 max-md:grid-cols-1 gap-3">
+            <div className="input-group">
+              <label>Category</label>
+              <select value={category} onChange={(e) => setCategory(e.target.value)}>
+                {SUB_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+            <div className="input-group">
+              <label>Frequency</label>
+              <select value={frequency} onChange={(e) => setFrequency(e.target.value as typeof frequency)}>
+                <option value="monthly">Monthly</option>
+                <option value="quarterly">Quarterly</option>
+                <option value="annual">Annual</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 max-md:grid-cols-1 gap-3">
+            <div className="input-group">
+              <label>Listed Amount</label>
+              <MoneyInput value={amount} onChange={setAmount} />
+            </div>
+            <div className="input-group">
+              <label>Next Charge Date</label>
+              <input
+                type="date"
+                value={nextCharge}
+                onChange={(e) => setNextCharge(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {projection && (
+            <div className="rounded-lg border border-border bg-bg-input px-3.5 py-3 flex flex-col gap-2.5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+                    {usesProjection ? "Counts as (projected)" : "Counts as (listed)"}
+                  </div>
+                  <div className="text-[11px] text-text-muted mt-0.5">
+                    {projection.method === "listed"
+                      ? projection.basis
+                      : pinned
+                        ? `History projects ${fmtP(projection.amount)}: ${projection.basis}`
+                        : projection.basis}
+                  </div>
+                </div>
+                <div className="font-mono text-sm shrink-0">{fmtP(counted)}</div>
+              </div>
+              <ChargeBars history={projection.history} />
+              {projection.method !== "listed" && (
+                <label className="flex items-center gap-2 text-xs text-text-dim cursor-pointer">
+                  <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} />
+                  Use the listed amount instead
+                </label>
+              )}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 max-md:grid-cols-1 gap-3">
+            <div className="input-group">
+              <label>Split Between</label>
+              <select value={splitBy} onChange={(e) => setSplitBy(parseInt(e.target.value))}>
+                <option value={1}>Just me</option>
+                <option value={2}>2 people</option>
+                <option value={3}>3 people</option>
+                <option value={4}>4 people</option>
+              </select>
+            </div>
+            <div className="input-group">
+              <label>My Cost</label>
+              <div className="font-mono px-3.5 py-2.5 rounded-lg bg-bg-input border border-border text-sm text-green">
+                {fmtP(myCost)}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
+            <div className="input-group">
+              <label>Status</label>
+              <select value={status} onChange={(e) => setStatus(e.target.value)}>
+                <option value="">None</option>
+                <option value="essential">Essential</option>
+                <option value="review">Under Review</option>
+              </select>
+            </div>
+            <div className="input-group">
+              <label>Paying it?</label>
+              <select
+                value={state}
+                onChange={(e) => {
+                  const next = e.target.value as BillState;
+                  setState(next);
+                  if (next !== "active" && !stateSince) setStateSince(todayStr());
+                }}
+              >
+                <option value="active">Active</option>
+                <option value="paused">Paused</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+          </div>
+
+          {state !== "active" && (
+            <div className="input-group">
+              <label>{state === "paused" ? "Paused since" : "Cancelled since"}</label>
+              <input type="date" value={stateSince} onChange={(e) => setStateSince(e.target.value)} />
+              <span className="text-[11px] text-text-muted">
+                Left out of your totals and pay periods. Bills check flags any charge after this date.
+              </span>
+            </div>
+          )}
+
+          <div className="input-group">
+            <label>Notes (optional)</label>
+            <textarea
+              rows={2}
+              placeholder="e.g. Split with mom, seasonal pricing..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </div>
+        </div>
+      </Modal>
+
+      <Confirm
+        open={open && showConfirm}
         title={`Remove "${subscription?.name}"?`}
         message="This action cannot be undone."
         onConfirm={handleDelete}
         onCancel={() => setShowConfirm(false)}
       />
-    );
-  }
-
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={subscription ? "Edit Bill" : "Add Bill"}
-      footer={
-        <>
-          {subscription && (
-            <button className="btn btn-danger btn-sm mr-auto" onClick={() => setShowConfirm(true)}>
-              🗑️ Delete
-            </button>
-          )}
-          <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={handleSave}>
-            {subscription ? "Update" : "Add"}
-          </button>
-        </>
-      }
-    >
-      <div className="flex flex-col gap-4">
-        <div className="input-group">
-          <label>Service Name</label>
-          <input
-            type="text"
-            placeholder="e.g. Netflix, Allstate"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </div>
-
-        <div className="grid grid-cols-2 max-md:grid-cols-1 gap-3">
-          <div className="input-group">
-            <label>Category</label>
-            <select value={category} onChange={(e) => setCategory(e.target.value)}>
-              {SUB_CATEGORIES.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
-          <div className="input-group">
-            <label>Frequency</label>
-            <select value={frequency} onChange={(e) => setFrequency(e.target.value as typeof frequency)}>
-              <option value="monthly">Monthly</option>
-              <option value="quarterly">Quarterly</option>
-              <option value="annual">Annual</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 max-md:grid-cols-1 gap-3">
-          <div className="input-group">
-            <label>Listed Amount</label>
-            <input
-              type="number"
-              step="0.01"
-              placeholder="0.00"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-          </div>
-          <div className="input-group">
-            <label>Next Charge Date</label>
-            <input
-              type="date"
-              value={nextCharge}
-              onChange={(e) => setNextCharge(e.target.value)}
-            />
-          </div>
-        </div>
-
-        {projection && (
-          <div className="rounded-lg border border-border bg-bg-input px-3.5 py-3 flex flex-col gap-2.5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
-                  {usesProjection ? "Counts as (projected)" : "Counts as (listed)"}
-                </div>
-                <div className="text-[11px] text-text-muted mt-0.5">
-                  {projection.method === "listed"
-                    ? projection.basis
-                    : pinned
-                      ? `History projects ${fmtP(projection.amount)}: ${projection.basis}`
-                      : projection.basis}
-                </div>
-              </div>
-              <div className="font-mono text-sm shrink-0">{fmtP(counted)}</div>
-            </div>
-            <ChargeBars history={projection.history} />
-            {projection.method !== "listed" && (
-              <label className="flex items-center gap-2 text-xs text-text-dim cursor-pointer">
-                <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} />
-                Use the listed amount instead
-              </label>
-            )}
-          </div>
-        )}
-
-        <div className="grid grid-cols-2 max-md:grid-cols-1 gap-3">
-          <div className="input-group">
-            <label>Split Between</label>
-            <select value={splitBy} onChange={(e) => setSplitBy(parseInt(e.target.value))}>
-              <option value={1}>Just me</option>
-              <option value={2}>2 people</option>
-              <option value={3}>3 people</option>
-              <option value={4}>4 people</option>
-            </select>
-          </div>
-          <div className="input-group">
-            <label>My Cost</label>
-            <div className="font-mono px-3.5 py-2.5 rounded-lg bg-bg-input border border-border text-sm text-green">
-              {fmtP(myCost)}
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
-          <div className="input-group">
-            <label>Status</label>
-            <select value={status} onChange={(e) => setStatus(e.target.value)}>
-              <option value="">None</option>
-              <option value="essential">Essential</option>
-              <option value="review">Under Review</option>
-            </select>
-          </div>
-          <div className="input-group">
-            <label>Paying it?</label>
-            <select
-              value={state}
-              onChange={(e) => {
-                const next = e.target.value as BillState;
-                setState(next);
-                if (next !== "active" && !stateSince) setStateSince(todayStr());
-              }}
-            >
-              <option value="active">Active</option>
-              <option value="paused">Paused</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-          </div>
-        </div>
-
-        {state !== "active" && (
-          <div className="input-group">
-            <label>{state === "paused" ? "Paused since" : "Cancelled since"}</label>
-            <input type="date" value={stateSince} onChange={(e) => setStateSince(e.target.value)} />
-            <span className="text-[11px] text-text-muted">
-              Left out of your totals and pay periods. Bills check flags any charge after this date.
-            </span>
-          </div>
-        )}
-
-        <div className="input-group">
-          <label>Notes (optional)</label>
-          <textarea
-            rows={2}
-            placeholder="e.g. Split with mom, seasonal pricing..."
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          />
-        </div>
-      </div>
-    </Modal>
+    </>
   );
 }

@@ -10,11 +10,16 @@ interface ConfirmProps {
   onCancel: () => void;
 }
 
+/**
+ * A yes/no question. Opens on top of whatever asked it (the form stays put
+ * underneath). Stacked full-width buttons on phones, destructive on top.
+ */
 export default function Confirm({ open, title, message, confirmLabel = "Delete", onConfirm, onCancel }: ConfirmProps) {
   return (
     <Modal
       open={open}
       onClose={onCancel}
+      variant="confirm"
       title={title}
       footer={
         <>

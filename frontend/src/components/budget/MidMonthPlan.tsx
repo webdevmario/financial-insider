@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Modal from "../layout/Modal";
+import IconButton from "../layout/IconButton";
+import MoneyInput from "../layout/MoneyInput";
 import { api } from "../../lib/api";
 import { fmt, fmtDate, moLabel } from "../../lib/formatters";
 import type { MidMonthPlan as PlanData, PlanLine } from "../../types";
@@ -41,23 +43,31 @@ function upgrade(p: Partial<SavedPlan> & { ally?: number | null }): Partial<Save
   return rest.balance === undefined && ally !== undefined ? { ...rest, balance: ally } : rest;
 }
 
-function AmountInput({ value, onChange, disabled }: { value: number; onChange: (n: number) => void; disabled?: boolean }) {
-  const [text, setText] = useState(String(value));
-  useEffect(() => setText(String(value)), [value]);
+/** A number kept as typed while editing ("12." stays "12."), committed as it parses */
+function AmountInput({ value, onChange, disabled, className = "!w-28 shrink-0 !py-1.5 !px-2.5 max-md:!py-2 text-right", ...rest }: {
+  value: number | null;
+  onChange: (n: number | null) => void;
+  disabled?: boolean;
+  className?: string;
+  id?: string;
+  placeholder?: string;
+}) {
+  const shown = value == null ? "" : String(value);
+  const [text, setText] = useState(shown);
+  useEffect(() => setText(shown), [shown]);
   return (
-    <input
-      type="number"
-      step="0.01"
-      inputMode="decimal"
+    <MoneyInput
       value={text}
       disabled={disabled}
-      onChange={(e) => {
-        setText(e.target.value);
-        const n = parseFloat(e.target.value);
+      onChange={(t) => {
+        setText(t);
+        if (t === "") return onChange(null);
+        const n = parseFloat(t);
         if (!isNaN(n)) onChange(n);
       }}
-      onBlur={() => setText(String(value))}
-      className={`!w-28 shrink-0 !py-1.5 !px-2.5 text-right ${disabled ? "opacity-40" : ""}`}
+      onBlur={() => setText(shown)}
+      className={`${className} ${disabled ? "opacity-40" : ""}`}
+      {...rest}
     />
   );
 }
@@ -66,7 +76,8 @@ function Row({ line, on, amount, onToggle, onAmount }: {
   line: PlanLine; on: boolean; amount: number; onToggle: () => void; onAmount: (n: number) => void;
 }) {
   return (
-    <div className="flex items-center gap-3 py-2 border-b border-border/30 last:border-0">
+    // A label, so tapping anywhere on the row (except the amount) ticks it
+    <label className="flex items-center gap-3 py-2 max-md:py-2.5 border-b border-border/30 last:border-0 cursor-pointer">
       <input type="checkbox" checked={on} onChange={onToggle} aria-label={`Count ${line.label}`} />
       <div className={`min-w-0 flex-1 ${on ? "" : "opacity-50"}`}>
         <div className="text-sm truncate">{line.label}</div>
@@ -74,8 +85,8 @@ function Row({ line, on, amount, onToggle, onAmount }: {
           {line.date && <>{shortDate(line.date)} · </>}{line.note}
         </div>
       </div>
-      <AmountInput value={amount} onChange={onAmount} disabled={!on} />
-    </div>
+      <AmountInput value={amount} onChange={(n) => onAmount(n ?? 0)} disabled={!on} />
+    </label>
   );
 }
 
@@ -238,15 +249,12 @@ export default function MidMonthPlan({ open, onClose, month, onUse, onToast }: {
           <div className="flex items-end justify-between gap-3 mb-5 flex-wrap">
             <div className="input-group flex-1 min-w-[240px] max-w-[360px]">
               <label htmlFor="checking-balance">Bank checking balance</label>
-              <input
+              <AmountInput
                 id="checking-balance"
-                type="number"
-                step="0.01"
-                inputMode="decimal"
                 placeholder="Balance after the paycheck"
-                value={plan.balance ?? ""}
-                onChange={(e) => edit((p) => ({ ...p, balance: e.target.value === "" ? null : parseFloat(e.target.value) }))}
-                className="font-mono"
+                value={plan.balance}
+                onChange={(n) => edit((p) => ({ ...p, balance: n }))}
+                className=""
               />
             </div>
             <div className="text-[11px] text-text-muted text-right max-md:text-left">
@@ -254,7 +262,7 @@ export default function MidMonthPlan({ open, onClose, month, onUse, onToast }: {
               {edited && (
                 <button
                   type="button"
-                  className="block ml-auto max-md:ml-0 mt-1 text-accent"
+                  className="link-tap block ml-auto max-md:ml-0 mt-1"
                   onClick={() => edit((p) => ({ ...blankPlan(p), balance: p.balance }))}
                 >
                   Reset to suggestions
@@ -283,14 +291,14 @@ export default function MidMonthPlan({ open, onClose, month, onUse, onToast }: {
                 <div className="text-sm">Set aside first</div>
                 <div className="text-[11px] text-text-muted">Like an extra loan payment. Carries over to next month</div>
               </div>
-              <AmountInput value={plan.reserve} onChange={(n) => edit((p) => ({ ...p, reserve: n }))} />
+              <AmountInput value={plan.reserve} onChange={(n) => edit((p) => ({ ...p, reserve: n ?? 0 }))} />
             </div>
             <div className="flex items-center gap-3 py-2 border-t border-border/30">
               <div className="min-w-0 flex-1">
                 <div className="text-sm">Cushion to keep</div>
                 <div className="text-[11px] text-text-muted">Not subtracted; the total is compared against it</div>
               </div>
-              <AmountInput value={plan.cushion} onChange={(n) => edit((p) => ({ ...p, cushion: n }))} />
+              <AmountInput value={plan.cushion} onChange={(n) => edit((p) => ({ ...p, cushion: n ?? 0 }))} />
             </div>
           </Section>
 
@@ -309,23 +317,22 @@ export default function MidMonthPlan({ open, onClose, month, onUse, onToast }: {
                   type="text"
                   value={x.label}
                   placeholder="What for?"
+                  autoCapitalize="sentences"
+                  enterKeyHint="next"
                   onChange={(e) => edit((p) => ({ ...p, extras: p.extras.map((y) => (y.id === x.id ? { ...y, label: e.target.value } : y)) }))}
                   className="!py-1.5 !px-2.5 !text-sm flex-1 min-w-0"
                 />
-                <AmountInput value={x.amount} onChange={(n) => edit((p) => ({ ...p, extras: p.extras.map((y) => (y.id === x.id ? { ...y, amount: n } : y)) }))} />
-                <button
-                  type="button"
-                  aria-label="Remove"
-                  className="text-text-muted hover:text-red text-sm px-1"
+                <AmountInput value={x.amount} onChange={(n) => edit((p) => ({ ...p, extras: p.extras.map((y) => (y.id === x.id ? { ...y, amount: n ?? 0 } : y)) }))} />
+                <IconButton
+                  danger
+                  label="Remove"
                   onClick={() => edit((p) => ({ ...p, extras: p.extras.filter((y) => y.id !== x.id) }))}
-                >
-                  ✕
-                </button>
+                />
               </div>
             ))}
             <button
               type="button"
-              className="text-[12px] text-accent mt-2"
+              className="link-tap text-[12px] mt-2"
               onClick={() => edit((p) => ({ ...p, extras: [...p.extras, { id: Date.now().toString(36), label: "", amount: 0 }] }))}
             >
               + Add a planned expense

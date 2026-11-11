@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import Modal from "../layout/Modal";
+import Picker from "../layout/Picker";
+import Segmented from "../layout/Segmented";
 import { api } from "../../lib/api";
 import { fmtDate, fmtP } from "../../lib/formatters";
 import { money } from "./shared";
@@ -16,6 +18,9 @@ export interface MergeMember {
   date?: string;
   amount?: number;
 }
+
+/** Names listed before "Show all" */
+const MEMBER_ROWS = 6;
 
 interface Props {
   members: MergeMember[] | null;
@@ -38,6 +43,7 @@ export default function MergeModal({ members, payees, suggestedName, categories,
   const [category, setCategory] = useState("");
   const [targetId, setTargetId] = useState("");
   const [saving, setSaving] = useState(false);
+  const [allMembers, setAllMembers] = useState(false);
 
   useEffect(() => {
     if (!members) return;
@@ -46,6 +52,7 @@ export default function MergeModal({ members, payees, suggestedName, categories,
     setTargetId(existing ? existing.key.slice(2) : payees[0]?.id ?? "");
     setName(suggestedName ?? members[0]?.name ?? "");
     setCategory("");
+    setAllMembers(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [members]);
 
@@ -100,6 +107,7 @@ export default function MergeModal({ members, payees, suggestedName, categories,
     <Modal
       open={!!members}
       onClose={onClose}
+      variant="form"
       title={
         txnIds ? `Assign ${txnIds.length} Transaction${txnIds.length === 1 ? "" : "s"}`
         : members.length === 1 ? "Name This Payee" : `Group ${members.length} Names`
@@ -117,10 +125,12 @@ export default function MergeModal({ members, payees, suggestedName, categories,
         </>
       }
     >
-      <div className="flex flex-col gap-1 mb-4 max-h-[180px] scroll-list">
-        {members.map((m) => (
+      {/* Not a scroll box: one that scrolls inside the scrolling sheet is hard to use by touch */}
+      <div className="flex flex-col gap-1 mb-4">
+        {(allMembers ? members : members.slice(0, MEMBER_ROWS)).map((m) => (
           <div key={m.key} className="flex justify-between gap-3 text-xs py-1 border-b border-border/30 last:border-0">
-            <span className={`truncate ${txnIds ? "font-mono" : ""}`} title={m.name}>
+            {/* Wraps on phones, where there's no hover to read a cut-off name */}
+            <span className={`truncate max-md:whitespace-normal max-md:break-all min-w-0 ${txnIds ? "font-mono" : ""}`} title={m.name}>
               {m.name}
               {m.key.startsWith("p:") && <span className="text-accent"> · payee</span>}
             </span>
@@ -137,33 +147,38 @@ export default function MergeModal({ members, payees, suggestedName, categories,
         ))}
       </div>
 
-      <div className="flex gap-0.5 p-0.5 bg-bg border border-border rounded-lg mb-4 w-fit">
-        {(["new", "existing"] as const).map((m) => (
-          <button
-            key={m}
-            onClick={() => setMode(m)}
-            disabled={m === "existing" && payees.length === 0}
-            className={`px-3 py-1 rounded-md text-xs font-medium transition-all disabled:opacity-40 ${
-              mode === m ? "text-accent bg-accent/[0.1]" : "text-text-dim hover:text-text"
-            }`}
-          >
-            {m === "new" ? "New payee" : "Existing payee"}
-          </button>
-        ))}
-      </div>
+      {members.length > MEMBER_ROWS && (
+        <button type="button" className="link-tap text-xs -mt-2 mb-3" onClick={() => setAllMembers((v) => !v)}>
+          {allMembers ? "Show fewer" : `Show all ${members.length}`}
+        </button>
+      )}
+
+      <Segmented
+        className="mb-4"
+        value={mode}
+        onChange={setMode}
+        options={[
+          { value: "new", label: "New payee" },
+          { value: "existing", label: "Existing payee", disabled: payees.length === 0 },
+        ]}
+      />
 
       {mode === "new" ? (
         <div className="flex flex-col gap-3">
           <div className="input-group">
             <label>Name</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} />
+            <input value={name} onChange={(e) => setName(e.target.value)} autoCorrect="off" autoCapitalize="words" enterKeyHint="next" />
           </div>
           <div className="input-group">
             <label>Category (optional)</label>
-            <input list="merge-categories" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Keep what the bank says" />
-            <datalist id="merge-categories">
-              {categories.map((c) => <option key={c} value={c} />)}
-            </datalist>
+            <Picker
+              title="Category"
+              value={category}
+              onChange={setCategory}
+              options={categories}
+              placeholder="Keep what the bank says"
+              clearLabel="Keep what the bank says"
+            />
           </div>
         </div>
       ) : (

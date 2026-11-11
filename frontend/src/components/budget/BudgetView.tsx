@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "../../lib/api";
 import { fmt, fmtP, fmtDate, curMo, moLabel, today } from "../../lib/formatters";
 import Modal from "../layout/Modal";
+import IconButton from "../layout/IconButton";
+import MoneyInput from "../layout/MoneyInput";
 import MidMonthPlan from "./MidMonthPlan";
 import { useOnRefresh } from "../../lib/offline/status";
 import type { Expense } from "../../types";
@@ -564,6 +566,7 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
       <Modal
         open={targetOpen}
         onClose={() => setTargetOpen(false)}
+        variant="form"
         title="Set Budget Target"
         footer={
           <>
@@ -575,24 +578,16 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
         <p className="text-[13px] text-text-dim mb-5">
           Set your spending target for {moLabel(selectedMonth)}.
         </p>
-        <div className="grid grid-cols-2 max-md:grid-cols-1 gap-3">
-          <div className="input-group">
-            <label>Month</label>
-            <input type="text" value={moLabel(selectedMonth)} disabled />
-          </div>
-          <div className="input-group">
-            <label>Target Amount</label>
-            <input
-              type="number"
-              step="0.01"
-              placeholder="0.00"
-              value={targetAmt}
-              onChange={(e) => setTargetAmt(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") saveTarget();
-              }}
-            />
-          </div>
+        <div className="input-group">
+          <label>Target Amount</label>
+          <MoneyInput
+            value={targetAmt}
+            onChange={setTargetAmt}
+            enterKeyHint="go"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") saveTarget();
+            }}
+          />
         </div>
       </Modal>
 
@@ -600,6 +595,7 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
       <Modal
         open={notesIndexOpen}
         onClose={() => setNotesIndexOpen(false)}
+        variant="list"
         title="All Notes"
       >
         <div className="flex flex-col gap-1.5">
@@ -630,6 +626,7 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
       <Modal
         open={reimbOpen}
         onClose={() => setReimbOpen(false)}
+        variant="form"
         title="Add Reimbursement"
         footer={
           <>
@@ -651,17 +648,15 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
               onChange={(e) => setReimbDesc(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") saveReimbursement(); }}
               autoCapitalize="sentences"
+              enterKeyHint="next"
             />
           </div>
           <div className="input-group">
             <label>Amount</label>
-            <input
-              type="number"
-              step="0.01"
-              placeholder="0.00"
-              inputMode="decimal"
+            <MoneyInput
               value={reimbAmt}
-              onChange={(e) => setReimbAmt(e.target.value)}
+              onChange={setReimbAmt}
+              enterKeyHint="go"
               onKeyDown={(e) => { if (e.key === "Enter") saveReimbursement(); }}
             />
           </div>
@@ -677,12 +672,7 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-sm text-green">+{fmt(r.amount)}</span>
-                  <button
-                    className="text-xs text-red opacity-60 hover:opacity-100"
-                    onClick={() => deleteReimbursement(i)}
-                  >
-                    ×
-                  </button>
+                  <IconButton danger label={`Remove ${r.description}`} onClick={() => deleteReimbursement(i)} />
                 </div>
               </div>
             ))}
@@ -694,12 +684,15 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
       <Modal
         open={!!editingExpense}
         onClose={() => setEditingExpense(null)}
+        variant="form"
         title="Edit Expense"
+        aside={
+          <button className="btn btn-danger btn-sm" onClick={deleteFromEdit}>
+            🗑️ Delete
+          </button>
+        }
         footer={
           <>
-            <button className="btn btn-danger btn-sm mr-auto" onClick={deleteFromEdit}>
-              🗑️ Delete
-            </button>
             <button className="btn" onClick={() => setEditingExpense(null)}>Cancel</button>
             <button className="btn btn-primary" onClick={saveEditExpense}>Update</button>
           </>
@@ -713,18 +706,13 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
               value={editDesc}
               onChange={(e) => setEditDesc(capitalize(e.target.value))}
               autoCapitalize="sentences"
+              enterKeyHint="next"
             />
           </div>
           <div className="grid grid-cols-2 max-md:grid-cols-1 gap-3">
             <div className="input-group">
               <label>Amount</label>
-              <input
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={editAmt}
-                onChange={(e) => setEditAmt(e.target.value)}
-              />
+              <MoneyInput value={editAmt} onChange={setEditAmt} />
             </div>
             <div className="input-group">
               <label>Date</label>

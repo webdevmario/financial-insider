@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Modal from "../layout/Modal";
 import Confirm from "../layout/Confirm";
+import IconButton from "../layout/IconButton";
+import Picker from "../layout/Picker";
 import LoadingState from "../layout/LoadingState";
 import { api } from "../../lib/api";
 import { fmt, fmtDate, fmtP, moLabel } from "../../lib/formatters";
@@ -86,24 +88,6 @@ export default function PayeeModal({ payeeId, categories, onClose, onChanged, on
       (billId || null) !== detail.billId ||
       (notes.trim() || null) !== detail.notes);
 
-  if (confirmingDelete && detail) {
-    return (
-      <Confirm
-        open
-        title={`Delete "${detail.name}"?`}
-        message="Its transactions go back to their bank names. Aliases are removed too."
-        onConfirm={() => {
-          setConfirmingDelete(false);
-          run(async () => {
-            await api.payees.delete(detail.id);
-            onClose();
-          }, "Payee deleted");
-        }}
-        onCancel={() => setConfirmingDelete(false)}
-      />
-    );
-  }
-
   const counts: Partial<Record<Tab, number>> = detail ? { aliases: detail.aliases.length } : {};
 
   // Left/right arrows move between tabs, as in any tab list
@@ -117,177 +101,201 @@ export default function PayeeModal({ payeeId, categories, onClose, onChanged, on
   }
 
   return (
-    <Modal
-      open={!!payeeId}
-      onClose={onClose}
-      title={detail?.name ?? "Payee"}
-      // One height for every tab, so switching tabs doesn't resize the dialog;
-      // a long tab scrolls under the tab bar instead
-      className="h-[min(640px,85%)] max-md:h-[min(720px,90%)]"
-      footer={
-        detail && (
-          <>
-            <button className="btn btn-danger btn-sm mr-auto" disabled={busy} onClick={() => setConfirmingDelete(true)}>
+    <>
+      <Modal
+        open={!!payeeId}
+        onClose={onClose}
+        title={detail?.name ?? "Payee"}
+        // One height for every tab, so switching tabs doesn't resize the dialog;
+        // a long tab scrolls under the tab bar instead
+        className="h-[min(640px,85%)] max-md:h-[min(720px,90%)]"
+        dirty={dirty}
+        // Delete belongs with the payee's settings, not under its activity list
+        aside={
+          detail && tab === "settings" && (
+            <button className="btn btn-danger btn-sm" disabled={busy} onClick={() => setConfirmingDelete(true)}>
               🗑️ Delete
             </button>
-            <button className="btn" onClick={onClose}>{dirty ? "Cancel" : "Close"}</button>
-            <button
-              className="btn btn-primary"
-              disabled={busy || !dirty || !name.trim()}
-              onClick={() =>
-                run(async () => {
-                  await api.payees.update(detail.id, {
-                    name: name.trim(),
-                    category: category.trim() || null,
-                    kind: kind || null,
-                    billId: billId || null,
-                    notes: notes.trim() || null,
-                  });
-                  onClose();
-                }, "Payee saved")
-              }
-            >
-              Save
-            </button>
-          </>
-        )
-      }
-    >
-      {!detail ? (
-        <LoadingState />
-      ) : (
-        <div className="flex flex-col">
-          <div className="text-xs text-text-muted mb-2">
-            {detail.count} transactions · {detail.spent === 0 && detail.received > 0 ? money(0, detail.received) : <>{fmt(detail.spent)} spent</>}
-            {moneyInNote(detail.spent, detail.received) && <> · {moneyInNote(detail.spent, detail.received)}</>}
-            {detail.lastDate && <> · last {fmtDate(detail.lastDate)}</>}
-            {detail.handPicked > 0 && <> · {detail.handPicked} picked by hand</>}
-          </div>
+          )
+        }
+        footer={
+          detail && (
+            <>
+              <button className="btn" onClick={onClose}>{dirty ? "Cancel" : "Close"}</button>
+              <button
+                className="btn btn-primary"
+                disabled={busy || !dirty || !name.trim()}
+                onClick={() =>
+                  run(async () => {
+                    await api.payees.update(detail.id, {
+                      name: name.trim(),
+                      category: category.trim() || null,
+                      kind: kind || null,
+                      billId: billId || null,
+                      notes: notes.trim() || null,
+                    });
+                    onClose();
+                  }, "Payee saved")
+                }
+              >
+                Save
+              </button>
+            </>
+          )
+        }
+      >
+        {!detail ? (
+          <LoadingState />
+        ) : (
+          <div className="flex flex-col">
+            <div className="text-xs text-text-muted mb-2">
+              {detail.count} transactions · {detail.spent === 0 && detail.received > 0 ? money(0, detail.received) : <>{fmt(detail.spent)} spent</>}
+              {moneyInNote(detail.spent, detail.received) && <> · {moneyInNote(detail.spent, detail.received)}</>}
+              {detail.lastDate && <> · last {fmtDate(detail.lastDate)}</>}
+              {detail.handPicked > 0 && <> · {detail.handPicked} picked by hand</>}
+            </div>
 
-          {/* Stays in view while a long tab scrolls under it */}
-          <div className="sticky top-0 z-10 bg-bg-card pb-3">
-            <div role="tablist" aria-label="Payee sections" className="grid grid-cols-3 gap-0.5 p-0.5 bg-bg border border-border rounded-lg" onKeyDown={onTabKey}>
-              {TABS.map((t) => {
-                const active = tab === t.id;
-                return (
-                  <button
-                    key={t.id}
-                    ref={(el) => { tabRefs.current[t.id] = el; }}
-                    id={`payee-tab-${t.id}`}
-                    role="tab"
-                    aria-selected={active}
-                    aria-controls={`payee-panel-${t.id}`}
-                    tabIndex={active ? 0 : -1}
-                    onClick={() => setTab(t.id)}
-                    className={`relative px-1 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-all ${
-                      active ? "text-accent bg-accent/[0.1]" : "text-text-dim hover:text-text"
-                    }`}
-                  >
-                    {t.label}
-                    {counts[t.id] != null && <span className="ml-1 tabular-nums opacity-60">{counts[t.id]}</span>}
-                    {t.id === "settings" && dirty && !active && (
-                      <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-amber" title="Unsaved changes" />
+            {/* Stays in view while a long tab scrolls under it */}
+            <div className="sticky top-0 z-10 bg-bg-card pb-3">
+              <div role="tablist" aria-label="Payee sections" className="grid grid-cols-3 gap-0.5 p-0.5 bg-bg border border-border rounded-lg" onKeyDown={onTabKey}>
+                {TABS.map((t) => {
+                  const active = tab === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      ref={(el) => { tabRefs.current[t.id] = el; }}
+                      id={`payee-tab-${t.id}`}
+                      role="tab"
+                      aria-selected={active}
+                      aria-controls={`payee-panel-${t.id}`}
+                      tabIndex={active ? 0 : -1}
+                      onClick={() => setTab(t.id)}
+                      className={`relative px-1 py-1.5 max-md:min-h-[42px] rounded-md text-xs font-medium whitespace-nowrap transition-all ${
+                        active ? "text-accent bg-accent/[0.1]" : "text-text-dim hover:text-text"
+                      }`}
+                    >
+                      {t.label}
+                      {counts[t.id] != null && <span className="ml-1 tabular-nums opacity-60">{counts[t.id]}</span>}
+                      {t.id === "settings" && dirty && !active && (
+                        <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-amber" title="Unsaved changes" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div role="tabpanel" id={`payee-panel-${tab}`} aria-labelledby={`payee-tab-${tab}`}>
+              {tab === "settings" && (
+                <div className="flex flex-col gap-3">
+                  <div className="input-group">
+                    <label>Name</label>
+                    <input value={name} onChange={(e) => setName(e.target.value)} autoCorrect="off" autoCapitalize="words" />
+                  </div>
+                  <div className="grid grid-cols-2 max-md:grid-cols-1 gap-3">
+                    <div className="input-group">
+                      <label>Type</label>
+                      <select value={kind} onChange={(e) => setKind(e.target.value)}>
+                        <option value="">Automatic</option>
+                        {(Object.keys(KIND_LABELS) as TxnKind[]).map((k) => <option key={k} value={k}>{KIND_LABELS[k]}</option>)}
+                      </select>
+                    </div>
+                    <div className="input-group">
+                      <label>Category</label>
+                      <Picker
+                        title="Category"
+                        value={category}
+                        onChange={setCategory}
+                        options={categories}
+                        placeholder="What the bank says"
+                        clearLabel="What the bank says"
+                      />
+                    </div>
+                  </div>
+                  <div className="input-group">
+                    <label>Bill on your Bills list</label>
+                    <select value={billId} onChange={(e) => setBillId(e.target.value)}>
+                      <option value="">Not a bill</option>
+                      {bills.map((b) => <option key={b.id} value={b.id}>{b.name} · {fmtP(b.amount)} {b.frequency}{isActiveBill(b) ? "" : ` · ${BILL_STATE_LABEL[billState(b)].toLowerCase()}`}</option>)}
+                    </select>
+                    <span className="text-[11px] text-text-muted">Linked bills are matched by this payee in Bills check and Recurring, not by name.</span>
+                  </div>
+                  <div className="input-group">
+                    <label>Notes</label>
+                    <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" />
+                  </div>
+                </div>
+              )}
+
+              {tab === "aliases" && (
+                <div className="flex flex-col gap-5">
+                  <div>
+                    <p className="text-[11px] text-text-muted mb-2">Transactions whose bank text matches an alias are filed under this payee.</p>
+                    {detail.aliases.length === 0 ? (
+                      <Empty>None. Transactions were picked by hand.</Empty>
+                    ) : (
+                      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto_auto] gap-x-2 text-xs tabular-nums">
+                        {detail.aliases.map((a) => (
+                          <div key={a.id} className="grid grid-cols-subgrid col-span-5 items-center py-1.5 border-b border-border/30 last:border-0">
+                            <Badge className="bg-white/[0.06] text-text-dim justify-self-start">{MATCH_LABELS[a.match]}</Badge>
+                            <span className="font-mono truncate" title={a.pattern}>{a.pattern}</span>
+                            <span className="font-mono text-text-muted text-right whitespace-nowrap">{a.amount != null && <>= {fmtP(a.amount)}</>}</span>
+                            <span className={`text-right ${a.matched === 0 ? "text-amber" : "text-text-muted"}`} title="Transactions matched">{a.matched}×</span>
+                            <IconButton
+                              danger
+                              label={`Remove alias ${a.pattern}`}
+                              className="-my-1"
+                              disabled={busy}
+                              onClick={() => run(() => api.payees.deleteAlias(detail.id, a.id), "Alias removed")}
+                            />
+                          </div>
+                        ))}
+                      </div>
                     )}
-                  </button>
-                );
-              })}
+                  </div>
+
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-2">Add an alias</div>
+                    <AliasEditor value={draft} onChange={setDraft} />
+                    <button
+                      className="btn btn-sm mt-2"
+                      disabled={busy || draft.pattern.trim().length < 3}
+                      onClick={() =>
+                        run(async () => {
+                          const d = await api.payees.addAlias(detail.id, draft);
+                          setDraft(EMPTY_DRAFT);
+                          return d;
+                        }, "Alias added")
+                      }
+                    >
+                      + Add Alias
+                    </button>
+                  </div>
+
+                  {detail.bankNames.length > 0 && <BankNames names={detail.bankNames} aliases={detail.aliases} />}
+                </div>
+              )}
+
+              {tab === "activity" && <Activity detail={detail} />}
             </div>
           </div>
+        )}
+      </Modal>
 
-          <div role="tabpanel" id={`payee-panel-${tab}`} aria-labelledby={`payee-tab-${tab}`}>
-            {tab === "settings" && (
-              <div className="flex flex-col gap-3">
-                <div className="input-group">
-                  <label>Name</label>
-                  <input value={name} onChange={(e) => setName(e.target.value)} />
-                </div>
-                <div className="grid grid-cols-2 max-md:grid-cols-1 gap-3">
-                  <div className="input-group">
-                    <label>Type</label>
-                    <select value={kind} onChange={(e) => setKind(e.target.value)}>
-                      <option value="">Automatic</option>
-                      {(Object.keys(KIND_LABELS) as TxnKind[]).map((k) => <option key={k} value={k}>{KIND_LABELS[k]}</option>)}
-                    </select>
-                  </div>
-                  <div className="input-group">
-                    <label>Category</label>
-                    <input list="payee-categories" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="What the bank says" />
-                    <datalist id="payee-categories">
-                      {categories.map((c) => <option key={c} value={c} />)}
-                    </datalist>
-                  </div>
-                </div>
-                <div className="input-group">
-                  <label>Bill on your Bills list</label>
-                  <select value={billId} onChange={(e) => setBillId(e.target.value)}>
-                    <option value="">Not a bill</option>
-                    {bills.map((b) => <option key={b.id} value={b.id}>{b.name} · {fmtP(b.amount)} {b.frequency}{isActiveBill(b) ? "" : ` · ${BILL_STATE_LABEL[billState(b)].toLowerCase()}`}</option>)}
-                  </select>
-                  <span className="text-[11px] text-text-muted">Linked bills are matched by this payee in Bills check and Recurring, not by name.</span>
-                </div>
-                <div className="input-group">
-                  <label>Notes</label>
-                  <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" />
-                </div>
-              </div>
-            )}
-
-            {tab === "aliases" && (
-              <div className="flex flex-col gap-5">
-                <div>
-                  <p className="text-[11px] text-text-muted mb-2">Transactions whose bank text matches an alias are filed under this payee.</p>
-                  {detail.aliases.length === 0 ? (
-                    <Empty>None. Transactions were picked by hand.</Empty>
-                  ) : (
-                    <div className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto_auto] gap-x-2 text-xs tabular-nums">
-                      {detail.aliases.map((a) => (
-                        <div key={a.id} className="grid grid-cols-subgrid col-span-5 items-center py-1.5 border-b border-border/30 last:border-0">
-                          <Badge className="bg-white/[0.06] text-text-dim justify-self-start">{MATCH_LABELS[a.match]}</Badge>
-                          <span className="font-mono truncate" title={a.pattern}>{a.pattern}</span>
-                          <span className="font-mono text-text-muted text-right whitespace-nowrap">{a.amount != null && <>= {fmtP(a.amount)}</>}</span>
-                          <span className={`text-right ${a.matched === 0 ? "text-amber" : "text-text-muted"}`} title="Transactions matched">{a.matched}×</span>
-                          <button
-                            className="text-text-muted hover:text-red px-2 py-1 -my-1"
-                            title="Remove alias"
-                            aria-label={`Remove alias ${a.pattern}`}
-                            disabled={busy}
-                            onClick={() => run(() => api.payees.deleteAlias(detail.id, a.id), "Alias removed")}
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-2">Add an alias</div>
-                  <AliasEditor value={draft} onChange={setDraft} />
-                  <button
-                    className="btn btn-sm mt-2"
-                    disabled={busy || draft.pattern.trim().length < 3}
-                    onClick={() =>
-                      run(async () => {
-                        const d = await api.payees.addAlias(detail.id, draft);
-                        setDraft(EMPTY_DRAFT);
-                        return d;
-                      }, "Alias added")
-                    }
-                  >
-                    + Add Alias
-                  </button>
-                </div>
-
-                {detail.bankNames.length > 0 && <BankNames names={detail.bankNames} aliases={detail.aliases} />}
-              </div>
-            )}
-
-            {tab === "activity" && <Activity detail={detail} />}
-          </div>
-        </div>
-      )}
-    </Modal>
+      <Confirm
+        open={confirmingDelete && !!detail}
+        title={`Delete "${detail?.name}"?`}
+        message="Its transactions go back to their bank names. Aliases are removed too."
+        onConfirm={() => {
+          setConfirmingDelete(false);
+          run(async () => {
+            await api.payees.delete(detail!.id);
+            onClose();
+          }, "Payee deleted");
+        }}
+        onCancel={() => setConfirmingDelete(false)}
+      />
+    </>
   );
 }
 
@@ -403,7 +411,7 @@ function Activity({ detail }: { detail: PayeeDetail }) {
       {month && (
         <div className="flex items-center justify-between text-xs text-text-dim">
           <span>Showing {moLabel(month)}</span>
-          <button className="text-accent hover:underline" onClick={() => setMonth(null)}>Show all months</button>
+          <button className="link-tap" onClick={() => setMonth(null)}>Show all months</button>
         </div>
       )}
 
