@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import Modal from "../layout/Modal";
+import MoneyInput from "../layout/MoneyInput";
+import Segmented from "../layout/Segmented";
 import { api } from "../../lib/api";
 import { fmtP, today } from "../../lib/formatters";
 import type { Goal } from "../../types";
@@ -61,6 +63,7 @@ export default function ContributionForm({ open, onClose, onSaved, onToast, goal
     <Modal
       open={open}
       onClose={onClose}
+      variant="form"
       title={goal.name}
       footer={
         <>
@@ -72,36 +75,23 @@ export default function ContributionForm({ open, onClose, onSaved, onToast, goal
       }
     >
       <div className="flex flex-col gap-4">
-        <div className="grid grid-cols-2 gap-1 p-1 bg-bg-input border border-border rounded-lg">
-          {(["add", "withdraw"] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setMode(m)}
-              className={`py-1.5 rounded-md text-[13px] font-medium transition-all ${
-                mode === m
-                  ? m === "add"
-                    ? "bg-green-dim text-green"
-                    : "bg-red-dim text-red"
-                  : "text-text-dim hover:text-text"
-              }`}
-            >
-              {m === "add" ? "Add money" : "Withdraw"}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          full
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: "add", label: "Add money", activeClass: "bg-green-dim text-green" },
+            { value: "withdraw", label: "Withdraw", activeClass: "bg-red-dim text-red" },
+          ]}
+        />
 
         <div className="grid grid-cols-2 max-md:grid-cols-1 gap-3">
           <div className="input-group">
             <label>Amount</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              inputMode="decimal"
-              placeholder="0.00"
+            <MoneyInput
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onChange={setAmount}
+              enterKeyHint="go"
               onKeyDown={(e) => e.key === "Enter" && handleSave()}
             />
           </div>
@@ -116,6 +106,8 @@ export default function ContributionForm({ open, onClose, onSaved, onToast, goal
           <input
             type="text"
             placeholder="e.g. Bonus, tax refund"
+            autoCapitalize="sentences"
+            enterKeyHint="done"
             value={note}
             onChange={(e) => setNote(e.target.value)}
           />

@@ -245,7 +245,7 @@ export default function StatementsMenu({ onToast, onChanged }: StatementsMenuPro
       )}
 
       {/* Phones: the same three choices in a bottom sheet */}
-      <Modal open={sheetOpen} onClose={() => setSheetOpen(false)} title="Statements">
+      <Modal open={sheetOpen} onClose={() => setSheetOpen(false)} variant="list" title="Statements">
         <div className="flex flex-col gap-1">
           {items.map((it) => (
             <button
@@ -266,7 +266,7 @@ export default function StatementsMenu({ onToast, onChanged }: StatementsMenuPro
         </div>
       </Modal>
 
-      <Modal open={historyOpen} onClose={() => setHistoryOpen(false)} title="Import history">
+      <Modal open={historyOpen} onClose={() => setHistoryOpen(false)} variant="detail" title="Import history">
         <p className="text-xs text-text-muted mb-3 leading-relaxed">
           Bank CSVs and PDF statements in <span className="font-mono text-text-dim break-all" title={folder}>{folder.replace(/^\/Users\/[^/]+/, "~") || "…"}</span> are picked up automatically.
         </p>
@@ -286,7 +286,7 @@ export default function StatementsMenu({ onToast, onChanged }: StatementsMenuPro
             {batches.map((b) => (
               <div key={b.id} className={`flex items-center gap-3 text-xs py-2 border-b border-border/30 last:border-0 ${b.status === "undone" ? "opacity-50" : ""}`}>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate font-mono text-text-dim" title={b.sourcePath || b.fileName}>{b.fileName}</div>
+                  <div className="truncate max-md:whitespace-normal max-md:break-all font-mono text-text-dim" title={b.sourcePath || b.fileName}>{b.fileName}</div>
                   <div className="text-text-muted">
                     {fmtDate(b.importedAt.slice(0, 10))} · {b.dateFrom && b.dateTo ? `${fmtDate(b.dateFrom)} – ${fmtDate(b.dateTo)} · ` : ""}
                     {b.inserted} new, {b.duplicates} already had

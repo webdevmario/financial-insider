@@ -70,6 +70,7 @@ export default function UnassignedModal({ group, version, onClose, onAssign, onG
     <Modal
       open
       onClose={onClose}
+      variant="detail"
       title={g.merchant}
       className="h-[min(680px,85%)] md:!w-[760px] max-md:h-[min(760px,92%)]"
       footer={
@@ -118,7 +119,7 @@ export default function UnassignedModal({ group, version, onClose, onAssign, onG
           </div>
           <TxnRows rows={rows} select={{ picked, onToggle: toggle }} />
           {data.total > FIRST_PAGE && (
-            <button type="button" className="text-xs text-accent hover:underline mt-3" onClick={() => setAll((v) => !v)}>
+            <button type="button" className="link-tap text-xs mt-3" onClick={() => setAll((v) => !v)}>
               {all ? `Show latest ${FIRST_PAGE}` : `Show all ${data.total}`}
             </button>
           )}

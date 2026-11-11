@@ -47,6 +47,9 @@ export default function AliasEditor({ value, onChange, amountHint }: Props) {
           onChange={(e) => onChange({ ...value, pattern: e.target.value })}
           className="font-mono min-w-0"
           placeholder="Text from the statement"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
         />
       </div>
       {amountHint != null && (

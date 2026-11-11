@@ -19,7 +19,7 @@ interface OptionSheetProps<T extends string> {
 /** A short list of destinations in a bottom sheet: the "More" menu on phones */
 export default function OptionSheet<T extends string>({ open, onClose, title, options, active, onPick }: OptionSheetProps<T>) {
   return (
-    <Modal open={open} onClose={onClose} title={title}>
+    <Modal open={open} onClose={onClose} variant="list" title={title}>
       <div className="flex flex-col gap-1">
         {options.map((o) => (
           <button
@@ -28,7 +28,7 @@ export default function OptionSheet<T extends string>({ open, onClose, title, op
               onPick(o.id);
               onClose();
             }}
-            className={`flex items-center gap-3 text-left px-3 py-3 rounded-lg text-sm font-medium transition-colors ${
+            className={`flex items-center gap-3 text-left px-3 py-3 min-h-12 rounded-lg text-sm font-medium transition-colors ${
               o.id === active ? "bg-accent/10 text-accent" : "text-text hover:bg-white/[0.04]"
             }`}
           >

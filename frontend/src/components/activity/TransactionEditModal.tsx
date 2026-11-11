@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Modal from "../layout/Modal";
+import Picker from "../layout/Picker";
 import { api } from "../../lib/api";
 import { fmtDate, fmtP } from "../../lib/formatters";
 import AliasEditor, { type AliasDraft } from "./AliasEditor";
@@ -42,6 +43,7 @@ export default function TransactionEditModal({ txn, payees, categories, onClose,
 
   if (!txn) return null;
   const t = txn;
+  const payeeNames = payees.map((p) => p.name);
 
   async function save() {
     setSaving(true);
@@ -94,14 +96,17 @@ export default function TransactionEditModal({ txn, payees, categories, onClose,
     <Modal
       open={!!txn}
       onClose={onClose}
+      variant="form"
       title="Edit Transaction"
+      aside={
+        (t.edited === 1 || t.payeeLocked === 1) && (
+          <button className="btn btn-sm" disabled={saving} onClick={reset} title="Drop hand edits on this transaction">
+            Reset to Auto
+          </button>
+        )
+      }
       footer={
         <>
-          {(t.edited === 1 || t.payeeLocked === 1) && (
-            <button className="btn btn-sm mr-auto" disabled={saving} onClick={reset} title="Drop hand edits on this transaction">
-              Reset to Auto
-            </button>
-          )}
           <button className="btn" onClick={onClose}>Cancel</button>
           <button
             className="btn btn-primary"
@@ -124,10 +129,14 @@ export default function TransactionEditModal({ txn, payees, categories, onClose,
       <div className="flex flex-col gap-4">
         <div className="input-group">
           <label>Payee</label>
-          <input list="payee-names" value={name} onChange={(e) => setName(e.target.value)} placeholder={t.baseMerchant ?? ""} />
-          <datalist id="payee-names">
-            {payees.map((p) => <option key={p.id} value={p.name} />)}
-          </datalist>
+          <Picker
+            title="Payee"
+            value={name}
+            onChange={setName}
+            options={payeeNames}
+            placeholder={t.baseMerchant ?? ""}
+            inputProps={{ autoCorrect: "off", autoCapitalize: "words" }}
+          />
           <span className="text-[11px] text-text-muted">
             {payees.some((p) => p.name.toLowerCase() === name.trim().toLowerCase())
               ? "Existing payee"
@@ -137,10 +146,7 @@ export default function TransactionEditModal({ txn, payees, categories, onClose,
         <div className="grid grid-cols-2 max-md:grid-cols-1 gap-3">
           <div className="input-group">
             <label>Category</label>
-            <input list="txn-categories" value={category} onChange={(e) => setCategory(e.target.value)} />
-            <datalist id="txn-categories">
-              {categories.map((c) => <option key={c} value={c} />)}
-            </datalist>
+            <Picker title="Category" value={category} onChange={setCategory} options={categories} />
           </div>
           <div className="input-group">
             <label>Type</label>

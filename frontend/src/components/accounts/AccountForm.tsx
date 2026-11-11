@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Modal from "../layout/Modal";
 import Confirm from "../layout/Confirm";
+import MoneyInput from "../layout/MoneyInput";
 import { api } from "../../lib/api";
 import { fmt, fmtDate } from "../../lib/formatters";
 import type { Account, AccountType } from "../../types";
@@ -94,151 +95,126 @@ export default function AccountForm({ open, onClose, onSaved, onToast, account }
     }
   }
 
-  if (showConfirm) {
-    const label = account ? `${account.type}${account.owner ? ` (${account.owner})` : ""}` : "";
-    return (
-      <Confirm
+  const label = account ? `${account.type}${account.owner ? ` (${account.owner})` : ""}` : "";
+
+  return (
+    <>
+      <Modal
         open={open}
+        onClose={onClose}
+        variant="form"
+        title={account ? "Edit Asset" : "Add Asset"}
+        aside={
+          account && (
+            <button className="btn btn-danger btn-sm" onClick={() => setShowConfirm(true)}>
+              🗑️ Delete
+            </button>
+          )
+        }
+        footer={
+          <>
+            <button className="btn" onClick={onClose}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleSave}>
+              {account ? "Update" : "Add"}
+            </button>
+          </>
+        }
+      >
+        {account?.lastUpdated && (
+          <div className="text-xs text-text-muted -mt-1 mb-4">Last updated {fmtDate(account.lastUpdated)}</div>
+        )}
+        <div className="flex flex-col gap-4">
+          {/* Type + Balance row */}
+          <div className="grid grid-cols-2 max-md:grid-cols-1 gap-3">
+            <div className="input-group">
+              <label>Type</label>
+              <select value={type} onChange={(e) => setType(e.target.value as AccountType)}>
+                {ACCOUNT_TYPES.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+            {!isHE && (
+              <div className="input-group">
+                <label>Value</label>
+                <MoneyInput value={balance} onChange={setBalance} />
+              </div>
+            )}
+          </div>
+
+          {/* Home Equity fields */}
+          {isHE && (
+            <>
+              <div className="grid grid-cols-2 max-md:grid-cols-1 gap-3">
+                <div className="input-group">
+                  <label>Home Value</label>
+                  <MoneyInput value={homeValue} onChange={setHomeValue} />
+                </div>
+                <div className="input-group">
+                  <label>Mortgage Balance</label>
+                  <MoneyInput value={mortgageBalance} onChange={setMortgageBalance} />
+                </div>
+              </div>
+              <div className="input-group">
+                <label>Your Equity</label>
+                <div className="font-mono px-3.5 py-2.5 rounded-lg bg-bg-input border border-border text-base font-semibold text-green">
+                  {fmt(equityPreview)}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Owner + Institution */}
+          <div className="grid grid-cols-2 max-md:grid-cols-1 gap-3">
+            <div className="input-group">
+              <label>Owner</label>
+              <select value={owner} onChange={(e) => setOwner(e.target.value)}>
+                {OWNERS.map((o) => (
+                  <option key={o} value={o}>{o || "None"}</option>
+                ))}
+              </select>
+            </div>
+            <div className="input-group">
+              <label>Held At</label>
+              <select value={institution} onChange={(e) => setInstitution(e.target.value)}>
+                {INSTITUTIONS.map((i) => (
+                  <option key={i} value={i}>{i || "None"}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Helper for Vehicle / Home Equity */}
+          {(isVehicle || isHE) && (
+            <div className="text-xs text-text-dim bg-bg-input rounded-lg px-3.5 py-2.5 leading-relaxed">
+              {isHE ? (
+                <>💡 Check value on <a href="https://www.zillow.com" target="_blank" rel="noreferrer" className="text-accent hover:underline">Zillow</a> or <a href="https://www.redfin.com" target="_blank" rel="noreferrer" className="text-accent hover:underline">Redfin</a>.</>
+              ) : (
+                <>💡 Check value at <a href="https://www.kbb.com/whats-my-car-worth/" target="_blank" rel="noreferrer" className="text-accent hover:underline">KBB.com</a></>
+              )}
+            </div>
+          )}
+
+          {/* Notes */}
+          <div className="input-group">
+            <label>Notes (optional)</label>
+            <textarea
+              rows={3}
+              placeholder="Add context, reminders, or details..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </div>
+        </div>
+      </Modal>
+
+      <Confirm
+        open={open && showConfirm}
         title={`Delete "${label}"?`}
         message="This action cannot be undone."
         onConfirm={handleDelete}
         onCancel={() => setShowConfirm(false)}
       />
-    );
-  }
-
-  const titleExtra = account?.lastUpdated ? (
-    <span className="relative group">
-      <span className="inline-flex items-center justify-center w-4 h-4 rounded-full border-[1.5px] border-text-muted text-text-muted text-[9px] font-bold cursor-default hover:border-accent hover:text-accent transition-all">
-        i
-      </span>
-      <span className="absolute top-full left-1/2 -translate-x-1/2 mt-2.5 bg-[#1e2130] border border-border text-text-dim text-xs px-3 py-2.5 rounded-lg min-w-[160px] opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-[0_8px_24px_rgba(0,0,0,0.4)] z-20 whitespace-nowrap">
-        Last updated {fmtDate(account.lastUpdated)}
-      </span>
-    </span>
-  ) : undefined;
-
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={account ? "Edit Asset" : "Add Asset"}
-      titleExtra={titleExtra}
-      footer={
-        <>
-          {account && (
-            <button className="btn btn-danger btn-sm mr-auto" onClick={() => setShowConfirm(true)}>
-              🗑️ Delete
-            </button>
-          )}
-          <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={handleSave}>
-            {account ? "Update" : "Add"}
-          </button>
-        </>
-      }
-    >
-      <div className="flex flex-col gap-4">
-        {/* Type + Balance row */}
-        <div className="grid grid-cols-2 max-md:grid-cols-1 gap-3">
-          <div className="input-group">
-            <label>Type</label>
-            <select value={type} onChange={(e) => setType(e.target.value as AccountType)}>
-              {ACCOUNT_TYPES.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-          </div>
-          {!isHE && (
-            <div className="input-group">
-              <label>Value</label>
-              <input
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={balance}
-                onChange={(e) => setBalance(e.target.value)}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Home Equity fields */}
-        {isHE && (
-          <>
-            <div className="grid grid-cols-2 max-md:grid-cols-1 gap-3">
-              <div className="input-group">
-                <label>Home Value</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={homeValue}
-                  onChange={(e) => setHomeValue(e.target.value)}
-                />
-              </div>
-              <div className="input-group">
-                <label>Mortgage Balance</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={mortgageBalance}
-                  onChange={(e) => setMortgageBalance(e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="input-group">
-              <label>Your Equity</label>
-              <div className="font-mono px-3.5 py-2.5 rounded-lg bg-bg-input border border-border text-base font-semibold text-green">
-                {fmt(equityPreview)}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Owner + Institution */}
-        <div className="grid grid-cols-2 max-md:grid-cols-1 gap-3">
-          <div className="input-group">
-            <label>Owner</label>
-            <select value={owner} onChange={(e) => setOwner(e.target.value)}>
-              {OWNERS.map((o) => (
-                <option key={o} value={o}>{o || "None"}</option>
-              ))}
-            </select>
-          </div>
-          <div className="input-group">
-            <label>Held At</label>
-            <select value={institution} onChange={(e) => setInstitution(e.target.value)}>
-              {INSTITUTIONS.map((i) => (
-                <option key={i} value={i}>{i || "None"}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Helper for Vehicle / Home Equity */}
-        {(isVehicle || isHE) && (
-          <div className="text-xs text-text-dim bg-bg-input rounded-lg px-3.5 py-2.5 leading-relaxed">
-            {isHE ? (
-              <>💡 Check value on <a href="https://www.zillow.com" target="_blank" rel="noreferrer" className="text-accent hover:underline">Zillow</a> or <a href="https://www.redfin.com" target="_blank" rel="noreferrer" className="text-accent hover:underline">Redfin</a>.</>
-            ) : (
-              <>💡 Check value at <a href="https://www.kbb.com/whats-my-car-worth/" target="_blank" rel="noreferrer" className="text-accent hover:underline">KBB.com</a></>
-            )}
-          </div>
-        )}
-
-        {/* Notes */}
-        <div className="input-group">
-          <label>Notes (optional)</label>
-          <textarea
-            rows={3}
-            placeholder="Add context, reminders, or details..."
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          />
-        </div>
-      </div>
-    </Modal>
+    </>
   );
 }

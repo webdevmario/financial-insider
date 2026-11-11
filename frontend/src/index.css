@@ -155,4 +155,18 @@ body::before {
   .btn-danger:hover {
     @apply border-red;
   }
+
+  /* ── Phone sheets: room for a thumb ───────────── */
+  @media (max-width: 767px) {
+    .sheet .btn {
+      min-height: 44px;
+    }
+    .sheet input[type="checkbox"] {
+      @apply w-5 h-5;
+    }
+  }
+  /* A text link with a 44px touch area on phones (the extra is padding) */
+  .link-tap {
+    @apply text-accent hover:underline max-md:inline-flex max-md:items-center max-md:min-h-11;
+  }
 }
