@@ -31,7 +31,7 @@ export default function SearchInput({ value, onChange, placeholder, className = 
             clear();
           }
         }}
-        className="!text-sm !py-1.5 !pr-9"
+        className={`!text-sm !py-1.5 ${value ? "!pr-9" : ""}`}
       />
       {value && (
         <button
