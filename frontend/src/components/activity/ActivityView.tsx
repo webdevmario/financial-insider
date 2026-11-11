@@ -318,7 +318,7 @@ function AllTransactions({
   return (
     <div>
       <div className="flex gap-2 flex-wrap mb-4">
-        <SearchInput placeholder="Search merchant, description, category" value={q} onChange={setQ} className="w-[260px] max-md:w-full" />
+        <SearchInput placeholder="Search merchant, description, category" value={q} onChange={setQ} className="flex-1 min-w-[min(100%,21rem)] max-w-md" />
         <select value={account} onChange={(e) => setAccount(e.target.value)} className="!w-auto !text-sm !py-1.5">
           <option value="">All accounts</option>
           {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
