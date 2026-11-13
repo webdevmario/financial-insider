@@ -152,7 +152,7 @@ const chaseCard: Format = {
     return {
       id: last4 ? `chase-${last4}` : "chase-card",
       institution: "Chase",
-      name: last4 ? `Chase card ··${last4}` : "Chase card",
+      name: last4 ? `Chase Card ··${last4}` : "Chase Card",
       kind: "credit",
       last4,
     };
@@ -243,7 +243,7 @@ const amex: Format = {
     return {
       id: acct ? `amex-${acct}` : "amex",
       institution: "Amex",
-      name: acct ? `Amex ··${acct}` : "Amex",
+      name: acct ? `Amex Card ··${acct}` : "Amex Card",
       kind: "credit",
       last4: acct,
     };

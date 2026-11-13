@@ -51,33 +51,6 @@ export interface Subscription {
   projection?: BillProjection | null;
 }
 
-/** One suggested line in the mid-month plan */
-export interface PlanLine {
-  key: string;
-  label: string;
-  amount: number;
-  note: string;
-  date?: string;
-}
-
-/** Suggested lines for planning the 16th to month-end */
-export interface MidMonthPlan {
-  month: string;
-  /** The 16th to month-end */
-  window: { start: string; end: string };
-  /** This month's mid-month paycheck, once it's in the data */
-  payday: { date: string; amount: number } | null;
-  /** Accounts whose data stops a few days or more before today */
-  stale: { name: string; through: string }[];
-  /** Savings already moved out this month, like an extra loan payment */
-  saved: { date: string; amount: number; label: string }[];
-  /** Bills that haven't charged yet this month */
-  bills: PlanLine[];
-  /** What each card still owes: posted but unpaid, plus not posted yet */
-  cards: PlanLine[];
-  work: PlanLine[];
-}
-
 /** Dashboard: this year's spending against the two years before */
 export interface YearOverYear {
   /** MM-DD the year-to-date comparison runs through */

@@ -356,7 +356,7 @@ function parseChase(lines: PdfLine[]): ParsedPdfStatement {
   const account: AccountInfo = {
     id: last4 ? `chase-${last4}` : "chase-card",
     institution: "Chase",
-    name: last4 ? `Chase card ··${last4}` : "Chase card",
+    name: last4 ? `Chase Card ··${last4}` : "Chase Card",
     kind: "credit",
     last4,
   };
@@ -510,7 +510,7 @@ function parseAmex(lines: PdfLine[]): ParsedPdfStatement {
   const closingCell = lines.find((l) => /^Closing Date \d{2}\/\d{2}\/\d{2}$/.test(l.cells[0].text))!.cells[0].text;
   const periodEnd = isoDate(closingCell.replace("Closing Date ", ""))!;
   const ending = lines.map((l) => l.text.match(/Account Ending \d*-?(\d{4,5})/)?.[1]).find(Boolean) ?? null;
-  const account: AccountInfo = { id: ending ? `amex-${ending}` : "amex", institution: "Amex", name: ending ? `Amex ··${ending}` : "Amex", kind: "credit", last4: ending };
+  const account: AccountInfo = { id: ending ? `amex-${ending}` : "amex", institution: "Amex", name: ending ? `Amex Card ··${ending}` : "Amex Card", kind: "credit", last4: ending };
 
   const out: CardLine[] = [];
   let section: CardSection | null = null;

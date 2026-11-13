@@ -4,7 +4,6 @@ import { fmt, fmtP, fmtDate, curMo, moLabel, today } from "../../lib/formatters"
 import Modal from "../layout/Modal";
 import IconButton from "../layout/IconButton";
 import MoneyInput from "../layout/MoneyInput";
-import MidMonthPlan from "./MidMonthPlan";
 import { useOnRefresh } from "../../lib/offline/status";
 import type { Expense } from "../../types";
 
@@ -29,8 +28,6 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
 
   // Budget target modal
   const [targetOpen, setTargetOpen] = useState(false);
-  // Mid-month scratchpad for working out the 16th-to-month-end number
-  const [planOpen, setPlanOpen] = useState(false);
   const [targetAmt, setTargetAmt] = useState("");
 
   // Edit expense modal
@@ -393,9 +390,6 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
         >
           Set Target
         </button>
-        <button className="btn btn-sm" onClick={() => setPlanOpen(true)}>
-          Mid-month plan
-        </button>
         <button
           className="btn btn-sm"
           onClick={() => setReimbOpen(true)}
@@ -412,22 +406,6 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
         )}
       </div>
 
-      <MidMonthPlan
-        open={planOpen}
-        onClose={() => setPlanOpen(false)}
-        month={selectedMonth}
-        onToast={onToast}
-        onUse={async (amount) => {
-          const newTargets = { ...budgetTargets, [selectedMonth]: amount };
-          try {
-            await api.settings.set("budgetTargets", newTargets);
-            setBudgetTargets(newTargets);
-            onToast(`Budget set to ${fmt(amount)}`);
-          } catch {
-            onToast("Failed to save", true);
-          }
-        }}
-      />
 
       {/* Budget Summary */}
       <div className="bg-bg-card border border-border rounded-xl p-6 mb-5">
