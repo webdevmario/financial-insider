@@ -1,20 +1,17 @@
 /**
- * The mid-month plan: what's really free to spend from the 16th to month-end.
+ * The budget plan: what's really free to spend in one half of a month.
  *
- * You prep on the 15th (the paycheck has usually landed by then), enter the checking
- * balance, and set aside:
- * - bills that haven't charged yet this month (projected amounts, by their usual day).
- *   A bill whose charge already shows up is already out of checking, even if it came early
- * - what each card still owes: posted charges not paid yet (exact, from the card's
- *   statement data, since cards are paid as charges post) plus a small estimate for
- *   spending that hasn't posted or been downloaded yet
- * - money set aside first: savings like an extra loan payment (carries forward), and
- *   anything else held back this month (a project fund)
- * Work expenses due in the window are listed but left out: they're reimbursed
- * on the 1st.
+ * Usually the second half (the 16th to month-end), prepped on the 15th once the mid-month
+ * paycheck has landed; the first half (the 1st to the 15th, prepped on the last day of the
+ * month before) works the same way. You enter the checking balance and set aside:
+ * - bills that haven't charged yet and are due by the end of the half (projected amounts, by
+ *   their usual day). A bill whose charge already shows up is out of checking, even if early
+ * - what each card still owes: posted charges not paid yet (exact, from the card's activity,
+ *   since cards are paid as charges post) plus an estimate for spending not in the data yet
+ * - savings and anything else held back (asked for in the conversation, not computed here)
+ * Work expenses due in the half are listed but left out: they're reimbursed on the 1st.
  *
- * This module only suggests lines from the data; the page lets every amount be
- * changed and every line switched off.
+ * This module only suggests lines from the data; the /budget skill reviews them with the user.
  */
 import { db } from "../../db/index.js";
 import { payees, statementAccounts, subscriptions, transactions, type Subscription, type Transaction } from "../../db/schema.js";
@@ -76,7 +73,9 @@ export interface PlanLine {
   date?: string;
 }
 
-export function computeMidMonthPlan(month = today().slice(0, 7)) {
+export type Half = "first" | "second";
+
+export function computeBudgetPlan(month = today().slice(0, 7), half: Half = "second") {
   const all = db.select().from(transactions).all();
   const bills = db.select().from(subscriptions).all().filter(isActiveBill);
   const payeeList = db.select().from(payees).all();
@@ -84,20 +83,21 @@ export function computeMidMonthPlan(month = today().slice(0, 7)) {
   const cards = accounts.filter((a) => a.kind === "credit");
   const projections = computeBillProjections(month);
   const now = today();
-  const windowEnd = dateIn(month, 31);
-  const inMonth = (t: Transaction) => t.month === month;
+  const windowStart = half === "first" ? `${month}-01` : `${month}-16`;
+  const windowEnd = half === "first" ? `${month}-15` : dateIn(month, 31);
+  // The day the balance is taken: the day before the half starts, or today when prepping late
+  const prepBase = addDays(windowStart, -1);
+  const prepDay = now > prepBase && now <= windowEnd ? now : prepBase;
+  // "Usually charged by now" is judged against today, unless the half is already over
+  const seenThrough = now <= windowEnd ? now : prepDay;
 
-  // The mid-month paycheck, which often lands a day or few before the 15th
+  // The paycheck that funds this half, which often lands a few days before it starts
   const payday =
     all
-      .filter((t) => inMonth(t) && t.kind === "income" && t.category === "Paycheck" && t.amount > 0)
-      .filter((t) => Number(t.date.slice(8, 10)) >= 8 && Number(t.date.slice(8, 10)) <= 20)
+      .filter((t) => t.kind === "income" && t.category === "Paycheck" && t.amount > 0)
+      .filter((t) => t.date >= addDays(prepBase, -7) && t.date <= addDays(prepBase, 1))
       .sort((a, b) => a.date.localeCompare(b.date))
       .pop() ?? null;
-  const windowStart = `${month}-16`;
-  // The day the balance is taken: the 15th, or today when prepping late
-  const prepDay = now.slice(0, 7) === month && now > `${month}-15` ? now : `${month}-15`;
-  const seenThrough = now.slice(0, 7) === month ? now : prepDay;
 
   const billLines: PlanLine[] = [];
   const billChargeIds = new Set<string>();
@@ -108,6 +108,7 @@ export function computeMidMonthPlan(month = today().slice(0, 7)) {
     const day = chargeDayIn(b, month, charges);
     if (day == null) continue;
     const date = dateIn(month, day);
+    if (date > windowEnd) continue;
     // Charged already this cycle (early, late, or on the day): it's out of checking
     const step = STEP_MONTHS[b.frequency] ?? 1;
     const from = addDays(date, step === 1 ? -12 : -20);
@@ -124,7 +125,7 @@ export function computeMidMonthPlan(month = today().slice(0, 7)) {
         date < seenThrough
           ? "Usually charged by now, not in your data yet"
           : date < windowStart
-            ? `Due before the 16th, not charged yet${shared}`
+            ? `Due before ${monthDay(windowStart)}, not charged yet${shared}`
             : `${b.frequency}${shared}`,
     });
   }
@@ -178,12 +179,13 @@ export function computeMidMonthPlan(month = today().slice(0, 7)) {
     const last = rows[rows.length - 1];
     const recentMonths = new Set(rows.filter((t) => days(t.date) >= days(prepDay) - 125).map((t) => t.month));
     const name = last.merchant;
-    if (rows.some((t) => t.month === month && t.date >= windowStart)) continue;
+    if (rows.some((t) => t.date >= windowStart && t.date <= windowEnd)) continue;
     if (recentMonths.size >= 3) {
       const day = Math.round(median(rows.slice(-6).map((t) => Number(t.date.slice(8, 10)))));
-      if (dateIn(month, day) >= windowStart) workLines.push({ key: `work:${name}`, label: name, amount: round(-last.amount), date: dateIn(month, day), note: "Monthly" });
+      const date = dateIn(month, day);
+      if (date >= windowStart && date <= windowEnd) workLines.push({ key: `work:${name}`, label: name, amount: round(-last.amount), date: dateIn(month, day), note: "Monthly" });
     } else {
-      const lastYear = rows.filter((t) => t.month === yearAgo && t.date.slice(8, 10) >= windowStart.slice(8, 10));
+      const lastYear = rows.filter((t) => t.month === yearAgo && t.date.slice(8, 10) >= windowStart.slice(8, 10) && t.date.slice(8, 10) <= windowEnd.slice(8, 10));
       if (lastYear.length) {
         const t = lastYear[lastYear.length - 1];
         workLines.push({ key: `work:${name}`, label: name, amount: round(-t.amount), date: dateIn(month, Number(t.date.slice(8, 10))), note: "Charged this month last year" });
@@ -194,7 +196,9 @@ export function computeMidMonthPlan(month = today().slice(0, 7)) {
 
   return {
     month,
+    half,
     window: { start: windowStart, end: windowEnd },
+    prepDay,
     payday: payday ? { date: payday.date, amount: round(payday.amount) } : null,
     /** Accounts whose data stops more than a couple of days before the plan date */
     stale,

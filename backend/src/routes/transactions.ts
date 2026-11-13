@@ -9,7 +9,7 @@ import {
 } from "../lib/statements/importer.js";
 import { computeInsights } from "../lib/statements/insights.js";
 import { computeYearOverYear } from "../lib/statements/yoy.js";
-import { computeMidMonthPlan } from "../lib/statements/midmonth.js";
+import { computeBudgetPlan } from "../lib/statements/budget-plan.js";
 import { addAlias, findOrCreatePayee, recomputeAll } from "../lib/statements/payees.js";
 
 const router = Router();
@@ -67,10 +67,12 @@ router.get("/year-over-year", (_req, res) => {
   res.json(computeYearOverYear());
 });
 
-// GET /api/transactions/midmonth?month=YYYY-MM: suggested lines for planning the 16th to month-end (used by the /midmonth skill)
-router.get("/midmonth", (req, res) => {
+// GET /api/transactions/budget-plan?month=YYYY-MM&half=first|second: suggested lines for budgeting
+// one half of a month (default: the second half). Used by the /budget skill
+router.get("/budget-plan", (req, res) => {
   const month = typeof req.query.month === "string" && /^\d{4}-\d{2}$/.test(req.query.month) ? req.query.month : undefined;
-  res.json(computeMidMonthPlan(month));
+  const half = req.query.half === "first" ? "first" : "second";
+  res.json(computeBudgetPlan(month, half));
 });
 
 // GET /api/transactions/bill-checks: each bill against its most recent real charge, for the Bills page
