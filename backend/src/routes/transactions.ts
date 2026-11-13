@@ -9,6 +9,7 @@ import {
 } from "../lib/statements/importer.js";
 import { computeInsights } from "../lib/statements/insights.js";
 import { computeYearOverYear } from "../lib/statements/yoy.js";
+import { computeCostChanges } from "../lib/statements/cost-changes.js";
 import { computeBudgetPlan } from "../lib/statements/budget-plan.js";
 import { addAlias, findOrCreatePayee, recomputeAll } from "../lib/statements/payees.js";
 
@@ -65,6 +66,11 @@ router.get("/insights", (req, res) => {
 // GET /api/transactions/year-over-year: this year against the two before, for the Dashboard
 router.get("/year-over-year", (_req, res) => {
   res.json(computeYearOverYear());
+});
+
+// GET /api/transactions/cost-changes: what costs more than a year ago, for the Dashboard
+router.get("/cost-changes", (_req, res) => {
+  res.json(computeCostChanges());
 });
 
 // GET /api/transactions/budget-plan?month=YYYY-MM&half=first|second: suggested lines for budgeting

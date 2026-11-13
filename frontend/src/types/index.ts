@@ -51,6 +51,29 @@ export interface Subscription {
   projection?: BillProjection | null;
 }
 
+/** One thing that costs more than it did a year ago */
+export interface CostChange {
+  name: string;
+  before: number;
+  now: number;
+  pct: number;
+  per: string;
+  monthly?: number;
+  detail?: string;
+}
+
+/** Dashboard: what costs more, the past 12 full months against the 12 before */
+export interface CostChanges {
+  recent: { from: string; to: string };
+  prior: { from: string; to: string };
+  food: {
+    groceries: { before: { perMonth: number; timesPerMonth: number }; now: { perMonth: number; timesPerMonth: number } };
+    dining: { before: { perMonth: number; timesPerMonth: number }; now: { perMonth: number; timesPerMonth: number } };
+  } | null;
+  places: CostChange[];
+  bills: CostChange[];
+}
+
 /** Dashboard: this year's spending against the two years before */
 export interface YearOverYear {
   /** MM-DD the year-to-date comparison runs through */
