@@ -304,7 +304,7 @@ function BankNames({ names, aliases }: { names: PayeeDetail["bankNames"]; aliase
   const alias = new Map(aliases.map((a) => [a.id, a]));
   return (
     <div>
-      <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-1">Seen on statements as</div>
+      <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-1">Seen in your activity as</div>
       {names.map((n) => {
         const a = n.aliasId ? alias.get(n.aliasId) : undefined;
         return (

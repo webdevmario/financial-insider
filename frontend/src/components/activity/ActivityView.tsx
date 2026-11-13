@@ -4,7 +4,7 @@ import { api } from "../../lib/api";
 import { fmt, fmtDate, fmtP, moLabel } from "../../lib/formatters";
 import StatCard from "../layout/StatCard";
 import LoadingState from "../layout/LoadingState";
-import StatementsMenu from "./StatementsMenu";
+import ImportButton from "./ImportButton";
 import TransactionEditModal from "./TransactionEditModal";
 import MerchantsTab from "./MerchantsTab";
 import MergeModal, { type MergeMember } from "./MergeModal";
@@ -103,7 +103,7 @@ export default function ActivityView({ onToast }: ActivityViewProps) {
               {insights!.months.map((m) => <option key={m} value={m}>{moLabel(m)}</option>)}
             </select>
           )}
-          <StatementsMenu onToast={onToast} onChanged={reload} />
+          <ImportButton onToast={onToast} onChanged={reload} />
         </div>
       </div>
 
@@ -112,7 +112,7 @@ export default function ActivityView({ onToast }: ActivityViewProps) {
           <div className="text-4xl mb-3 opacity-40">🧾</div>
           <p className="text-sm mb-1">No transactions yet.</p>
           <p className="text-xs text-text-muted">
-            Download CSVs from your bank and card sites and drop them in the statements folder.
+            Download CSV exports or PDF statements from your bank and card sites, then tap Import.
           </p>
         </div>
       ) : (

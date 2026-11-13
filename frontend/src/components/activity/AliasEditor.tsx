@@ -46,7 +46,7 @@ export default function AliasEditor({ value, onChange, amountHint }: Props) {
           value={value.pattern}
           onChange={(e) => onChange({ ...value, pattern: e.target.value })}
           className="font-mono min-w-0"
-          placeholder="Text from the statement"
+          placeholder="Text as the bank shows it"
           autoCorrect="off"
           autoCapitalize="off"
           spellCheck={false}

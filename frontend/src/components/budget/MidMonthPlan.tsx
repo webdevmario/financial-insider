@@ -181,14 +181,15 @@ export default function MidMonthPlan({ open, onClose, month, onUse, onToast }: {
     if (!data) return null;
     const sum = (lines: PlanLine[], work = false) => lines.filter((l) => isOn(l, work)).reduce((s, l) => s + amountOf(l), 0);
     const bills = sum(data.bills);
-    const pending = sum(data.pending);
+    const pending = sum(data.cards);
     const work = sum(data.work, true);
     const extras = plan.extras.reduce((s, e) => s + (e.amount || 0), 0);
     const out = bills + pending + work + extras + (plan.reserve || 0);
     return { bills, pending, work, extras, out, available: plan.balance == null ? null : plan.balance - out };
   }, [data, plan]);
 
-  const windowLabel = data ? `${MONTHS[Number(month.slice(5, 7)) - 1]} 16–${Number(data.window.end.slice(8, 10))}` : "";
+  const windowLabel = data ? `${shortDate(data.window.start)}–${Number(data.window.end.slice(8, 10))}` : "";
+  const savedTotal = data ? data.saved.reduce((s, x) => s + x.amount, 0) : 0;
   const available = totals?.available ?? null;
 
   const footer = (
@@ -235,14 +236,14 @@ export default function MidMonthPlan({ open, onClose, month, onUse, onToast }: {
       footer={footer}
       className="!w-[640px]"
     >
-      {failed && <div className="text-[13px] text-text-dim py-4">Couldn't load your statement data. You're probably offline.</div>}
+      {failed && <div className="text-[13px] text-text-dim py-4">Couldn't load your activity. You're probably offline.</div>}
       {!data && !failed && <div className="text-[13px] text-text-dim py-4">Loading…</div>}
 
       {data && totals && (
         <div className="pb-2">
-          {!data.dataComplete && (
+          {data.stale.length > 0 && (
             <div className="mb-4 rounded-lg bg-amber-dim border border-amber/20 px-3.5 py-2.5 text-[12px] text-amber">
-              Your statements run through {fmtDate(data.asOf)}. Upload them through the 15th for a tighter pending estimate.
+              {data.stale.map((a) => `${a.name} data runs through ${fmtDate(a.through)}`).join(". ")}. Import newer activity for tighter numbers.
             </div>
           )}
 
@@ -251,11 +252,14 @@ export default function MidMonthPlan({ open, onClose, month, onUse, onToast }: {
               <label htmlFor="checking-balance">Bank checking balance</label>
               <AmountInput
                 id="checking-balance"
-                placeholder="Balance after the paycheck"
+                placeholder="Today's balance"
                 value={plan.balance}
                 onChange={(n) => edit((p) => ({ ...p, balance: n }))}
                 className=""
               />
+              <div className="text-[11px] text-text-muted mt-1">
+                {data.payday ? `Paycheck of ${fmt(data.payday.amount)} landed ${shortDate(data.payday.date)}` : "Paycheck not in your data yet"}
+              </div>
             </div>
             <div className="text-[11px] text-text-muted text-right max-md:text-left">
               {status === "saving" ? "Saving…" : status === "saved" ? "Saved" : status === "error" ? <span className="text-red">Couldn't save</span> : plans[month]?.savedAt ? `Last saved ${localDay(plans[month].savedAt!)}` : "Changes save as you go"}
@@ -271,16 +275,16 @@ export default function MidMonthPlan({ open, onClose, month, onUse, onToast }: {
             </div>
           </div>
 
-          <Section title={`Bills due ${windowLabel}`} total={totals.bills} hint="Projected amounts. Shared bills count in full, since the full charge leaves checking.">
-            {data.bills.length === 0 && <div className="text-[13px] text-text-dim py-2">No bills due in the second half.</div>}
+          <Section title="Bills still to come" total={totals.bills} hint="Not charged yet this month. Projected amounts; shared bills count in full, since the full charge leaves checking.">
+            {data.bills.length === 0 && <div className="text-[13px] text-text-dim py-2">Every bill has already charged this month.</div>}
             {data.bills.map((l) => (
               <Row key={l.key} line={l} on={isOn(l)} amount={amountOf(l)} onToggle={() => toggle(l)} onAmount={(n) => setAmount(l, n)} />
             ))}
           </Section>
 
-          <Section title="Pending from the first half" total={totals.pending} hint="Charges through the 15th that haven't left checking yet. Cards are paid as charges post.">
-            {data.pending.length === 0 && <div className="text-[13px] text-text-dim py-2">Nothing pending.</div>}
-            {data.pending.map((l) => (
+          <Section title="Card balances to pay" total={totals.pending} hint="Posted charges not paid yet, from your card activity, plus an estimate for charges that haven't posted.">
+            {data.cards.length === 0 && <div className="text-[13px] text-text-dim py-2">Cards are paid up.</div>}
+            {data.cards.map((l) => (
               <Row key={l.key} line={l} on={isOn(l)} amount={amountOf(l)} onToggle={() => toggle(l)} onAmount={(n) => setAmount(l, n)} />
             ))}
           </Section>
@@ -290,6 +294,11 @@ export default function MidMonthPlan({ open, onClose, month, onUse, onToast }: {
               <div className="min-w-0 flex-1">
                 <div className="text-sm">Set aside first</div>
                 <div className="text-[11px] text-text-muted">Like an extra loan payment. Carries over to next month</div>
+                {savedTotal > 0 && (
+                  <div className="text-[11px] text-amber mt-0.5">
+                    Already moved {fmt(savedTotal)} this month ({data.saved.map((x) => shortDate(x.date)).join(", ")}). Clear this if that covers it.
+                  </div>
+                )}
               </div>
               <AmountInput value={plan.reserve} onChange={(n) => edit((p) => ({ ...p, reserve: n ?? 0 }))} />
             </div>

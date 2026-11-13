@@ -159,7 +159,7 @@ export default function TransactionEditModal({ txn, payees, categories, onClose,
         <label className="flex items-start gap-2.5 text-sm cursor-pointer">
           <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="mt-0.5" />
           <span>
-            Remember: statement text that means this payee
+            Remember: bank text that means this payee
             <span className="block text-[11px] text-text-muted">
               {remember
                 ? "Applies to past and future imports. The category and type become this payee's defaults."
