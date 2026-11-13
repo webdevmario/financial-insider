@@ -1,15 +1,17 @@
 /**
  * Statement importer: CSV text → transactions, plus the statements-folder scan.
  *
- * Drop CSVs anywhere under the statements folder (default ~/Documents/finance-statements,
- * override with STATEMENTS_DIR). Files are never moved or changed: each file's sha256 is
- * recorded, so a scan skips files it has already imported and re-downloads that overlap
- * old ones only add the transactions that are new.
+ * Drop CSVs and PDF statements into the statements folder (default ~/Documents/finance-statements,
+ * override with STATEMENTS_DIR), named anything. Each file's sha256 is recorded, so a scan skips
+ * files it has already imported and re-downloads that overlap old ones only add the transactions
+ * that are new. A file dropped at the top of the folder (or uploaded) is filed away once imported,
+ * as <bank>/<year>/<first day> to <last day> <account>.csv; files in subfolders stay where they are.
+ * File contents are never changed. Set STATEMENTS_ORGANIZE=0 to leave new files in place.
  */
 import { createHash } from "crypto";
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, watch, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, watch, writeFileSync } from "fs";
 import { homedir } from "os";
-import { basename, join, relative, resolve } from "path";
+import { basename, dirname, extname, join, relative, resolve, sep } from "path";
 import { and, eq, gte, inArray, isNull, lte, ne } from "drizzle-orm";
 import { db } from "../../db/index.js";
 import { importBatches, payees, statementAccounts, transactions, type Transaction } from "../../db/schema.js";
@@ -99,6 +101,59 @@ function sameAccount(account: AccountInfo): AccountInfo {
   if (amex.length !== 1 || amex[0].id === account.id) return account;
   const a = amex[0];
   return { id: a.id, institution: a.institution, name: a.name, kind: a.kind as AccountInfo["kind"], last4: a.last4 };
+}
+
+export class AccountUnclearError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AccountUnclearError";
+  }
+}
+
+const toInfo = (a: typeof statementAccounts.$inferSelect): AccountInfo => ({
+  id: a.id,
+  institution: a.institution,
+  name: a.name,
+  kind: a.kind as AccountInfo["kind"],
+  last4: a.last4,
+});
+
+/**
+ * A file that doesn't say which account it's for (a Chase CSV without the card number in its
+ * name) goes to the account of that bank and type already on file. With several (two Chase
+ * cards), it goes to the one that already has the most of its rows.
+ */
+function resolveAccount(account: AccountInfo, rows: ParsedRow[]): AccountInfo {
+  if (account.last4) return account;
+  if (db.select().from(statementAccounts).where(eq(statementAccounts.id, account.id)).get()) return account;
+  const same = db
+    .select()
+    .from(statementAccounts)
+    .where(and(eq(statementAccounts.institution, account.institution), eq(statementAccounts.kind, account.kind)))
+    .all();
+  if (!same.length) return account;
+  if (same.length === 1) return toInfo(same[0]);
+
+  const dates = rows.map((r) => r.date).sort();
+  const mine = new Set(rows.map((r) => `${r.date}|${r.amount.toFixed(2)}|${r.description}`));
+  const scored = same
+    .map((a) => ({
+      a,
+      n: dates.length
+        ? db
+            .select({ date: transactions.date, amount: transactions.amount, description: transactions.description })
+            .from(transactions)
+            .where(and(eq(transactions.accountId, a.id), gte(transactions.date, dates[0]), lte(transactions.date, dates[dates.length - 1])))
+            .all()
+            .filter((t) => mine.has(`${t.date}|${t.amount.toFixed(2)}|${t.description}`)).length
+        : 0,
+    }))
+    .sort((x, y) => y.n - x.n);
+  if (scored[0].n > 0 && scored[0].n > (scored[1]?.n ?? 0)) return toInfo(scored[0].a);
+  throw new AccountUnclearError(
+    `Can't tell which ${account.institution} account this is (${same.map((a) => a.name).join(", ")}). ` +
+      `Rename the file to start with the last 4 digits, e.g. ${account.institution}1234_${account.institution === "Chase" ? "Activity" : "export"}.csv`
+  );
 }
 
 /**
@@ -234,7 +289,7 @@ function settle() {
 
 export function importCsv(text: string, fileName: string, sourcePath: string | null = null): ImportResult {
   const parsed = parseStatement(text, fileName);
-  const result = storeRows(parsed.account, parsed.format, parsed.rows, { fileName, sourcePath, fileHash: sha256(text) });
+  const result = storeRows(resolveAccount(parsed.account, parsed.rows), parsed.format, parsed.rows, { fileName, sourcePath, fileHash: sha256(text) });
   settle();
   return result;
 }
@@ -243,7 +298,7 @@ export function importCsv(text: string, fileName: string, sourcePath: string | n
 export async function importPdf(data: Uint8Array, fileName: string, sourcePath: string | null, fileHash: string): Promise<ImportResult[]> {
   const parsed = parsePdfStatement(await extractPdfLines(data));
   const results = parsed.sections.map((s) =>
-    storeRows(sameAccount(s.account), parsed.format, s.rows, {
+    storeRows(sameAccount(resolveAccount(s.account, s.rows)), parsed.format, s.rows, {
       fileName: parsed.sections.length > 1 ? `${fileName} · ${s.account.name}` : fileName,
       sourcePath,
       fileHash,
@@ -413,11 +468,18 @@ export async function scanStatements({ fresh = false } = {}): Promise<ScanResult
       }
       const rel = relative(folder, path);
       try {
-        if (isPdfPath(path)) result.imported.push(...(await importPdf(new Uint8Array(bytes), basename(path), rel, hash)));
-        else result.imported.push(importCsv(bytes.toString("utf8"), basename(path), rel));
+        const done = isPdfPath(path)
+          ? await importPdf(new Uint8Array(bytes), basename(path), rel, hash)
+          : [importCsv(bytes.toString("utf8"), basename(path), rel)];
         known.add(hash);
+        if (organizing() && isLoose(rel)) fileAway(folder, path, done);
+        result.imported.push(...done);
       } catch (err) {
-        const known = err instanceof UnrecognizedFormatError || err instanceof UnrecognizedPdfError || err instanceof StatementCheckError;
+        const known =
+          err instanceof UnrecognizedFormatError ||
+          err instanceof UnrecognizedPdfError ||
+          err instanceof StatementCheckError ||
+          err instanceof AccountUnclearError;
         result.unrecognized.push({
           file: rel,
           error: err instanceof StatementCheckError
@@ -445,6 +507,53 @@ export async function scanStatements({ fresh = false } = {}): Promise<ScanResult
     }, 2000);
   }
   return result;
+}
+
+const organizing = () => process.env.STATEMENTS_ORGANIZE !== "0";
+
+/** Dropped at the top of the folder, or uploaded from the app: not filed anywhere yet */
+function isLoose(rel: string): boolean {
+  const parts = rel.split(sep);
+  return parts.length === 1 || (parts.length === 2 && parts[0] === "uploads");
+}
+
+const cleanName = (s: string) => s.replace(/··/g, "").replace(/[^\w .()-]/g, "").replace(/\s+/g, " ").trim();
+
+/**
+ * Move an imported file to <bank>/<year>/<first day> to <last day> <account>.<ext> and point
+ * its import batches at the new path. Leaves the file where it is if anything goes wrong.
+ */
+function fileAway(folder: string, path: string, results: ImportResult[]) {
+  const froms = results.map((r) => r.dateFrom).filter((d): d is string => !!d).sort();
+  const tos = results.map((r) => r.dateTo).filter((d): d is string => !!d).sort();
+  if (!froms.length || !tos.length) return;
+  const account = db.select().from(statementAccounts).where(eq(statementAccounts.id, results[0].accountId)).get();
+  if (!account) return;
+  const from = froms[0];
+  const to = tos[tos.length - 1];
+  const label = results.length > 1 ? `${account.institution} statement` : results[0].accountName;
+  const ext = extname(path).toLowerCase();
+  const dir = join(folder, cleanName(account.institution).toLowerCase(), to.slice(0, 4));
+  const stem = cleanName(`${from} to ${to} ${label}`);
+  let target = join(dir, stem + ext);
+  for (let n = 2; existsSync(target); n++) target = join(dir, `${stem} (${n})${ext}`);
+  try {
+    mkdirSync(dirname(target), { recursive: true });
+    renameSync(path, target);
+  } catch (err) {
+    console.error(`${new Date().toISOString()} Couldn't file ${relative(folder, path)}: ${(err as Error).message}`);
+    return;
+  }
+  const oldName = basename(path);
+  const newName = basename(target);
+  const rel = relative(folder, target);
+  db.transaction((tx) => {
+    for (const r of results) {
+      r.fileName = r.fileName.replace(oldName, newName);
+      tx.update(importBatches).set({ fileName: r.fileName, sourcePath: rel }).where(eq(importBatches.id, r.batchId)).run();
+    }
+  });
+  console.log(`${new Date().toISOString()} Filed ${oldName} as ${rel}`);
 }
 
 /** Save an uploaded statement (CSV text, or a PDF as base64) into uploads/ and import it */

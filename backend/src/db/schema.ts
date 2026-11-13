@@ -75,7 +75,7 @@ export const statementAccounts = sqliteTable("statement_accounts", {
 export const importBatches = sqliteTable("import_batches", {
   id: text("id").primaryKey(),
   fileName: text("file_name").notNull(),
-  sourcePath: text("source_path"), // Where the file sits in the statements folder (files are never moved)
+  sourcePath: text("source_path"), // Where the file sits in the statements folder (updated when a new file is filed away)
   fileHash: text("file_hash").notNull(), // sha256 of the file: the folder scan skips files already seen
   status: text("status").notNull().default("imported"), // imported | undone (undone files are skipped by the scan)
   format: text("format").notNull(), // chase-card | apple-card | amex | ally
