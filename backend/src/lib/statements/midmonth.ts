@@ -8,7 +8,8 @@
  * - what each card still owes: posted charges not paid yet (exact, from the card's
  *   statement data, since cards are paid as charges post) plus a small estimate for
  *   spending that hasn't posted or been downloaded yet
- * - money set aside for savings (entered on the page; carries forward)
+ * - money set aside first: savings like an extra loan payment (carries forward), and
+ *   anything else held back this month (a project fund)
  * Work expenses due in the window are listed but left out: they're reimbursed
  * on the 1st.
  *
@@ -157,13 +158,6 @@ export function computeMidMonthPlan(month = today().slice(0, 7)) {
     cardLines.push({ key: `pending-card:${card.id}`, label: card.name, amount, note: parts.join(" · ") });
   }
 
-  const savingsPayees = new Set(payeeList.filter((p) => p.category === "Savings").map((p) => p.id));
-  // Savings already moved out this month (an extra loan payment before the paycheck)
-  const saved = all
-    .filter((t) => inMonth(t) && t.amount < 0 && (t.category === "Savings" || (t.payeeId != null && savingsPayees.has(t.payeeId))))
-    .map((t) => ({ date: t.date, amount: round(-t.amount), label: t.merchant }))
-    .sort((a, b) => a.date.localeCompare(b.date));
-
   // Accounts whose downloads stop well short of today
   const stale = accounts
     .map((a) => ({ name: a.name, through: all.filter((t) => t.accountId === a.id).reduce((m, t) => (t.date > m ? t.date : m), "") }))
@@ -204,7 +198,6 @@ export function computeMidMonthPlan(month = today().slice(0, 7)) {
     payday: payday ? { date: payday.date, amount: round(payday.amount) } : null,
     /** Accounts whose data stops more than a couple of days before the plan date */
     stale,
-    saved,
     bills: billLines,
     cards: cardLines,
     work: workLines,

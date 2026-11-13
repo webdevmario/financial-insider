@@ -67,7 +67,7 @@ router.get("/year-over-year", (_req, res) => {
   res.json(computeYearOverYear());
 });
 
-// GET /api/transactions/midmonth?month=YYYY-MM: suggested lines for planning the 16th to month-end
+// GET /api/transactions/midmonth?month=YYYY-MM: suggested lines for planning the 16th to month-end (used by the /midmonth skill)
 router.get("/midmonth", (req, res) => {
   const month = typeof req.query.month === "string" && /^\d{4}-\d{2}$/.test(req.query.month) ? req.query.month : undefined;
   res.json(computeMidMonthPlan(month));
