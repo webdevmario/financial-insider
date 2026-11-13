@@ -18,7 +18,7 @@ function billIssue(s: Subscription, c: BillVsActual | undefined): { text: string
   if (s.projection?.reason === "mismatch" && s.amountMode !== "listed") {
     return { text: `Charges found don't look ${s.frequency}; link it to a payee to fix the match`, className: "text-text-muted" };
   }
-  if (c.matched === 0) return { text: "No charge found in your statements", className: "text-text-muted" };
+  if (c.matched === 0) return { text: "No charge found in your activity", className: "text-text-muted" };
   if (c.notSeenRecently) return { text: `Not charged since ${fmtDate(c.lastDate!)}`, className: "text-amber" };
   // Projected bills follow their charges, so a gap from the typed amount only matters when it's what counts
   const usesListed = s.amountMode === "listed" || !s.projection || s.projection.method === "listed";
