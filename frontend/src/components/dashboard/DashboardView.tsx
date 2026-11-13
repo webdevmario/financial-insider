@@ -4,9 +4,7 @@ import { fmt, fmtP, fmtDate } from "../../lib/formatters";
 import { billAmount, isActiveBill } from "../../lib/billing";
 import { goalProgress, sortGoals } from "../../lib/goals";
 import StatCard from "../layout/StatCard";
-import YearOverYear from "./YearOverYear";
-import CostChanges from "./CostChanges";
-import type { Account, CostChanges as CostData, Goal, Subscription, YearOverYear as YoyData } from "../../types";
+import type { Account, Goal, Subscription } from "../../types";
 
 const ASSET_GROUPS: Record<string, string[]> = {
   Investments: ["401k", "Roth 401k", "IRA", "Roth IRA", "Rollover IRA", "Brokerage", "Crypto", "IUL"],
@@ -40,9 +38,6 @@ export default function DashboardView({ onOpenGoals }: { onOpenGoals: () => void
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [subs, setSubs] = useState<Subscription[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
-  // Needs imported statements; the Dashboard works without it
-  const [yoy, setYoy] = useState<YoyData | null>(null);
-  const [costs, setCosts] = useState<CostData | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -51,8 +46,6 @@ export default function DashboardView({ onOpenGoals }: { onOpenGoals: () => void
       api.accounts.list().then(setAccounts).catch(() => {}),
       api.subscriptions.list().then(setSubs).catch(() => {}),
       api.goals.list().then(setGoals).catch(() => {}),
-      api.transactions.yearOverYear().then(setYoy).catch(() => setYoy(null)),
-      api.transactions.costChanges().then(setCosts).catch(() => setCosts(null)),
     ]).finally(() => setLoading(false));
   }, []);
 
@@ -198,8 +191,6 @@ export default function DashboardView({ onOpenGoals }: { onOpenGoals: () => void
         </button>
       )}
 
-      {costs && <CostChanges data={costs} />}
-      {yoy && <YearOverYear data={yoy} />}
     </div>
   );
 }
