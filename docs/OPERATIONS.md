@@ -268,6 +268,35 @@ The transactions live in the same `data/finance.db`, so the daily backups cover 
 
 ---
 
+## Claude MCP (read-only finance tools)
+
+`backend/src/mcp/` is an MCP server that lets Claude (Claude Code, Claude Desktop) query the finance data. It opens `data/finance.db` **read-only** (SQLite refuses every write), so imports, edits and deletes stay in the app.
+
+| Tool | What it answers |
+|---|---|
+| `overview` | Date range, last import, accounts, categories, card members |
+| `find_transactions` | Individual transactions by merchant/description, category, kind, dates, weekday, amount |
+| `merchant_history` | Per merchant: visits, first/last visit, days since, typical gap, spend ("when did we last eat at X?") |
+| `spending_summary` | Spending grouped by category, merchant, month, year, weekday or account |
+| `list_bills` | Bills with your monthly share |
+| `net_worth` | Hand-entered asset balances by type |
+| `run_sql` | One read-only `SELECT`, for anything else |
+
+It's bundled into one file (Node's built-in `node:sqlite`, no native modules) and installed to `~/Library/Application Support/financial-insider-mcp/`, outside `~/Documents`, the same way as the Stacks MCP. `pnpm prod:deploy` reinstalls it.
+
+```bash
+pnpm mcp:install      # Build + install the bundle and launcher
+pnpm mcp              # Run from source over stdio (development)
+pnpm mcp:inspect      # Install, then open the MCP Inspector against it
+
+# Register with Claude Code (once)
+claude mcp add --scope user financial-insider -- "$HOME/Library/Application Support/financial-insider-mcp/mcp.sh"
+```
+
+For Claude Desktop, add the same launcher path under `mcpServers` in `~/Library/Application Support/Claude/claude_desktop_config.json`. Logs go to stderr (Desktop keeps them in `~/Library/Logs/Claude/mcp-server-financial-insider.log`).
+
+---
+
 ## Database
 
 ### Where it lives
