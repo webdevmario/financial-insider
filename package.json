@@ -6,7 +6,7 @@
   "directories": {
     "doc": "docs"
   },
-"scripts": {
+  "scripts": {
     "dev": "concurrently -n api,web -c blue,green \"pnpm --filter financial-insider-backend dev\" \"pnpm --filter financial-insider-frontend dev\"",
     "build": "pnpm --filter financial-insider-frontend build",
     "start": "pnpm --filter financial-insider-backend dev",
@@ -17,13 +17,17 @@
     "prod:logs": "tail -n 200 ~/Library/Logs/financial-insider/server.log",
     "prod:errors": "tail -n 200 ~/Library/Logs/financial-insider/error.log",
     "prod:status": "launchctl list | grep financial",
-    "prod:deploy": "pnpm build && pnpm prod:restart",
+    "prod:deploy": "pnpm build && pnpm mcp:install && pnpm prod:restart",
     "db:push": "pnpm --filter financial-insider-backend db:push",
     "db:backup": "bash scripts/backup-db.sh",
     "backup:now": "bash scripts/backup-db.sh",
     "backup:install": "bash scripts/install-agent.sh com.financial-insider-backup",
     "backup:uninstall": "bash scripts/install-agent.sh com.financial-insider-backup --uninstall",
-    "backup:list": "ls -lh data/backups/"
+    "backup:list": "ls -lh data/backups/",
+    "mcp": "pnpm --filter financial-insider-backend exec tsx src/mcp/index.ts",
+    "mcp:build": "node backend/scripts/build-mcp.mjs",
+    "mcp:install": "bash scripts/install-mcp.sh",
+    "mcp:inspect": "pnpm mcp:install && npx @modelcontextprotocol/inspector \"$HOME/Library/Application Support/financial-insider-mcp/mcp.sh\""
   },
   "repository": {
     "type": "git",
