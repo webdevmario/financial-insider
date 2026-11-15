@@ -20,6 +20,7 @@ const listColumns = {
   id: transactions.id,
   accountId: transactions.accountId,
   date: transactions.date,
+  bankDate: transactions.bankDate,
   postedDate: transactions.postedDate,
   month: transactions.month,
   amount: transactions.amount,
@@ -172,8 +173,18 @@ router.post("/imports/:id/forget", async (req, res) => {
 
 // ── One transaction ───────────────────────────────────────────────
 
+const MAX_DATE_SHIFT_DAYS = 31;
+
+/** Why `date` can't replace the bank's date `original`, or null when it can */
+function dateError(date: string, original: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`))) return "Date must be YYYY-MM-DD";
+  const days = Math.abs(Date.parse(`${date}T00:00:00Z`) - Date.parse(`${original}T00:00:00Z`)) / 86_400_000;
+  return days > MAX_DATE_SHIFT_DAYS ? `Date can move at most ${MAX_DATE_SHIFT_DAYS} days from the bank's (${original})` : null;
+}
+
 // PUT /api/transactions/:id
 // { payeeId?: string | null, payeeName?: string, category?, kind?,
+//   date?: "YYYY-MM-DD",                       // the real day, when the bank's date is off
 //   remember?: { pattern, match, amount? },  // add an alias + make category/kind the payee's defaults
 //   reset?: true }                             // drop hand edits and go back to automatic
 router.put("/:id", (req, res) => {
@@ -186,7 +197,19 @@ router.put("/:id", (req, res) => {
     kind?: string;
     remember?: { pattern?: string; match?: string; amount?: number | null };
     reset?: boolean;
+    date?: string;
   };
+
+  // The real day, when the bank's is off. The bank's date stays in bankDate for imports
+  if (body.date !== undefined && body.date !== t.date) {
+    const original = t.bankDate ?? t.date;
+    const err = dateError(body.date, original);
+    if (err) return res.status(400).json({ error: err });
+    db.update(transactions)
+      .set({ date: body.date, month: body.date.slice(0, 7), bankDate: body.date === original ? null : original })
+      .where(eq(transactions.id, t.id))
+      .run();
+  }
 
   if (body.reset) {
     db.update(transactions).set({ edited: 0, payeeLocked: 0 }).where(eq(transactions.id, t.id)).run();

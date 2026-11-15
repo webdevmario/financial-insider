@@ -140,7 +140,10 @@ export type TxnKind = "spend" | "income" | "refund" | "transfer" | "fee" | "inte
 export interface Transaction {
   id: string;
   accountId: string;
+  /** The day it happened: the bank's date unless corrected by hand */
   date: string;
+  /** The bank's own date, set only when `date` was corrected by hand */
+  bankDate: string | null;
   postedDate: string | null;
   month: string;
   /** Negative = money leaving you; positive = money coming in */

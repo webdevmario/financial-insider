@@ -95,7 +95,10 @@ export const transactions = sqliteTable("transactions", {
   id: text("id").primaryKey(), // Hash of account + date + amount + description + occurrence: re-imports dedupe
   accountId: text("account_id").notNull(),
   batchId: text("batch_id").notNull(),
-  date: text("date").notNull(), // Transaction date, YYYY-MM-DD
+  date: text("date").notNull(), // Transaction date, YYYY-MM-DD (can be corrected by hand: see bankDate)
+  // The bank's own date, kept only when `date` was changed by hand (cards like Chase date some
+  // restaurant charges a day late). Imports match on this, so a corrected row never comes back twice
+  bankDate: text("bank_date"),
   postedDate: text("posted_date"),
   month: text("month").notNull(), // YYYY-MM
   amount: real("amount").notNull(),

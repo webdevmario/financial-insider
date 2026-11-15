@@ -12,7 +12,7 @@ import { createHash } from "crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, watch, writeFileSync } from "fs";
 import { homedir } from "os";
 import { basename, dirname, extname, join, relative, resolve, sep } from "path";
-import { and, eq, gte, inArray, isNull, lte, ne } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lte, ne, sql } from "drizzle-orm";
 import { db } from "../../db/index.js";
 import { importBatches, payees, statementAccounts, transactions, type Transaction } from "../../db/schema.js";
 import { today } from "../date.js";
@@ -65,6 +65,9 @@ function csvCoverage(accountId: string): [string, string][] {
     .map((b) => [b.dateFrom!, b.dateTo!]);
 }
 
+/** The date the bank gave a stored row: imports compare on this, not on a date corrected by hand */
+const bankDate = sql<string>`coalesce(${transactions.bankDate}, ${transactions.date})`;
+
 /** Rows from an account's CSV imports on the given days */
 function csvRowsOn(accountId: string, dates: string[]): { date: string; amount: number }[] {
   if (!dates.length) return [];
@@ -77,9 +80,9 @@ function csvRowsOn(accountId: string, dates: string[]): { date: string; amount: 
     .map((b) => b.id);
   if (!csvBatches.length) return [];
   return db
-    .select({ date: transactions.date, amount: transactions.amount })
+    .select({ date: bankDate, amount: transactions.amount })
     .from(transactions)
-    .where(and(eq(transactions.accountId, accountId), inArray(transactions.batchId, csvBatches), inArray(transactions.date, [...new Set(dates)])))
+    .where(and(eq(transactions.accountId, accountId), inArray(transactions.batchId, csvBatches), inArray(bankDate, [...new Set(dates)])))
     .all();
 }
 
@@ -141,9 +144,9 @@ function resolveAccount(account: AccountInfo, rows: ParsedRow[]): AccountInfo {
       a,
       n: dates.length
         ? db
-            .select({ date: transactions.date, amount: transactions.amount, description: transactions.description })
+            .select({ date: bankDate, amount: transactions.amount, description: transactions.description })
             .from(transactions)
-            .where(and(eq(transactions.accountId, a.id), gte(transactions.date, dates[0]), lte(transactions.date, dates[dates.length - 1])))
+            .where(and(eq(transactions.accountId, a.id), gte(bankDate, dates[0]), lte(bankDate, dates[dates.length - 1])))
             .all()
             .filter((t) => mine.has(`${t.date}|${t.amount.toFixed(2)}|${t.description}`)).length
         : 0,
@@ -232,9 +235,9 @@ function storeRows(
         // Whole days inside the CSV's range go; on its first and last day only the rows it also has
         const mine = keep.map((r) => ({ date: r.date, amount: r.amount }));
         const stale = tx
-          .select({ id: transactions.id, date: transactions.date, amount: transactions.amount })
+          .select({ id: transactions.id, date: bankDate, amount: transactions.amount })
           .from(transactions)
-          .where(and(eq(transactions.accountId, account.id), inArray(transactions.batchId, pdfBatches), gte(transactions.date, dateFrom), lte(transactions.date, dateTo)))
+          .where(and(eq(transactions.accountId, account.id), inArray(transactions.batchId, pdfBatches), gte(bankDate, dateFrom), lte(bankDate, dateTo)))
           .all()
           .filter((r) => (r.date !== dateFrom && r.date !== dateTo) || claim(mine, r))
           .map((r) => r.id);
