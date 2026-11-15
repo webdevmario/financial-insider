@@ -267,6 +267,8 @@ export const api = {
         kind?: string;
         remember?: { pattern: string; match: string; amount?: number | null };
         reset?: boolean;
+        /** The real day, YYYY-MM-DD, when the bank's date is off */
+        date?: string;
       }
     ) =>
       request<Transaction>(`/transactions/${id}`, {

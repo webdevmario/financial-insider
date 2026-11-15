@@ -29,6 +29,7 @@ if (txnCols.length) {
   for (const [col, type] of [
     ["base_merchant", "TEXT"], ["base_category", "TEXT"], ["base_kind", "TEXT"],
     ["payee_id", "TEXT"], ["alias_id", "TEXT"], ["payee_locked", "INTEGER DEFAULT 0 NOT NULL"],
+    ["bank_date", "TEXT"],
   ]) {
     if (!txnCols.some((c) => c.name === col)) sqlite.exec(`ALTER TABLE transactions ADD COLUMN ${col} ${type}`);
   }
@@ -87,6 +88,7 @@ sqlite.exec(`
     account_id TEXT NOT NULL,
     batch_id TEXT NOT NULL,
     date TEXT NOT NULL,
+    bank_date TEXT,
     posted_date TEXT,
     month TEXT NOT NULL,
     amount REAL NOT NULL,

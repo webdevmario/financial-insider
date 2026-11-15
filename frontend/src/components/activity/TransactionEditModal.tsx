@@ -25,6 +25,7 @@ export default function TransactionEditModal({ txn, payees, categories, onClose,
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [kind, setKind] = useState<TxnKind>("spend");
+  const [date, setDate] = useState("");
   const [remember, setRemember] = useState(false);
   const [alias, setAlias] = useState<AliasDraft>({ pattern: "", match: "contains", amount: null });
   const [saving, setSaving] = useState(false);
@@ -36,6 +37,7 @@ export default function TransactionEditModal({ txn, payees, categories, onClose,
     setName(currentPayee?.name ?? txn.merchant);
     setCategory(txn.category);
     setKind(txn.kind);
+    setDate(txn.date);
     setRemember(false);
     setAlias({ pattern: defaultPattern(txn.description), match: "contains", amount: null });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -51,12 +53,14 @@ export default function TransactionEditModal({ txn, payees, categories, onClose,
       const payeeName = name.trim();
       const changedCategory = category.trim() && category.trim() !== t.category ? category.trim() : undefined;
       const changedKind = kind !== t.kind ? kind : undefined;
+      const changedDate = date && date !== t.date ? date : undefined;
       if (remember) {
         if (!payeeName) throw new Error("Give the payee a name");
         await api.transactions.update(t.id, {
           payeeName,
           category: category.trim() && category.trim() !== "Uncategorized" ? category.trim() : undefined,
           kind: changedKind,
+          date: changedDate,
           remember: { pattern: alias.pattern.trim(), match: alias.match, amount: alias.amount },
         });
         onToast(`Saved · “${alias.pattern.trim()}” now means ${payeeName}`);
@@ -66,6 +70,7 @@ export default function TransactionEditModal({ txn, payees, categories, onClose,
           ...(renamed ? (payeeName ? { payeeName } : { payeeId: null }) : {}),
           category: changedCategory,
           kind: changedKind,
+          date: changedDate,
         });
         onToast("Transaction updated");
       }
@@ -142,6 +147,16 @@ export default function TransactionEditModal({ txn, payees, categories, onClose,
               ? "Existing payee"
               : name.trim() ? "A new payee will be created" : ""}
           </span>
+        </div>
+        <div className="input-group">
+          <label>Date</label>
+          <input type="date" value={date} required onChange={(e) => setDate(e.target.value)} />
+          {t.bankDate && (
+            <span className="text-[11px] text-text-muted">
+              Bank said {fmtDate(t.bankDate)}.{" "}
+              <button type="button" className="underline" onClick={() => setDate(t.bankDate!)}>Use that</button>
+            </span>
+          )}
         </div>
         <div className="grid grid-cols-2 max-md:grid-cols-1 gap-3">
           <div className="input-group">
