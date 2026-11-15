@@ -17,15 +17,15 @@ interface Props {
 }
 
 /**
- * Put a transaction under a payee. With "Remember" on, the statement text becomes an
- * alias of the payee (past and future imports) and category/type become the payee's defaults.
- * With it off, only this one transaction changes.
+ * Put a transaction under a payee. By default only this one transaction changes. With
+ * "Remember" on, the statement text becomes an alias of the payee (past and future imports) and
+ * category/type become the payee's defaults. That's a standing rule, so it's opt-in.
  */
 export default function TransactionEditModal({ txn, payees, categories, onClose, onSaved, onToast }: Props) {
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [kind, setKind] = useState<TxnKind>("spend");
-  const [remember, setRemember] = useState(true);
+  const [remember, setRemember] = useState(false);
   const [alias, setAlias] = useState<AliasDraft>({ pattern: "", match: "contains", amount: null });
   const [saving, setSaving] = useState(false);
 
@@ -36,7 +36,7 @@ export default function TransactionEditModal({ txn, payees, categories, onClose,
     setName(currentPayee?.name ?? txn.merchant);
     setCategory(txn.category);
     setKind(txn.kind);
-    setRemember(true);
+    setRemember(false);
     setAlias({ pattern: defaultPattern(txn.description), match: "contains", amount: null });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [txn]);
