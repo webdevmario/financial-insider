@@ -68,10 +68,7 @@ export const MATCH_LABELS: Record<import("../../types").AliasMatch, string> = {
   merchant: "Bank name is",
 };
 
-/** Default alias text for a bank description: its start, before store numbers and reference codes */
-export function defaultPattern(description: string): string {
-  return description.replace(/\s+/g, " ").split(/ #| \d{3,}|\*/)[0].trim().slice(0, 40);
-}
+export { defaultPattern } from "../../lib/aliasPattern";
 
 /** "Oct 27" this year, "Oct 27, 2025" otherwise: keeps a date column narrow on phones */
 export function shortDate(ds: string): string {
