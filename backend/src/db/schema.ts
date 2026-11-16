@@ -171,6 +171,85 @@ export const creditCards = sqliteTable("credit_cards", {
   createdAt: text("created_at").notNull(),
 });
 
+// ── Cars ───────────────────────────────────────────────────────────
+// One per car the household owns or owned. Running costs come from bank charges assigned to it
+// (vehicle_links), shared-cost rules (vehicle_rules) and documents paid outside the imported accounts
+export const vehicles = sqliteTable("vehicles", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(), // "Vivian's Highlander"
+  year: integer("year"),
+  make: text("make"),
+  model: text("model"),
+  vin: text("vin"),
+  plate: text("plate"),
+  driver: text("driver"),
+  accountId: text("account_id"), // accounts.id of its Vehicle asset: the current value comes from there
+  purchaseDate: text("purchase_date"), // YYYY-MM-DD
+  purchasePrice: real("purchase_price"), // Out-the-door: price, tax, title and dealer fees, before any trade-in
+  purchaseMileage: integer("purchase_mileage"),
+  purchasedFrom: text("purchased_from"),
+  tradeInValue: real("trade_in_value"), // What the car traded in toward this one was worth
+  loanAmount: real("loan_amount"),
+  loanRate: real("loan_rate"), // APR, percent
+  loanMonths: integer("loan_months"),
+  interestPaid: real("interest_paid"), // Typed from a payoff letter or tax form; replaces the estimate
+  soldDate: text("sold_date"),
+  salePrice: real("sale_price"), // Sale or trade-in value
+  saleMileage: integer("sale_mileage"),
+  valueEstimate: real("value_estimate"), // Used when there's no linked asset
+  valueDate: text("value_date"),
+  notes: text("notes"),
+  createdAt: text("created_at").notNull(),
+});
+
+// Raw documents dropped in the car documents folder: receipts, invoices, bills of sale, insurance pages
+export const vehicleDocuments = sqliteTable("vehicle_documents", {
+  id: text("id").primaryKey(),
+  fileName: text("file_name").notNull(),
+  sourcePath: text("source_path").notNull(), // Relative to the car documents folder
+  fileHash: text("file_hash").notNull(),
+  size: integer("size").notNull(),
+  status: text("status").notNull().default("new"), // new (not read yet) | done | skipped (not a car document)
+  vehicleId: text("vehicle_id"),
+  docType: text("doc_type"), // purchase | sale | loan | repair | maintenance | tires | insurance | registration | inspection | fuel | parking | other
+  date: text("date"), // YYYY-MM-DD: service, sale or policy start date
+  vendor: text("vendor"),
+  odometer: integer("odometer"),
+  total: real("total"), // What was paid, positive dollars
+  summary: text("summary"), // One line: "Front brakes and rotors, cabin filter"
+  items: text("items"), // JSON: [{ description, amount }]
+  details: text("details"), // JSON: anything else worth keeping (policy period, per-car premiums, warranty)
+  transactionId: text("transaction_id"), // The bank charge that paid it
+  paidOutside: integer("paid_outside").notNull().default(0), // 1 = paid in cash or from an account that isn't imported: counts its total
+  notes: text("notes"),
+  addedAt: text("added_at").notNull(),
+  updatedAt: text("updated_at"),
+});
+
+// A bank charge assigned to a car. share splits one charge across cars (0.5 each for a two-car bill)
+export const vehicleLinks = sqliteTable("vehicle_links", {
+  id: text("id").primaryKey(),
+  transactionId: text("transaction_id").notNull(),
+  vehicleId: text("vehicle_id").notNull(),
+  share: real("share").notNull().default(1),
+  costType: text("cost_type").notNull(), // see COST_TYPES in lib/cars/costs.ts
+  createdAt: text("created_at").notNull(),
+});
+
+// Shared costs that can't be told apart per car (gas, a multi-car insurance policy): every matching
+// charge is split across the cars owned that day, evenly or by shares. A charge with its own link wins
+export const vehicleRules = sqliteTable("vehicle_rules", {
+  id: text("id").primaryKey(),
+  matchType: text("match_type").notNull(), // payee (payees.id) | category | merchant (exact merchant name)
+  matchValue: text("match_value").notNull(),
+  costType: text("cost_type").notNull(),
+  shares: text("shares"), // JSON { vehicleId: weight }; null = even across cars owned on the charge date
+  dateFrom: text("date_from"),
+  dateTo: text("date_to"),
+  notes: text("notes"),
+  createdAt: text("created_at").notNull(),
+});
+
 // ── Settings (key-value store) ─────────────────────────────────────
 // Stores: paycheck, income, paycheckHistory, budgetTargets
 export const settings = sqliteTable("settings", {
@@ -195,3 +274,7 @@ export type MerchantRule = typeof merchantRules.$inferSelect;
 export type Payee = typeof payees.$inferSelect;
 export type PayeeAlias = typeof payeeAliases.$inferSelect;
 export type CreditCard = typeof creditCards.$inferSelect;
+export type Vehicle = typeof vehicles.$inferSelect;
+export type VehicleDocument = typeof vehicleDocuments.$inferSelect;
+export type VehicleLink = typeof vehicleLinks.$inferSelect;
+export type VehicleRule = typeof vehicleRules.$inferSelect;

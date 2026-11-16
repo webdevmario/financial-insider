@@ -13,6 +13,8 @@ import { watchStatements } from "./lib/statements/importer.js";
 import { migratePayees } from "./lib/statements/payees.js";
 import payeesRouter from "./routes/payees.js";
 import cardsRouter from "./routes/cards.js";
+import carsRouter from "./routes/cars.js";
+import { watchCarDocs } from "./lib/cars/folder.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -56,6 +58,7 @@ app.use("/api/goals", goalsRouter);
 app.use("/api/transactions", transactionsRouter);
 app.use("/api/payees", payeesRouter);
 app.use("/api/cards", cardsRouter);
+app.use("/api/cars", carsRouter);
 app.use("/api", settingsRouter); // settings, dashboard, data routes
 
 // Serve frontend in production
@@ -83,4 +86,5 @@ app.listen(PORT, () => {
     console.error(`Payee migration failed: ${(err as Error).message}`);
   }
   watchStatements();
+  watchCarDocs();
 });

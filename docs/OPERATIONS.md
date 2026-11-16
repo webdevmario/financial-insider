@@ -268,6 +268,25 @@ The transactions live in the same `data/finance.db`, so the daily backups cover 
 
 ---
 
+## Cars (Cars tab)
+
+What each car has really cost, its service history, and whether keeping it or replacing it costs less.
+
+- **Documents folder:** drop anything about a car into **`~/Documents/car-documents/`**: repair and maintenance invoices, receipts (photos are fine, HEIC included), bills of sale, loan papers, payoff letters, insurance declarations, registration, saved emails. **Upload documents** on the Cars tab does the same from any device. The server watches the folder and records each new file within a few seconds (**Check folder** does it on demand). Each file's fingerprint is recorded, so copies and moved files aren't added twice. Set `CAR_DOCS_DIR` for another folder, `CAR_DOCS_WATCH=0` to stop watching.
+- **Reading them: `/car-docs` in Claude Code** (the skill is in `.claude/skills/car-docs/`). The app can't read documents itself; the skill reads each waiting file, saves the date, shop, mileage, total and line items, assigns it to a car, matches it to the bank charge that paid it (or marks it paid in cash / from an account that isn't imported), and updates purchase, loan and sale details from the big documents after you confirm. Any document can also be filled in or corrected by hand on the Cars tab.
+- **Filed away once read:** a loose file is moved to `<car>/<year>/<date> <shop> <type>.<ext>`. Files you put in subfolders yourself stay put; contents are never changed. Set `CAR_DOCS_ORGANIZE=0` to turn filing off.
+- **What counts toward a car:**
+  - bank charges assigned to it (from a matched document, or picked by hand),
+  - **shared-cost rules**: every charge from a merchant, payee or category goes to one car or is split across the cars owned on that day, evenly or by weights (gas, a two-car insurance policy). A charge assigned by hand wins over a rule,
+  - documents paid outside the imported accounts.
+- **Cost of ownership** = those running costs + depreciation (out-the-door purchase price minus the current value) + loan interest (typed from a payoff letter, or estimated from amount, APR and term). Down payment and loan payments are counted through the price and interest, never twice. The current value comes from the car's **Vehicle** asset on the Assets page, so update it there.
+- **Mileage** comes from the purchase, every document with an odometer reading, and the sale; with two or more readings the app estimates miles a year, today's mileage and cost per mile.
+- **Fill the gaps** lists Auto and Gas charges not assigned to a car yet, car charges over $100 with no invoice or receipt, and read documents with no bank charge.
+- **Keep or upgrade** compares what keeping the car and replacing it cost per year (repairs, value lost, interest), shows the repair bill at which they cost the same, and checks the cash side against checking and savings on the Assets page, an emergency fund of N months of average spending, and open goals. Inputs are remembered per device.
+- **Tables:** `vehicles`, `vehicle_documents`, `vehicle_links` (charge → car, with a share), `vehicle_rules`, all in `data/finance.db` and created on server start, so the daily backups cover them. The documents folder is the original source; back it up like the statements folder.
+
+---
+
 ## Claude MCP (read-only finance tools)
 
 `backend/src/mcp/` is an MCP server that lets Claude (Claude Code, Claude Desktop) query the finance data. It opens `data/finance.db` **read-only** (SQLite refuses every write), so imports, edits and deletes stay in the app.
@@ -280,6 +299,7 @@ The transactions live in the same `data/finance.db`, so the daily backups cover 
 | `spending_summary` | Spending grouped by category, merchant, month, year, weekday or account |
 | `list_bills` | Bills with your monthly share |
 | `net_worth` | Hand-entered asset balances by type |
+| `car_costs` | Each car's cost of ownership, per year and per mile, service history, mileage, gaps, and upgrade context |
 | `run_sql` | One read-only `SELECT`, for anything else |
 
 It's bundled into one file (Node's built-in `node:sqlite`, no native modules) and installed to `~/Library/Application Support/financial-insider-mcp/`, outside `~/Documents`, the same way as the Stacks MCP. `pnpm prod:deploy` reinstalls it.

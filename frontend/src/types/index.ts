@@ -367,3 +367,182 @@ export const EXPENSE_CATEGORIES = [
   "Home", "Kids", "Entertainment", "Travel", "Other",
 ];
 
+
+// ── Cars ──────────────────────────────────────────────────────
+
+export type CostType = "repair" | "maintenance" | "tires" | "insurance" | "fuel" | "registration" | "parking" | "other" | "purchase" | "loan";
+export type CarDocType =
+  | "purchase" | "sale" | "loan" | "repair" | "maintenance" | "tires" | "insurance"
+  | "registration" | "inspection" | "fuel" | "parking" | "other";
+
+export interface Vehicle {
+  id: string;
+  name: string;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  vin: string | null;
+  plate: string | null;
+  driver: string | null;
+  accountId: string | null;
+  purchaseDate: string | null;
+  purchasePrice: number | null;
+  purchaseMileage: number | null;
+  purchasedFrom: string | null;
+  tradeInValue: number | null;
+  loanAmount: number | null;
+  loanRate: number | null;
+  loanMonths: number | null;
+  interestPaid: number | null;
+  soldDate: string | null;
+  salePrice: number | null;
+  saleMileage: number | null;
+  valueEstimate: number | null;
+  valueDate: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface OdometerReading {
+  date: string;
+  miles: number;
+  source: string;
+  documentId?: string;
+}
+
+export interface VehicleSummary {
+  vehicle: Vehicle;
+  currentValue: number | null;
+  currentValueDate: string | null;
+  valueSource: "asset" | "estimate" | "sale" | null;
+  ownedYears: number | null;
+  running: Partial<Record<CostType, number>>;
+  runningTotal: number;
+  paidTowardCar: number;
+  depreciation: number | null;
+  interest: { amount: number; estimated: boolean } | null;
+  ownershipCost: number;
+  perYear: number | null;
+  perMonth: number | null;
+  byYear: { year: string; total: number; byType: Partial<Record<CostType, number>> }[];
+  upkeepLast12: number;
+  upkeepPrior12: number;
+  runningLast12: number;
+  readings: OdometerReading[];
+  latestMiles: number | null;
+  milesPerYear: number | null;
+  estimatedMilesNow: number | null;
+  milesDriven: number | null;
+  costPerMile: number | null;
+  lastService: { date: string; vendor: string | null; summary: string | null; odometer: number | null } | null;
+  documents: number;
+}
+
+export interface CarCostEntry {
+  vehicleId: string;
+  date: string;
+  amount: number;
+  costType: CostType;
+  source: "charge" | "rule" | "document";
+  description: string;
+  transactionId?: string;
+  documentId?: string;
+  linkId?: string;
+  ruleId?: string;
+  share?: number;
+}
+
+export interface CarDocument {
+  id: string;
+  fileName: string;
+  sourcePath: string;
+  path: string | null;
+  size: number;
+  status: "new" | "done" | "skipped";
+  vehicleId: string | null;
+  docType: CarDocType | null;
+  date: string | null;
+  vendor: string | null;
+  odometer: number | null;
+  total: number | null;
+  summary: string | null;
+  items: { description: string; amount?: number | null }[];
+  details: unknown;
+  transactionId: string | null;
+  paidOutside: boolean;
+  notes: string | null;
+  addedAt: string;
+  updatedAt: string | null;
+}
+
+export interface CarGaps {
+  unassigned: { merchant: string; payeeId: string | null; category: string; count: number; total: number; first: string; last: string }[];
+  unassignedTotal: number;
+  missingReceipts: { transactionId: string; date: string; merchant: string; amount: number; vehicleId: string | null }[];
+  unmatchedDocuments: { id: string; date: string | null; vendor: string | null; total: number; vehicleId: string | null }[];
+  unread: number;
+}
+
+export interface UpgradeContext {
+  liquidCash: number;
+  liquidAccounts: { type: string; institution: string | null; owner: string | null; balance: number }[];
+  monthlySpending: number;
+  monthlyIncome: number;
+  goals: { name: string; remaining: number; deadline: string | null; priority: string }[];
+  goalsRemaining: number;
+}
+
+export interface CarsOverview {
+  vehicles: VehicleSummary[];
+  household: {
+    runningTotal: number;
+    runningLast12: number;
+    ownershipTotal: number;
+    byYear: { year: string; total: number }[];
+    unassignedTotal: number;
+  };
+  gaps: CarGaps;
+  context: UpgradeContext;
+}
+
+export interface VehicleDetail {
+  summary: VehicleSummary;
+  entries: CarCostEntry[];
+  documents: CarDocument[];
+}
+
+export interface CarRule {
+  id: string;
+  matchType: "payee" | "category" | "merchant";
+  matchValue: string;
+  costType: CostType;
+  shares: Record<string, number> | null;
+  dateFrom: string | null;
+  dateTo: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface CarCharge {
+  id: string;
+  date: string;
+  merchant: string;
+  description: string;
+  amount: number;
+  category: string;
+  accountId: string;
+}
+
+export interface CarDocMatch {
+  transactionId: string;
+  date: string;
+  merchant: string;
+  description: string;
+  amount: number;
+  category: string;
+  days: number;
+  exactAmount: boolean;
+  nameMatch: boolean;
+  otherDocumentId: string | null;
+  score: number;
+}
