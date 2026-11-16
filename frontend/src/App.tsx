@@ -6,12 +6,13 @@ import SubscriptionsView from "./components/subscriptions/SubscriptionsView";
 import GoalsView from "./components/goals/GoalsView";
 import ActivityView from "./components/activity/ActivityView";
 import AnalyticsView from "./components/analytics/AnalyticsView";
+import CarsView from "./components/cars/CarsView";
 import SettingsModal from "./components/layout/SettingsModal";
 import Toast from "./components/layout/Toast";
 import OptionSheet from "./components/layout/OptionSheet";
 import { ConnectionDot, ConnectionPill, useConnectionNotice } from "./components/layout/ConnectionNotice";
 
-type View = "dashboard" | "accounts" | "budget" | "subscriptions" | "goals" | "activity" | "analytics";
+type View = "dashboard" | "accounts" | "budget" | "subscriptions" | "goals" | "activity" | "analytics" | "cars";
 
 const NAV_ITEMS: { view: View; icon: string; label: string; desktop: string; hint: string }[] = [
   { view: "dashboard", icon: "📊", label: "Home", desktop: "Dashboard", hint: "" },
@@ -21,6 +22,7 @@ const NAV_ITEMS: { view: View; icon: string; label: string; desktop: string; hin
   { view: "activity", icon: "🧾", label: "Activity", desktop: "Activity", hint: "" },
   { view: "analytics", icon: "📈", label: "Analytics", desktop: "Analytics", hint: "What costs more, year over year" },
   { view: "goals", icon: "🎯", label: "Goals", desktop: "Goals", hint: "What you're saving toward" },
+  { view: "cars", icon: "🚗", label: "Cars", desktop: "Cars", hint: "What the cars cost, documents, keep or upgrade" },
 ];
 /** The phone tab bar holds these four; the rest live in the "More" sheet */
 const PHONE_TABS: View[] = ["dashboard", "budget", "subscriptions", "activity"];
@@ -133,6 +135,7 @@ export default function App() {
           {activeView === "goals" && <GoalsView onToast={showToast} />}
           {activeView === "activity" && <ActivityView onToast={showToast} />}
           {activeView === "analytics" && <AnalyticsView />}
+          {activeView === "cars" && <CarsView onToast={showToast} />}
         </div>
       </main>
 

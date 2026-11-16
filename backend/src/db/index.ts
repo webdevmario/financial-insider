@@ -166,5 +166,83 @@ if (cardCols.length && !cardCols.some((c) => c.name === "reward_caps")) {
   sqlite.exec("ALTER TABLE credit_cards ADD COLUMN reward_caps TEXT");
 }
 
+// Cars: vehicles, their documents, bank charges assigned to them and shared-cost rules
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS vehicles (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    year INTEGER,
+    make TEXT,
+    model TEXT,
+    vin TEXT,
+    plate TEXT,
+    driver TEXT,
+    account_id TEXT,
+    purchase_date TEXT,
+    purchase_price REAL,
+    purchase_mileage INTEGER,
+    purchased_from TEXT,
+    trade_in_value REAL,
+    loan_amount REAL,
+    loan_rate REAL,
+    loan_months INTEGER,
+    interest_paid REAL,
+    sold_date TEXT,
+    sale_price REAL,
+    sale_mileage INTEGER,
+    value_estimate REAL,
+    value_date TEXT,
+    notes TEXT,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS vehicle_documents (
+    id TEXT PRIMARY KEY NOT NULL,
+    file_name TEXT NOT NULL,
+    source_path TEXT NOT NULL,
+    file_hash TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    status TEXT DEFAULT 'new' NOT NULL,
+    vehicle_id TEXT,
+    doc_type TEXT,
+    date TEXT,
+    vendor TEXT,
+    odometer INTEGER,
+    total REAL,
+    summary TEXT,
+    items TEXT,
+    details TEXT,
+    transaction_id TEXT,
+    paid_outside INTEGER DEFAULT 0 NOT NULL,
+    notes TEXT,
+    added_at TEXT NOT NULL,
+    updated_at TEXT
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS vehicle_documents_hash ON vehicle_documents(file_hash);
+  CREATE INDEX IF NOT EXISTS vehicle_documents_vehicle ON vehicle_documents(vehicle_id);
+
+  CREATE TABLE IF NOT EXISTS vehicle_links (
+    id TEXT PRIMARY KEY NOT NULL,
+    transaction_id TEXT NOT NULL,
+    vehicle_id TEXT NOT NULL,
+    share REAL DEFAULT 1 NOT NULL,
+    cost_type TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS vehicle_links_txn_vehicle ON vehicle_links(transaction_id, vehicle_id);
+
+  CREATE TABLE IF NOT EXISTS vehicle_rules (
+    id TEXT PRIMARY KEY NOT NULL,
+    match_type TEXT NOT NULL,
+    match_value TEXT NOT NULL,
+    cost_type TEXT NOT NULL,
+    shares TEXT,
+    date_from TEXT,
+    date_to TEXT,
+    notes TEXT,
+    created_at TEXT NOT NULL
+  );
+`);
+
 export const db = drizzle(sqlite, { schema });
 export { sqlite };

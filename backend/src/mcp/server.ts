@@ -2,6 +2,7 @@ import { McpServer, type CallToolResult } from "@modelcontextprotocol/server";
 import { z } from "zod";
 
 import {
+  carCosts,
   findTransactions,
   listBills,
   merchantHistory,
@@ -39,6 +40,7 @@ date range covered. Card data has a date but no time, and can't tell a dinner ou
 
 For "where have we eaten / when did we last go": merchant_history with categories ["Dining"].
 For "time to go back": add minVisits and sort "longest_ago". For "too soon": sort "recent".
+For what the cars cost, their service history and mileage, or whether an upgrade makes sense: car_costs.
 For ad hoc questions the other tools can't answer, run_sql (read-only SELECT; schema in its description).
 
 This is private financial data: don't send it to web searches or other services unless the user asks.`;
@@ -47,7 +49,11 @@ const SCHEMA_HINT = `Tables: transactions(id, account_id, date YYYY-MM-DD, month
 category, kind, member, payee_id), statement_accounts(id, institution, name, kind), payees(id, name, category, kind,
 bill_id), subscriptions(name, category, frequency, amount, split_by, next_charge, status, state), accounts(type,
 balance, owner, institution, home_value, mortgage_balance, last_updated), goals(name, target_amount, saved_amount,
-deadline), credit_cards(name, issuer, annual_fee, reward_rates JSON), import_batches(file_name, imported_at).`;
+deadline), credit_cards(name, issuer, annual_fee, reward_rates JSON), import_batches(file_name, imported_at),
+vehicles(id, name, year, make, model, purchase_date, purchase_price, purchase_mileage, loan_amount, loan_rate, loan_months,
+sold_date, sale_price, account_id), vehicle_documents(vehicle_id, status, doc_type, date, vendor, odometer, total, summary,
+items JSON, transaction_id, paid_outside), vehicle_links(transaction_id, vehicle_id, share, cost_type),
+vehicle_rules(match_type, match_value, cost_type, shares JSON, date_from, date_to).`;
 
 type Result = CallToolResult;
 
@@ -210,6 +216,20 @@ export function createServer(deps: McpDeps): McpServer {
       inputSchema: z.object({}),
     },
     () => netWorth(deps.db),
+  );
+
+  tool(
+    "car_costs",
+    {
+      title: "Car costs and history",
+      description:
+        "Every car: cost of ownership (running costs + depreciation + loan interest), per year and per mile, costs by " +
+        "type and by year, mileage readings, repairs in the last 12 months vs the 12 before, plus service history from " +
+        "the documents, gaps in the data (unassigned car charges, charges with no receipt) and the household context " +
+        "for an upgrade (checking and savings, average monthly spending and income, open goals).",
+      inputSchema: z.object({}),
+    },
+    () => carCosts(deps.db, deps.today?.()),
   );
 
   tool(

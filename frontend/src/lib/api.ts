@@ -1,6 +1,7 @@
 import type {
   Account, Subscription, Expense, Goal, AppSettings, Transaction, StatementAccount, ScanResult,
   BillVsActual, ImportBatch, Insights, YearOverYear, CostChanges, Payee, PayeeDetail, UnassignedMerchant, UnassignedTxn, AliasPreview,
+  CarsOverview, Vehicle, VehicleDetail, CarDocument, CarRule, CarCharge, CarDocMatch, CostType,
 } from "../types";
 import { today } from "./formatters";
 import { offlineDb } from "./offline/db";
@@ -311,6 +312,51 @@ export const api = {
       request<PayeeDetail>(`/payees/${id}/aliases`, { method: "POST", body: JSON.stringify(data) }),
     deleteAlias: (id: string, aliasId: string) =>
       request<PayeeDetail>(`/payees/${id}/aliases/${aliasId}`, { method: "DELETE" }),
+  },
+
+  // ── Cars ─────────────────────────────────────────────────────
+  cars: {
+    overview: () => cachedGet<CarsOverview>("/cars"),
+    meta: () => cachedGet<{ costTypes: CostType[]; docTypes: string[]; folder: string; vehicleAssets: Account[] }>("/cars/meta"),
+    vehicle: (id: string) => cachedGet<VehicleDetail>(`/cars/vehicles/${id}`),
+    create: (data: Partial<Vehicle>) => request<Vehicle>("/cars", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: string, data: Partial<Vehicle>) =>
+      request<Vehicle>(`/cars/vehicles/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    delete: (id: string) => request<{ success: boolean }>(`/cars/vehicles/${id}`, { method: "DELETE" }),
+    documents: (params: { status?: string; vehicleId?: string } = {}) => {
+      const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]).toString();
+      return cachedGet<CarDocument[]>(`/cars/documents${qs ? `?${qs}` : ""}`);
+    },
+    scan: () => request<{ added: number; moved: number; missing: number; newDocs: number }>("/cars/documents/scan", { method: "POST" }),
+    upload: (name: string, content: string) =>
+      request<{ document: CarDocument | null; duplicate: boolean }>("/cars/documents/upload", {
+        method: "POST",
+        body: JSON.stringify({ name, content }),
+      }, 60000),
+    updateDocument: (id: string, data: Partial<Omit<CarDocument, "items">> & { items?: CarDocument["items"]; share?: number; costType?: CostType }) =>
+      request<CarDocument>(`/cars/documents/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    deleteDocument: (id: string) => request<{ success: boolean }>(`/cars/documents/${id}`, { method: "DELETE" }),
+    matches: (id: string, params: { total?: number | null; date?: string | null; vendor?: string | null } = {}) => {
+      const qs = new URLSearchParams(
+        Object.entries(params).filter(([, v]) => v != null && v !== "").map(([k, v]) => [k, String(v)])
+      ).toString();
+      return request<{ date: string; total: number | null; vendor: string | null; candidates: CarDocMatch[] }>(
+        `/cars/documents/${id}/matches${qs ? `?${qs}` : ""}`, undefined, READ_TIMEOUT
+      );
+    },
+    fileUrl: (id: string) => `${BASE}/cars/documents/${id}/file`,
+    charges: (params: { merchant?: string; payeeId?: string } = {}) => {
+      const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]).toString();
+      return cachedGet<CarCharge[]>(`/cars/charges${qs ? `?${qs}` : ""}`);
+    },
+    link: (data: { transactionIds: string[]; vehicleId: string; costType: CostType; share?: number }) =>
+      request<{ linked: number }>("/cars/links", { method: "POST", body: JSON.stringify(data) }),
+    unlink: (id: string) => request<{ success: boolean }>(`/cars/links/${id}`, { method: "DELETE" }),
+    rules: () => cachedGet<CarRule[]>("/cars/rules"),
+    createRule: (data: Partial<CarRule>) => request<CarRule>("/cars/rules", { method: "POST", body: JSON.stringify(data) }),
+    updateRule: (id: string, data: Partial<CarRule>) =>
+      request<CarRule>(`/cars/rules/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    deleteRule: (id: string) => request<{ success: boolean }>(`/cars/rules/${id}`, { method: "DELETE" }),
   },
 
   // ── Settings ─────────────────────────────────────────────────

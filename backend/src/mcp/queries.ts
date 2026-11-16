@@ -1,4 +1,5 @@
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
+import { carsOverview, type CarData } from "../lib/cars/compute.js";
 
 /**
  * Read-only queries behind the finance MCP. Every function takes a connection
@@ -341,4 +342,68 @@ export function runSql(db: Db, sql: string, maxRows = 200) {
     rows.push(row);
   }
   return { columns: stmt.columns().map((c) => c.name), rowCount: rows.length, truncated, rows };
+}
+
+// ── cars ──────────────────────────────────────────────────────────
+
+/**
+ * Rows for the car math, read with the same column names the app uses. Before the app has created
+ * the car tables (the server adds them on its next start), there are simply no cars.
+ */
+export function loadCarData(db: Db, today = localToday()): CarData {
+  const has = (table: string) =>
+    !!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table);
+  const all = <T>(sql: string): T[] => db.prepare(sql).all() as T[];
+  const carTables = has("vehicles") && has("vehicle_documents") && has("vehicle_links") && has("vehicle_rules");
+  return {
+    cars: carTables
+      ? all(`SELECT id, name, year, make, model, vin, plate, driver, account_id AS accountId, purchase_date AS purchaseDate,
+                    purchase_price AS purchasePrice, purchase_mileage AS purchaseMileage, purchased_from AS purchasedFrom,
+                    trade_in_value AS tradeInValue, loan_amount AS loanAmount, loan_rate AS loanRate, loan_months AS loanMonths,
+                    interest_paid AS interestPaid, sold_date AS soldDate, sale_price AS salePrice, sale_mileage AS saleMileage,
+                    value_estimate AS valueEstimate, value_date AS valueDate, notes, created_at AS createdAt
+               FROM vehicles`)
+      : [],
+    links: carTables
+      ? all(`SELECT id, transaction_id AS transactionId, vehicle_id AS vehicleId, share, cost_type AS costType, created_at AS createdAt
+               FROM vehicle_links`)
+      : [],
+    rules: carTables
+      ? all(`SELECT id, match_type AS matchType, match_value AS matchValue, cost_type AS costType, shares,
+                    date_from AS dateFrom, date_to AS dateTo, notes, created_at AS createdAt
+               FROM vehicle_rules`)
+      : [],
+    docs: carTables
+      ? all(`SELECT id, file_name AS fileName, source_path AS sourcePath, file_hash AS fileHash, size, status,
+                    vehicle_id AS vehicleId, doc_type AS docType, date, vendor, odometer, total, summary, items, details,
+                    transaction_id AS transactionId, paid_outside AS paidOutside, notes, added_at AS addedAt, updated_at AS updatedAt
+               FROM vehicle_documents`)
+      : [],
+    txns: all(`SELECT id, date, month, amount, merchant, category, kind, payee_id AS payeeId FROM transactions`),
+    assets: all(`SELECT id, type, balance, last_updated AS lastUpdated, institution, owner FROM accounts`),
+    goals: all(`SELECT name, target_amount AS targetAmount, saved_amount AS savedAmount, deadline, priority,
+                       completed_at AS completedAt FROM goals`),
+    today,
+  };
+}
+
+/** Each car's costs, the gaps in the data, and the household numbers an upgrade decision needs */
+export function carCosts(db: Db, today?: string) {
+  const data = loadCarData(db, today);
+  const overview = carsOverview(data);
+  return {
+    note:
+      "Cost of ownership = running costs (charges assigned to a car, shared costs split by rules, documents paid outside " +
+      "the imported accounts) + depreciation (purchase price minus current value) + loan interest. Purchase and loan " +
+      "payments are counted through the price, not as running costs. Current value comes from the car's Vehicle asset.",
+    ...overview,
+    // Service history per car: what was done, when, at what mileage
+    documents: data.docs
+      .filter((d) => d.status === "done")
+      .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
+      .map((d) => ({
+        vehicleId: d.vehicleId, date: d.date, type: d.docType, vendor: d.vendor, odometer: d.odometer, total: d.total,
+        summary: d.summary, items: d.items ? JSON.parse(d.items) : [], details: d.details ? JSON.parse(d.details) : null,
+      })),
+  };
 }
