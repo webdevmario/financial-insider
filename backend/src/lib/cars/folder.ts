@@ -6,7 +6,9 @@
  * files it hasn't seen, and a file that moved keeps its record. Nothing here reads what a document
  * says: Claude does that with the /car-docs skill and saves the details through the API. Once a document
  * is read and assigned to a car, a loose file is filed away as <car>/<year>/<date> <vendor> <type>.<ext>
- * (set CAR_DOCS_ORGANIZE=0 to leave files in place). File contents are never changed.
+ * (set CAR_DOCS_ORGANIZE=0 to leave files in place). Photos and scanned PDFs are cleaned up as they
+ * arrive (see cleanup.ts): the cleaned PDF takes the file's place and the original is kept, unchanged,
+ * under .originals/ (hidden, so the scan skips it).
  */
 import { createHash } from "crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, watch, writeFileSync } from "fs";
@@ -15,6 +17,7 @@ import { basename, dirname, extname, join, relative, resolve, sep } from "path";
 import { eq } from "drizzle-orm";
 import { db } from "../../db/index.js";
 import { vehicleDocuments, vehicles, type VehicleDocument } from "../../db/schema.js";
+import { queueNewDocuments } from "./cleanup.js";
 
 export function carDocsDir(): string {
   return resolve(process.env.CAR_DOCS_DIR || join(homedir(), "Documents", "car-documents"));
@@ -40,11 +43,16 @@ function newId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
+/** Absolute path of a file in the folder, or null if the path points outside it */
+export function folderPath(rel: string): string | null {
+  const folder = carDocsDir();
+  const full = resolve(folder, rel);
+  return full === folder || !full.startsWith(folder + sep) ? null : full;
+}
+
 /** Absolute path of a document's file, or null if it points outside the folder */
 export function documentPath(doc: Pick<VehicleDocument, "sourcePath">): string | null {
-  const folder = carDocsDir();
-  const full = resolve(folder, doc.sourcePath);
-  return full === folder || !full.startsWith(folder + sep) ? null : full;
+  return folderPath(doc.sourcePath);
 }
 
 /** Every document file under the folder, skipping hidden files and macOS metadata */
@@ -88,6 +96,8 @@ export function scanCarDocs(): DocScanResult {
     mkdirSync(folder, { recursive: true });
     const known = db.select().from(vehicleDocuments).all();
     const byHash = new Map(known.map((d) => [d.fileHash, d]));
+    // The same photo dropped in again after it was cleaned up is still a copy of a known document
+    for (const d of known) if (d.originalHash && !byHash.has(d.originalHash)) byHash.set(d.originalHash, d);
     const byPath = new Map(known.map((d) => [d.sourcePath, d]));
     const seenPaths = new Set<string>();
     const now = new Date().toISOString();
@@ -108,7 +118,7 @@ export function scanCarDocs(): DocScanResult {
         continue;
       }
       if (match) {
-        if (match.sourcePath !== rel && !existsSync(resolve(folder, match.sourcePath))) {
+        if (match.fileHash === hash && match.sourcePath !== rel && !existsSync(resolve(folder, match.sourcePath))) {
           db.update(vehicleDocuments).set({ sourcePath: rel, fileName: basename(full) }).where(eq(vehicleDocuments.id, match.id)).run();
           match.sourcePath = rel;
           result.moved++;
@@ -132,6 +142,7 @@ export function scanCarDocs(): DocScanResult {
   } finally {
     scanning = false;
   }
+  queueNewDocuments();
   return result;
 }
 

@@ -244,5 +244,11 @@ sqlite.exec(`
   );
 `);
 
+// Scan cleanup for car documents
+const carDocCols = sqlite.prepare("PRAGMA table_info(vehicle_documents)").all() as { name: string }[];
+for (const col of ["text", "original_path", "original_hash", "cleanup", "parent_id"]) {
+  if (!carDocCols.some((c) => c.name === col)) sqlite.exec(`ALTER TABLE vehicle_documents ADD COLUMN ${col} TEXT`);
+}
+
 export const db = drizzle(sqlite, { schema });
 export { sqlite };
