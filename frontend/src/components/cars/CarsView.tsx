@@ -55,6 +55,12 @@ export default function CarsView({ onToast }: CarsViewProps) {
     load().finally(() => setLoading(false));
   }, [load]);
 
+  /** "+2 supporting" for a document with supporting documents (they're listed inside it, not on their own) */
+  const supportCount = (id: string) => {
+    const n = docs.filter((d) => d.parentId === id).length;
+    return n ? `+${n} supporting` : null;
+  };
+
   const changed = useCallback(() => {
     setVersion((v) => v + 1);
     load();
@@ -246,7 +252,7 @@ export default function CarsView({ onToast }: CarsViewProps) {
           className="mb-3"
           options={[
             { value: "new", label: `To read (${unread})` },
-            { value: "done", label: `Read (${docs.filter((d) => d.status === "done").length})` },
+            { value: "done", label: `Read (${docs.filter((d) => d.status === "done" && !d.parentId).length})` },
             { value: "skipped", label: "Skipped" },
           ]}
         />
@@ -254,14 +260,15 @@ export default function CarsView({ onToast }: CarsViewProps) {
           <Empty>{docFilter === "new" ? "Nothing waiting. New files show up here as soon as they land in the folder." : "None."}</Empty>
         ) : (
           <List>
-            {shownDocs.map((d) => (
+            {shownDocs.filter((d) => !d.parentId || !shownDocs.some((m) => m.id === d.parentId)).map((d) => (
               <Row
                 key={d.id}
                 title={d.status === "new" ? d.fileName : d.vendor || d.fileName}
                 sub={
                   d.status === "new"
                     ? `Added ${fmtDate(d.addedAt.slice(0, 10))}`
-                    : [fmtDate(d.date), d.docType ? DOC_TYPE_LABELS[d.docType] : null, carName(d.vehicleId), d.odometer != null ? miles(d.odometer) : null]
+                    : [fmtDate(d.date), d.docType ? DOC_TYPE_LABELS[d.docType] : null, carName(d.vehicleId), d.odometer != null ? miles(d.odometer) : null,
+                      supportCount(d.id)]
                         .filter(Boolean).join(" · ")
                 }
                 amount={d.total != null ? fmtP(d.total) : undefined}
@@ -307,7 +314,7 @@ export default function CarsView({ onToast }: CarsViewProps) {
         onChanged={changed}
         onToast={onToast}
       />
-      <DocumentModal doc={openDoc} cars={cars} onClose={() => setOpenDoc(null)} onSaved={changed} onToast={onToast} />
+      <DocumentModal doc={openDoc} cars={cars} docs={docs} onOpen={setOpenDoc} onClose={() => setOpenDoc(null)} onSaved={changed} onToast={onToast} />
       <AssignModal target={assign} cars={cars} onClose={() => setAssign(null)} onSaved={changed} onToast={onToast} />
     </div>
   );

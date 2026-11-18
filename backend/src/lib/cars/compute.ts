@@ -177,7 +177,7 @@ export function costEntries(data: CarData): { entries: CostEntry[]; covered: Set
   }
 
   for (const d of data.docs) {
-    if (d.status !== "done" || !d.paidOutside) continue;
+    if (d.status !== "done" || !d.paidOutside || d.parentId) continue;
     const type = docCostType(d.docType);
     if (!d.vehicleId || !d.total || !d.date || !type || d.transactionId) continue;
     entries.push({
@@ -267,7 +267,10 @@ export function summarizeVehicle(v: Vehicle, entries: CostEntry[], data: Pick<Ca
   const now = data.today;
   const docs = data.docs;
   const mine = entries.filter((e) => e.vehicleId === v.id);
-  const myDocs = docs.filter((d) => d.vehicleId === v.id && d.status === "done");
+  // Supporting documents (a CARFAX alert for an invoice) only fill in a reading their main one lacks
+  const myDocs = docs.filter((d) => d.vehicleId === v.id && d.status === "done" && !d.parentId);
+  const mainIds = new Set(myDocs.map((d) => d.id));
+  const supporting = docs.filter((d) => d.vehicleId === v.id && d.status === "done" && d.parentId && mainIds.has(d.parentId));
   const running: Record<string, number> = {};
   const byYearMap = new Map<string, Record<string, number>>();
   let paidTowardCar = 0;
@@ -323,6 +326,12 @@ export function summarizeVehicle(v: Vehicle, entries: CostEntry[], data: Pick<Ca
   if (v.purchaseDate && v.purchaseMileage != null) readings.push({ date: v.purchaseDate, miles: v.purchaseMileage, source: "Purchase" });
   for (const d of myDocs) {
     if (d.date && d.odometer != null) readings.push({ date: d.date, miles: d.odometer, source: d.vendor || d.docType || "Document", documentId: d.id });
+  }
+  for (const d of supporting) {
+    const main = myDocs.find((m) => m.id === d.parentId);
+    if (main?.odometer == null && d.date && d.odometer != null) {
+      readings.push({ date: d.date, miles: d.odometer, source: d.vendor || d.docType || "Document", documentId: d.id });
+    }
   }
   if (v.soldDate && v.saleMileage != null) readings.push({ date: v.soldDate, miles: v.saleMileage, source: "Sale" });
   readings.sort((a, b) => a.date.localeCompare(b.date) || a.miles - b.miles);
@@ -410,7 +419,7 @@ export function findGaps(data: CarData, covered: Set<string>, entries: CostEntry
     .map((t) => ({ transactionId: t.id, date: t.date, merchant: t.merchant, amount: round(spent(t)), vehicleId: vehicleOf.get(t.id) ?? null }));
 
   const unmatchedDocuments = docs
-    .filter((d) => d.status === "done" && d.total && d.total > 0 && !d.transactionId && !d.paidOutside && d.docType !== "sale")
+    .filter((d) => d.status === "done" && !d.parentId && d.total && d.total > 0 && !d.transactionId && !d.paidOutside && d.docType !== "sale")
     .map((d) => ({ id: d.id, date: d.date, vendor: d.vendor, total: d.total!, vehicleId: d.vehicleId }));
 
   return {

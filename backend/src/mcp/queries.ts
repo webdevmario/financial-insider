@@ -355,6 +355,7 @@ export function loadCarData(db: Db, today = localToday()): CarData {
     !!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table);
   const all = <T>(sql: string): T[] => db.prepare(sql).all() as T[];
   const carTables = has("vehicles") && has("vehicle_documents") && has("vehicle_links") && has("vehicle_rules");
+  const docCols = carTables ? all<{ name: string }>("PRAGMA table_info(vehicle_documents)").map((c) => c.name) : [];
   return {
     cars: carTables
       ? all(`SELECT id, name, year, make, model, vin, plate, driver, account_id AS accountId, purchase_date AS purchaseDate,
@@ -376,7 +377,8 @@ export function loadCarData(db: Db, today = localToday()): CarData {
     docs: carTables
       ? all(`SELECT id, file_name AS fileName, source_path AS sourcePath, file_hash AS fileHash, size, status,
                     vehicle_id AS vehicleId, doc_type AS docType, date, vendor, odometer, total, summary, items, details,
-                    transaction_id AS transactionId, paid_outside AS paidOutside, notes, added_at AS addedAt, updated_at AS updatedAt
+                    transaction_id AS transactionId, paid_outside AS paidOutside, notes, added_at AS addedAt, updated_at AS updatedAt,
+                    ${docCols.includes("parent_id") ? "parent_id" : "NULL"} AS parentId
                FROM vehicle_documents`)
       : [],
     txns: all(`SELECT id, date, month, amount, merchant, category, kind, payee_id AS payeeId FROM transactions`),

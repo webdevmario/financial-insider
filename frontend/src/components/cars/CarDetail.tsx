@@ -84,7 +84,7 @@ export default function CarDetail({ vehicleId, onClose, onEdit, onOpenDocument, 
             full
             options={[
               { value: "costs", label: "Costs" },
-              { value: "history", label: `Service (${detail.documents.length})` },
+              { value: "history", label: `Service (${detail.documents.filter((d) => !d.parentId).length})` },
               { value: "charges", label: `Charges (${detail.entries.length})` },
             ]}
           />
@@ -168,7 +168,7 @@ export default function CarDetail({ vehicleId, onClose, onEdit, onOpenDocument, 
               <p className="text-xs text-text-muted py-6 text-center">No documents for this car yet.</p>
             ) : (
               <div className="bg-bg-input border border-border rounded-lg">
-                {detail.documents.map((d) => (
+                {detail.documents.filter((d) => !d.parentId || !detail.documents.some((m) => m.id === d.parentId)).map((d) => (
                   <button
                     key={d.id}
                     onClick={() => onOpenDocument(d)}
@@ -180,7 +180,9 @@ export default function CarDetail({ vehicleId, onClose, onEdit, onOpenDocument, 
                         {d.docType && <span className="text-text-muted"> · {DOC_TYPE_LABELS[d.docType]}</span>}
                       </span>
                       <span className="block text-text-muted truncate">
-                        {[fmtDate(d.date), d.odometer != null ? miles(d.odometer) : null, d.summary].filter(Boolean).join(" · ")}
+                        {[fmtDate(d.date), d.odometer != null ? miles(d.odometer) : null, d.summary,
+                          (() => { const n = detail.documents.filter((s) => s.parentId === d.id).length; return n ? `+${n} supporting` : null; })()]
+                          .filter(Boolean).join(" · ")}
                       </span>
                     </span>
                     {d.total != null && <span className="font-mono shrink-0">{fmtP(d.total)}</span>}

@@ -471,8 +471,27 @@ export interface CarDocument {
   transactionId: string | null;
   paidOutside: boolean;
   notes: string | null;
+  /** What the document says, read by OCR when it was cleaned up (or its own text layer) */
+  text: string | null;
+  /** Set when the file is a cleaned-up scan: the original is kept and can be opened or restored */
+  originalPath: string | null;
+  cleanup: CarDocCleanup | null;
+  /** Supporting document of another (a CARFAX alert for an invoice): the main one carries cost, charge and mileage */
+  parentId: string | null;
   addedAt: string;
   updatedAt: string | null;
+}
+
+export interface CarDocCleanup {
+  at: string;
+  result: "cleaned" | "digital" | "photo" | "restored" | "failed";
+  originalName?: string;
+  originalBytes?: number;
+  bytes?: number;
+  pages?: number[];
+  part?: number;
+  partsTotal?: number;
+  error?: string;
 }
 
 export interface CarGaps {

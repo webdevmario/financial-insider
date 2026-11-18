@@ -9,6 +9,9 @@ import type { CarDocMatch, CarDocType, CarDocument, Vehicle } from "../../types"
 interface DocumentModalProps {
   doc: CarDocument | null;
   cars: Vehicle[];
+  /** Every document, for supporting documents and the main one they belong to */
+  docs: CarDocument[];
+  onOpen: (doc: CarDocument) => void;
   onClose: () => void;
   onSaved: () => void;
   onToast: (msg: string, err?: boolean) => void;
@@ -20,7 +23,8 @@ const IMAGE = /\.(jpe?g|png|gif|webp)$/i;
  * One document: the original next to what it says. /car-docs fills this in; here it can be
  * checked, corrected or entered by hand, and matched to the bank charge that paid it.
  */
-export default function DocumentModal({ doc, cars, onClose, onSaved, onToast }: DocumentModalProps) {
+export default function DocumentModal({ doc, cars, docs, onOpen, onClose, onSaved, onToast }: DocumentModalProps) {
+  const [parentId, setParentId] = useState("");
   const [vehicleId, setVehicleId] = useState("");
   const [docType, setDocType] = useState<CarDocType | "">("");
   const [date, setDate] = useState("");
@@ -35,6 +39,7 @@ export default function DocumentModal({ doc, cars, onClose, onSaved, onToast }: 
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    setParentId(doc?.parentId || "");
     setVehicleId(doc?.vehicleId || "");
     setDocType(doc?.docType || "");
     setDate(doc?.date || "");
@@ -61,12 +66,13 @@ export default function DocumentModal({ doc, cars, onClose, onSaved, onToast }: 
 
   async function save(status: "done" | "skipped" | "new") {
     if (!doc) return;
-    if (status === "done" && !vehicleId && docType !== "insurance") return onToast("Pick the car", true);
+    if (status === "done" && !vehicleId && !parentId && docType !== "insurance") return onToast("Pick the car", true);
     setSaving(true);
     try {
       await api.cars.updateDocument(doc.id, {
         status,
-        vehicleId: vehicleId || null,
+        ...(parentId !== (doc.parentId || "") ? { parentId: parentId || null } : {}),
+        ...(parentId ? {} : { vehicleId: vehicleId || null, transactionId, paidOutside: transactionId ? false : paidOutside }),
         docType: docType || null,
         date: date || null,
         vendor: vendor || null,
@@ -74,8 +80,6 @@ export default function DocumentModal({ doc, cars, onClose, onSaved, onToast }: 
         total: total ? parseFloat(total) : null,
         summary: summary || null,
         notes: notes || null,
-        transactionId,
-        paidOutside: transactionId ? false : paidOutside,
       });
       onToast(status === "skipped" ? "Marked as not a car document" : "Document saved");
       onSaved();
@@ -87,7 +91,32 @@ export default function DocumentModal({ doc, cars, onClose, onSaved, onToast }: 
     }
   }
 
+  async function restore() {
+    if (!doc) return;
+    setSaving(true);
+    try {
+      await api.cars.restoreOriginal(doc.id);
+      onToast("Original put back");
+      onSaved();
+      onClose();
+    } catch (err) {
+      onToast(err instanceof Error ? err.message : "Couldn't restore the original", true);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const fileUrl = doc ? api.cars.fileUrl(doc.id) : "";
+  const cleaned = doc?.originalPath && doc.cleanup?.result === "cleaned" ? doc.cleanup : null;
+  const mb = (n?: number) => `${((n ?? 0) / 1_048_576).toFixed(1)} MB`;
+  const label = (d: CarDocument) => [fmtDate(d.date), d.vendor || d.fileName, d.docType ? DOC_TYPE_LABELS[d.docType] : null].filter(Boolean).join(" · ");
+  const main = parentId ? docs.find((d) => d.id === parentId) : undefined;
+  const supporting = doc ? docs.filter((d) => d.parentId === doc.id) : [];
+  // Documents this one could support: read, standing on their own, nearest in date first
+  const near = (d: CarDocument) => (doc?.date && d.date ? Math.abs(Date.parse(d.date) - Date.parse(doc.date)) : Infinity);
+  const mainChoices = doc && !supporting.length
+    ? docs.filter((d) => d.id !== doc.id && !d.parentId && d.status === "done").sort((a, b) => near(a) - near(b) || (b.date || "").localeCompare(a.date || ""))
+    : [];
 
   return (
     <Modal
@@ -111,18 +140,65 @@ export default function DocumentModal({ doc, cars, onClose, onSaved, onToast }: 
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between gap-3 text-xs">
             <span className="text-text-dim truncate" title={doc.sourcePath}>{doc.fileName}</span>
-            <a href={fileUrl} target="_blank" rel="noreferrer" className="link-tap shrink-0">Open original ↗</a>
+            <span className="flex gap-3 shrink-0">
+              <a href={fileUrl} target="_blank" rel="noreferrer" className="link-tap">{cleaned ? "Open ↗" : "Open original ↗"}</a>
+              {cleaned && (
+                <a href={api.cars.originalUrl(doc.id)} target="_blank" rel="noreferrer" className="link-tap">Original ↗</a>
+              )}
+            </span>
           </div>
+          {cleaned && (
+            <p className="text-xs text-text-muted -mt-2">
+              Cleaned up from {cleaned.originalName}
+              {cleaned.partsTotal ? ` (part ${cleaned.part} of ${cleaned.partsTotal}, pages ${cleaned.pages?.join(", ")})` : ""}
+              : {mb(cleaned.originalBytes)} to {mb(cleaned.bytes)}.{" "}
+              {!cleaned.partsTotal && (
+                <button type="button" className="link-tap" onClick={restore} disabled={saving}>Use the original instead</button>
+              )}
+            </p>
+          )}
           {IMAGE.test(doc.fileName) && (
             <a href={fileUrl} target="_blank" rel="noreferrer" className="block rounded-lg overflow-hidden border border-border bg-black/20">
               <img src={fileUrl} alt={doc.fileName} className="w-full max-h-[260px] object-contain" />
             </a>
           )}
 
+          {mainChoices.length > 0 && (
+            <div className="input-group">
+              <label>Supporting document of</label>
+              <select value={parentId} onChange={(e) => setParentId(e.target.value)}>
+                <option value="">None: it stands on its own</option>
+                {parentId && !mainChoices.some((d) => d.id === parentId) && main && <option value={main.id}>{label(main)}</option>}
+                {mainChoices.slice(0, 40).map((d) => <option key={d.id} value={d.id}>{label(d)}</option>)}
+              </select>
+              {parentId && (
+                <p className="text-xs text-text-muted mt-1">
+                  Kept with it for reference. Its car, bank charge and mileage come from that document, and any charge this one holds moves there.
+                  {main && <> <button type="button" className="link-tap" onClick={() => onOpen(main)}>Open it</button></>}
+                </p>
+              )}
+            </div>
+          )}
+
+          {supporting.length > 0 && (
+            <div className="input-group">
+              <label>Supporting documents</label>
+              <div className="bg-bg-input border border-border rounded-lg">
+                {supporting.map((s) => (
+                  <button key={s.id} type="button" onClick={() => onOpen(s)}
+                    className="w-full text-left flex justify-between gap-3 px-3.5 py-2 text-xs border-b border-border/40 last:border-0 hover:bg-white/[0.03]">
+                    <span className="min-w-0 truncate">{s.summary || s.fileName}</span>
+                    <span className="text-text-muted shrink-0">{fmtDate(s.date)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 max-md:grid-cols-1 gap-3">
             <div className="input-group">
               <label>Car</label>
-              <select value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
+              <select value={vehicleId} onChange={(e) => setVehicleId(e.target.value)} disabled={!!parentId}>
                 <option value="">Not assigned</option>
                 {cars.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
@@ -170,7 +246,7 @@ export default function DocumentModal({ doc, cars, onClose, onSaved, onToast }: 
             </div>
           )}
 
-          <div className="input-group">
+          {!parentId && <div className="input-group">
             <label>Paid with</label>
             {transactionId ? (
               <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 bg-bg-input border border-border rounded-lg text-xs">
@@ -211,7 +287,7 @@ export default function DocumentModal({ doc, cars, onClose, onSaved, onToast }: 
                 )}
               </>
             )}
-          </div>
+          </div>}
 
           <div className="input-group">
             <label>Notes</label>

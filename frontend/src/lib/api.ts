@@ -333,7 +333,7 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ name, content }),
       }, 60000),
-    updateDocument: (id: string, data: Partial<Omit<CarDocument, "items">> & { items?: CarDocument["items"]; share?: number; costType?: CostType }) =>
+    updateDocument: (id: string, data: Partial<Omit<CarDocument, "items">> & { items?: CarDocument["items"]; share?: number; costType?: CostType; parentId?: string | null }) =>
       request<CarDocument>(`/cars/documents/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     deleteDocument: (id: string) => request<{ success: boolean }>(`/cars/documents/${id}`, { method: "DELETE" }),
     matches: (id: string, params: { total?: number | null; date?: string | null; vendor?: string | null } = {}) => {
@@ -345,6 +345,8 @@ export const api = {
       );
     },
     fileUrl: (id: string) => `${BASE}/cars/documents/${id}/file`,
+    originalUrl: (id: string) => `${BASE}/cars/documents/${id}/original`,
+    restoreOriginal: (id: string) => request<CarDocument>(`/cars/documents/${id}/restore`, { method: "POST" }),
     charges: (params: { merchant?: string; payeeId?: string } = {}) => {
       const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]).toString();
       return cachedGet<CarCharge[]>(`/cars/charges${qs ? `?${qs}` : ""}`);

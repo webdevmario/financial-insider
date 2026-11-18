@@ -8,7 +8,8 @@ import {
 } from "../db/schema.js";
 import { today } from "../lib/date.js";
 import { CAR_CATEGORIES, COST_TYPES, DOC_TYPES, carsOverview, costEntries, docCostType, loadCarData, summarizeVehicle } from "../lib/cars/costs.js";
-import { carDocsDir, contentType, documentPath, fileAwayDocument, saveCarDocUpload, scanCarDocs } from "../lib/cars/folder.js";
+import { carDocsDir, contentType, documentPath, fileAwayDocument, folderPath, saveCarDocUpload, scanCarDocs } from "../lib/cars/folder.js";
+import { cleanDocument, restoreOriginal, type CleanOptions } from "../lib/cars/cleanup.js";
 import { accounts } from "../db/schema.js";
 
 const router = Router();
@@ -102,7 +103,9 @@ function docOut(d: VehicleDocument) {
     paidOutside: !!d.paidOutside,
     items: parseJson(d.items) ?? [],
     details: parseJson(d.details),
+    cleanup: parseJson(d.cleanup),
     path: documentPath(d),
+    originalFile: d.originalPath ? folderPath(d.originalPath) : null,
   };
 }
 
@@ -228,12 +231,59 @@ router.get("/documents/:id/file", (req, res) => {
   res.sendFile(path);
 });
 
+// GET /api/cars/documents/:id/original: the file as it came in, before cleanup
+router.get("/documents/:id/original", (req, res) => {
+  const d = findDoc(req.params.id);
+  const path = d?.originalPath ? folderPath(d.originalPath) : null;
+  if (!d || !path || !existsSync(path)) return res.status(404).json({ error: "No original kept for this document" });
+  const name = (parseJson(d.cleanup) as { originalName?: string } | null)?.originalName || d.fileName;
+  res.type(contentType(path));
+  res.set("Content-Disposition", `inline; filename="${name.replace(/"/g, "")}"`);
+  res.sendFile(path);
+});
+
+/**
+ * POST /api/cars/documents/:id/clean { pages?, mode?, rotate?, crop?, force? }: clean the scan up again
+ * from its original, or for the first time. pages "1;2-5" splits one file into several documents (pages
+ * left out are dropped); rotate "3:90" turns page 3 a further 90 degrees clockwise; mode gray | bw | color;
+ * crop false keeps the whole photo. Returns the document(s) and what was done per page, with its text.
+ */
+router.post("/documents/:id/clean", async (req, res) => {
+  if (!findDoc(req.params.id)) return res.status(404).json({ error: "Not found" });
+  const b = req.body || {};
+  const options: CleanOptions = {
+    pages: b.pages == null ? undefined : String(b.pages),
+    mode: b.mode ?? undefined,
+    rotate: b.rotate == null ? undefined : String(b.rotate),
+    crop: b.crop == null ? undefined : !!b.crop,
+    force: !!b.force,
+  };
+  try {
+    const r = await cleanDocument(req.params.id, options);
+    res.json({ result: r.result, documents: r.documents.map(docOut), pages: r.pages });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// POST /api/cars/documents/:id/restore: put the original back in place of the cleaned file
+router.post("/documents/:id/restore", (req, res) => {
+  try {
+    res.json(docOut(restoreOriginal(req.params.id)));
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
 /**
  * PATCH /api/cars/documents/:id: what a document says, from the /car-docs skill or the app.
  * Body: any of vehicleId, docType, date, vendor, odometer, total, summary, items, details, notes,
  * transactionId (the bank charge that paid it), paidOutside, status (new | done | skipped),
- * share (this car's part of the charge, default 1), costType (to override the one the type implies).
+ * share (this car's part of the charge, default 1), costType (to override the one the type implies),
+ * parentId (make it a supporting document of another, null to make it its own again).
  * A transactionId with a car links that charge to the car; the document is filed away once done.
+ * A supporting document takes its main document's car, never holds a charge, and doesn't count on its
+ * own; a charge it held moves to the main document when that has none.
  */
 router.patch("/documents/:id", (req, res) => {
   const doc = findDoc(req.params.id);
@@ -255,6 +305,24 @@ router.patch("/documents/:id", (req, res) => {
   if ("paidOutside" in body) fields.paidOutside = body.paidOutside ? 1 : 0;
   if ("items" in body) fields.items = body.items == null ? null : JSON.stringify(body.items);
   if ("details" in body) fields.details = body.details == null ? null : JSON.stringify(body.details);
+
+  // Supporting document of another: always attached to the main one, never to another supporter
+  let main: VehicleDocument | undefined;
+  if ("parentId" in body) {
+    const pid = str(body.parentId);
+    if (pid) {
+      main = findDoc(pid);
+      if (main?.parentId) main = findDoc(main.parentId);
+      if (!main) return fail(res, "No such document to attach it to");
+      if (main.id === doc.id) return fail(res, "That document already supports this one");
+      Object.assign(fields, { parentId: main.id, vehicleId: main.vehicleId, transactionId: null, paidOutside: 0 });
+      if (body.status == null && doc.status === "new") fields.status = "done";
+    } else {
+      fields.parentId = null;
+    }
+  } else if (doc.parentId && (fields.transactionId || ("vehicleId" in fields && fields.vehicleId !== doc.vehicleId))) {
+    return fail(res, "This is a supporting document: its car and charge come from its main document");
+  }
   if (fields.vehicleId && !findVehicle(fields.vehicleId as string)) return fail(res, "No such car");
   if (fields.transactionId) {
     const t = db.select().from(transactions).where(eq(transactions.id, fields.transactionId as string)).get();
@@ -266,6 +334,11 @@ router.patch("/documents/:id", (req, res) => {
   if (share == null || share <= 0 || share > 1) return fail(res, "share must be more than 0 and at most 1");
 
   const next = { ...doc, ...fields } as VehicleDocument;
+  // The charge a newly attached supporter held, to hand to its main document
+  const handoff = main && doc.transactionId && doc.vehicleId && !main.transactionId && !main.paidOutside && main.vehicleId
+    ? db.select().from(vehicleLinks)
+      .where(and(eq(vehicleLinks.transactionId, doc.transactionId), eq(vehicleLinks.vehicleId, doc.vehicleId))).get()
+    : undefined;
   db.transaction((tx) => {
     // The charge this document used to point at no longer belongs to the car through it
     if (doc.transactionId && doc.vehicleId && (doc.transactionId !== next.transactionId || doc.vehicleId !== next.vehicleId)) {
@@ -283,6 +356,26 @@ router.patch("/documents/:id", (req, res) => {
           id: newId(), transactionId: next.transactionId, vehicleId: next.vehicleId, share, costType, createdAt: today(),
         }).run();
       }
+    }
+    if (main) {
+      // Its own supporters move with it, so there's only ever one level
+      tx.update(vehicleDocuments).set({ parentId: main.id, vehicleId: main.vehicleId })
+        .where(eq(vehicleDocuments.parentId, doc.id)).run();
+      if (handoff) {
+        tx.update(vehicleDocuments).set({ transactionId: doc.transactionId, paidOutside: 0, updatedAt: new Date().toISOString() })
+          .where(eq(vehicleDocuments.id, main.id)).run();
+        const exists = tx.select().from(vehicleLinks)
+          .where(and(eq(vehicleLinks.transactionId, doc.transactionId!), eq(vehicleLinks.vehicleId, main.vehicleId!))).get();
+        if (!exists) {
+          tx.insert(vehicleLinks).values({
+            id: newId(), transactionId: doc.transactionId!, vehicleId: main.vehicleId!, share: handoff.share,
+            costType: docCostType(main.docType) || handoff.costType, createdAt: today(),
+          }).run();
+        }
+      }
+    } else if (!next.parentId && "vehicleId" in fields && fields.vehicleId !== doc.vehicleId) {
+      // Supporting documents follow their main document to another car
+      tx.update(vehicleDocuments).set({ vehicleId: next.vehicleId }).where(eq(vehicleDocuments.parentId, doc.id)).run();
     }
   });
   if (next.status === "done") fileAwayDocument(doc.id);
@@ -339,7 +432,9 @@ router.delete("/documents/:id", (req, res) => {
     if (doc.transactionId && doc.vehicleId) {
       tx.delete(vehicleLinks).where(and(eq(vehicleLinks.transactionId, doc.transactionId), eq(vehicleLinks.vehicleId, doc.vehicleId))).run();
     }
-    tx.update(vehicleDocuments).set({ status: "skipped", vehicleId: null, transactionId: null }).where(eq(vehicleDocuments.id, doc.id)).run();
+    tx.update(vehicleDocuments).set({ status: "skipped", vehicleId: null, transactionId: null, parentId: null }).where(eq(vehicleDocuments.id, doc.id)).run();
+    // Its supporting documents stand on their own again
+    tx.update(vehicleDocuments).set({ parentId: null }).where(eq(vehicleDocuments.parentId, doc.id)).run();
   });
   res.json({ success: true });
 });

@@ -222,6 +222,13 @@ export const vehicleDocuments = sqliteTable("vehicle_documents", {
   transactionId: text("transaction_id"), // The bank charge that paid it
   paidOutside: integer("paid_outside").notNull().default(0), // 1 = paid in cash or from an account that isn't imported: counts its total
   notes: text("notes"),
+  text: text("text"), // What the document says, read by OCR when it was cleaned (or its own text layer)
+  originalPath: text("original_path"), // The file as it came in, kept under .originals/ once cleaned up
+  originalHash: text("original_hash"), // So dropping the same photo again is still recognized
+  cleanup: text("cleanup"), // JSON: what cleaning did per page (turned, cropped, similar pages) and when
+  // Supporting document of another (a CARFAX alert, an estimate email, a card slip for an invoice): kept
+  // and readable, but the main document carries the car's cost, the bank charge and the mileage
+  parentId: text("parent_id"),
   addedAt: text("added_at").notNull(),
   updatedAt: text("updated_at"),
 });
