@@ -9,7 +9,7 @@
  *
  * Money here is positive dollars spent; a refund on a car charge is a negative cost.
  */
-import type { Vehicle, VehicleDocument, VehicleLink, VehicleRule } from "../../db/schema.js";
+import type { CarDocument, Vehicle, VehicleLink, VehicleRule } from "../../db/schema.js";
 
 /** The transaction columns the car math needs */
 export interface CarTxn {
@@ -45,7 +45,7 @@ export interface CarData {
   cars: Vehicle[];
   links: VehicleLink[];
   rules: VehicleRule[];
-  docs: VehicleDocument[];
+  docs: CarDocument[];
   /** Every imported transaction */
   txns: CarTxn[];
   assets: CarAsset[];

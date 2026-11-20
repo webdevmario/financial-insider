@@ -51,7 +51,7 @@ bill_id), subscriptions(name, category, frequency, amount, split_by, next_charge
 balance, owner, institution, home_value, mortgage_balance, last_updated), goals(name, target_amount, saved_amount,
 deadline), credit_cards(name, issuer, annual_fee, reward_rates JSON), import_batches(file_name, imported_at),
 vehicles(id, name, year, make, model, purchase_date, purchase_price, purchase_mileage, loan_amount, loan_rate, loan_months,
-sold_date, sale_price, account_id), vehicle_documents(vehicle_id, status, doc_type, date, vendor, odometer, total, summary,
+sold_date, sale_price, account_id), car_documents(id = Papers document id, vehicle_id, status, doc_type, date, vendor, odometer, total, summary,
 items JSON, transaction_id, paid_outside), vehicle_links(transaction_id, vehicle_id, share, cost_type),
 vehicle_rules(match_type, match_value, cost_type, shares JSON, date_from, date_to).`;
 

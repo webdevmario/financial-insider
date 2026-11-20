@@ -196,12 +196,10 @@ sqlite.exec(`
     created_at TEXT NOT NULL
   );
 
-  CREATE TABLE IF NOT EXISTS vehicle_documents (
+  -- Car documents live in the vault (Papers); this keeps what the car math needs (see schema.ts)
+  CREATE TABLE IF NOT EXISTS car_documents (
     id TEXT PRIMARY KEY NOT NULL,
     file_name TEXT NOT NULL,
-    source_path TEXT NOT NULL,
-    file_hash TEXT NOT NULL,
-    size INTEGER NOT NULL,
     status TEXT DEFAULT 'new' NOT NULL,
     vehicle_id TEXT,
     doc_type TEXT,
@@ -215,11 +213,11 @@ sqlite.exec(`
     transaction_id TEXT,
     paid_outside INTEGER DEFAULT 0 NOT NULL,
     notes TEXT,
+    parent_id TEXT,
     added_at TEXT NOT NULL,
     updated_at TEXT
   );
-  CREATE UNIQUE INDEX IF NOT EXISTS vehicle_documents_hash ON vehicle_documents(file_hash);
-  CREATE INDEX IF NOT EXISTS vehicle_documents_vehicle ON vehicle_documents(vehicle_id);
+  CREATE INDEX IF NOT EXISTS car_documents_vehicle ON car_documents(vehicle_id);
 
   CREATE TABLE IF NOT EXISTS vehicle_links (
     id TEXT PRIMARY KEY NOT NULL,
@@ -243,12 +241,6 @@ sqlite.exec(`
     created_at TEXT NOT NULL
   );
 `);
-
-// Scan cleanup for car documents
-const carDocCols = sqlite.prepare("PRAGMA table_info(vehicle_documents)").all() as { name: string }[];
-for (const col of ["text", "original_path", "original_hash", "cleanup", "parent_id"]) {
-  if (!carDocCols.some((c) => c.name === col)) sqlite.exec(`ALTER TABLE vehicle_documents ADD COLUMN ${col} TEXT`);
-}
 
 export const db = drizzle(sqlite, { schema });
 export { sqlite };

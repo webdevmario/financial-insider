@@ -14,9 +14,12 @@ import { migratePayees } from "./lib/statements/payees.js";
 import payeesRouter from "./routes/payees.js";
 import cardsRouter from "./routes/cards.js";
 import carsRouter from "./routes/cars.js";
-import { watchCarDocs } from "./lib/cars/folder.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Settings the launchd job doesn't carry (VAULT_TOKEN and friends), from the gitignored .env
+const envFile = resolve(__dirname, "../../.env");
+if (existsSync(envFile)) process.loadEnvFile(envFile);
 
 // Ensure data directory exists
 const dataDir = resolve(__dirname, "../../data");
@@ -86,5 +89,4 @@ app.listen(PORT, () => {
     console.error(`Payee migration failed: ${(err as Error).message}`);
   }
   watchStatements();
-  watchCarDocs();
 });
