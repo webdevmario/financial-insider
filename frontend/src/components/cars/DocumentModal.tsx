@@ -91,24 +91,7 @@ export default function DocumentModal({ doc, cars, docs, onOpen, onClose, onSave
     }
   }
 
-  async function restore() {
-    if (!doc) return;
-    setSaving(true);
-    try {
-      await api.cars.restoreOriginal(doc.id);
-      onToast("Original put back");
-      onSaved();
-      onClose();
-    } catch (err) {
-      onToast(err instanceof Error ? err.message : "Couldn't restore the original", true);
-    } finally {
-      setSaving(false);
-    }
-  }
-
   const fileUrl = doc ? api.cars.fileUrl(doc.id) : "";
-  const cleaned = doc?.originalPath && doc.cleanup?.result === "cleaned" ? doc.cleanup : null;
-  const mb = (n?: number) => `${((n ?? 0) / 1_048_576).toFixed(1)} MB`;
   const label = (d: CarDocument) => [fmtDate(d.date), d.vendor || d.fileName, d.docType ? DOC_TYPE_LABELS[d.docType] : null].filter(Boolean).join(" · ");
   const main = parentId ? docs.find((d) => d.id === parentId) : undefined;
   const supporting = doc ? docs.filter((d) => d.parentId === doc.id) : [];
@@ -139,24 +122,12 @@ export default function DocumentModal({ doc, cars, docs, onOpen, onClose, onSave
       {doc && (
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between gap-3 text-xs">
-            <span className="text-text-dim truncate" title={doc.sourcePath}>{doc.fileName}</span>
+            <span className="text-text-dim truncate">{doc.fileName}</span>
             <span className="flex gap-3 shrink-0">
-              <a href={fileUrl} target="_blank" rel="noreferrer" className="link-tap">{cleaned ? "Open ↗" : "Open original ↗"}</a>
-              {cleaned && (
-                <a href={api.cars.originalUrl(doc.id)} target="_blank" rel="noreferrer" className="link-tap">Original ↗</a>
-              )}
+              <a href={fileUrl} target="_blank" rel="noreferrer" className="link-tap">Open ↗</a>
+              {doc.vaultUrl && <a href={doc.vaultUrl} target="_blank" rel="noreferrer" className="link-tap">In Papers ↗</a>}
             </span>
           </div>
-          {cleaned && (
-            <p className="text-xs text-text-muted -mt-2">
-              Cleaned up from {cleaned.originalName}
-              {cleaned.partsTotal ? ` (part ${cleaned.part} of ${cleaned.partsTotal}, pages ${cleaned.pages?.join(", ")})` : ""}
-              : {mb(cleaned.originalBytes)} to {mb(cleaned.bytes)}.{" "}
-              {!cleaned.partsTotal && (
-                <button type="button" className="link-tap" onClick={restore} disabled={saving}>Use the original instead</button>
-              )}
-            </p>
-          )}
           {IMAGE.test(doc.fileName) && (
             <a href={fileUrl} target="_blank" rel="noreferrer" className="block rounded-lg overflow-hidden border border-border bg-black/20">
               <img src={fileUrl} alt={doc.fileName} className="w-full max-h-[260px] object-contain" />
