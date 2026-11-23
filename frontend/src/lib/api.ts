@@ -2,6 +2,7 @@ import type {
   Account, Subscription, Expense, Goal, AppSettings, Transaction, StatementAccount, ScanResult,
   BillVsActual, ImportBatch, Insights, YearOverYear, CostChanges, Payee, PayeeDetail, UnassignedMerchant, UnassignedTxn, AliasPreview,
   CarsOverview, Vehicle, VehicleDetail, CarDocument, CarRule, CarCharge, CarDocMatch, CostType,
+  HoldingsOverview, HoldingsMeta, Security, InvestmentTargets, Snapshot, SnapshotRowInput,
 } from "../types";
 import { today } from "./formatters";
 import { offlineDb } from "./offline/db";
@@ -315,6 +316,25 @@ export const api = {
   },
 
   // ── Cars ─────────────────────────────────────────────────────
+  holdings: {
+    overview: () => cachedGet<HoldingsOverview>("/holdings"),
+    meta: () => cachedGet<HoldingsMeta>("/holdings/meta"),
+    saveTargets: (data: Partial<InvestmentTargets>) =>
+      request<InvestmentTargets>("/holdings/targets", { method: "PUT", body: JSON.stringify(data) }),
+    createSecurity: (data: Partial<Security>) =>
+      request<Security>("/holdings/securities", { method: "POST", body: JSON.stringify(data) }),
+    updateSecurity: (id: string, data: Partial<Security>) =>
+      request<Security>(`/holdings/securities/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    deleteSecurity: (id: string) => request<{ success: boolean }>(`/holdings/securities/${id}`, { method: "DELETE" }),
+    snapshot: (accountId: string, asOf?: string) =>
+      request<Snapshot>(
+        `/holdings/snapshot?${new URLSearchParams({ accountId, ...(asOf ? { asOf } : {}) })}`, undefined, READ_TIMEOUT
+      ),
+    saveSnapshot: (data: { accountId: string; asOf: string; previousAsOf?: string; rows: SnapshotRowInput[] }) =>
+      request<{ saved: number; created: string[] }>("/holdings/snapshot", { method: "PUT", body: JSON.stringify(data) }),
+    deleteSnapshot: (accountId: string, asOf: string) =>
+      request<{ deleted: number }>(`/holdings/snapshot?${new URLSearchParams({ accountId, asOf })}`, { method: "DELETE" }),
+  },
   cars: {
     overview: () => cachedGet<CarsOverview>("/cars"),
     meta: () => cachedGet<{ costTypes: CostType[]; docTypes: string[]; scanUrl: string | null; vehicleAssets: Account[] }>("/cars/meta"),

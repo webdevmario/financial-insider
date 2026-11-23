@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   carCosts,
   findTransactions,
+  investmentHoldings,
   listBills,
   merchantHistory,
   netWorth,
@@ -41,6 +42,8 @@ date range covered. Card data has a date but no time, and can't tell a dinner ou
 For "where have we eaten / when did we last go": merchant_history with categories ["Dining"].
 For "time to go back": add minVisits and sort "longest_ago". For "too soon": sort "recent".
 For what the cars cost, their service history and mileage, or whether an upgrade makes sense: car_costs.
+For investments (what each account holds, the mix against the targets, play money against its cap, and what's
+marked keep, watch or remove): holdings.
 For ad hoc questions the other tools can't answer, run_sql (read-only SELECT; schema in its description).
 
 This is private financial data: don't send it to web searches or other services unless the user asks.`;
@@ -53,7 +56,8 @@ deadline), credit_cards(name, issuer, annual_fee, reward_rates JSON), import_bat
 vehicles(id, name, year, make, model, purchase_date, purchase_price, purchase_mileage, loan_amount, loan_rate, loan_months,
 sold_date, sale_price, account_id), car_documents(id = Papers document id, vehicle_id, status, doc_type, date, vendor, odometer, total, summary,
 items JSON, transaction_id, paid_outside), vehicle_links(transaction_id, vehicle_id, share, cost_type),
-vehicle_rules(match_type, match_value, cost_type, shares JSON, date_from, date_to).`;
+vehicle_rules(match_type, match_value, cost_type, shares JSON, date_from, date_to), securities(id, symbol, name, kind,
+asset_class, role, status, expense_ratio, why), holdings(account_id, security_id, as_of, shares, value, cost_basis, role).`;
 
 type Result = CallToolResult;
 
@@ -230,6 +234,22 @@ export function createServer(deps: McpDeps): McpServer {
       inputSchema: z.object({}),
     },
     () => carCosts(deps.db, deps.today?.()),
+  );
+
+  tool(
+    "holdings",
+    {
+      title: "Investment holdings",
+      description:
+        "Every investment account's latest snapshot (funds, stocks, crypto, cash with shares, value, cost basis), the " +
+        "household mix by asset class against the written targets and bands, core vs play money against the play cap, " +
+        "blended fund fees, the securities list with keep / watch / remove status and why, flags worth a look, and the " +
+        'household on each past snapshot date. E.g. "what should we add or remove?" or "are we inside our bands?".',
+      inputSchema: z.object({
+        asOf: date.optional().describe("Use each account's latest snapshot on or before this date."),
+      }),
+    },
+    (a) => investmentHoldings(deps.db, a.asOf),
   );
 
   tool(

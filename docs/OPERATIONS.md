@@ -290,6 +290,17 @@ What each car has really cost, its service history, and whether keeping it or re
 - **Keep or upgrade** compares what keeping the car and replacing it cost per year (repairs, value lost, interest), shows the repair bill at which they cost the same, and checks the cash side against checking and savings on the Assets page, an emergency fund of N months of average spending, and open goals. Inputs are remembered per device.
 - **Tables:** `vehicles`, `car_documents` (Papers ids), `vehicle_links` (charge → car, with a share), `vehicle_rules`, all in `data/finance.db` and created on server start, so the daily backups cover them. The documents folder is the original source; back it up like the statements folder.
 
+## Investments (Investments tab)
+
+Which funds, stocks, crypto and cash each investment account holds, the household mix against the written targets, and play money against its cap. No live prices: values are typed from each broker, usually on the 1st.
+
+- **Snapshots:** **New snapshot** records one account on one date: symbol, shares, value, cost basis, and core or play. It starts from the account's last snapshot, so each month is mostly updating values. **Edit this one** fixes or re-dates a snapshot, or deletes it. A snapshot never changes the account's balance on the Assets page.
+- **Our list (`securities`):** one row per symbol, with what it is (fund, single stock, crypto, cash, event contract), the asset class it counts as, core or play money, the expense ratio, a decision (**keep**, **watch** or **remove**) and one line on why. A new symbol in a snapshot is added to the list as "watch" with no asset class, so it shows up to be filled in. A 401k fund with no ticker gets a made-up code like `401K-SP500`. Anything a snapshot uses can't be deleted; mark it remove instead.
+- **Core or play:** set on the list; a snapshot row can differ (cash is core in one account and play money in another).
+- **Mix vs target** uses every account's latest snapshot. **Targets** holds the target mix, the band (± points), the play cap, and the lines for one stock, idle cash and fund fees (stored in `settings` under `investmentTargets`).
+- **Worth a look** flags, never trades: a class outside its band, play money near or over its cap, one stock over its line, anything marked remove that's still held, the watch list, idle core cash, missing or high fund fees, and an account whose snapshot is much older than the rest.
+- **Tables:** `securities` and `holdings` in `data/finance.db`, created on server start, so the daily backups cover them.
+
 ---
 
 ## Claude MCP (read-only finance tools)
@@ -305,6 +316,7 @@ What each car has really cost, its service history, and whether keeping it or re
 | `list_bills` | Bills with your monthly share |
 | `net_worth` | Hand-entered asset balances by type |
 | `car_costs` | Each car's cost of ownership, per year and per mile, service history, mileage, gaps, and upgrade context |
+| `holdings` | What each investment account holds, the mix against the targets, play money against its cap, the keep / watch / remove list, and flags |
 | `run_sql` | One read-only `SELECT`, for anything else |
 
 It's bundled into one file (Node's built-in `node:sqlite`, no native modules) and installed to `~/Library/Application Support/financial-insider-mcp/`, outside `~/Documents`, the same way as the Stacks MCP. `pnpm prod:deploy` reinstalls it.

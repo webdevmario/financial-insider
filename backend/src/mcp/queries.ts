@@ -1,5 +1,6 @@
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 import { carsOverview, type CarData } from "../lib/cars/compute.js";
+import { TARGETS_KEY, holdingsOverview, parseTargets, type HoldingsData } from "../lib/holdings/compute.js";
 
 /**
  * Read-only queries behind the finance MCP. Every function takes a connection
@@ -406,5 +407,48 @@ export function carCosts(db: Db, today?: string) {
         vehicleId: d.vehicleId, date: d.date, type: d.docType, vendor: d.vendor, odometer: d.odometer, total: d.total,
         summary: d.summary, items: d.items ? JSON.parse(d.items) : [], details: d.details ? JSON.parse(d.details) : null,
       })),
+  };
+}
+
+// ── holdings ──────────────────────────────────────────────────────
+
+/** Rows for the holdings math. Before the app has created the tables (on its next start), nothing is held. */
+export function loadHoldingsData(db: Db, asOf?: string): HoldingsData {
+  const has = (table: string) =>
+    !!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table);
+  const all = <T>(sql: string): T[] => db.prepare(sql).all() as T[];
+  const tables = has("securities") && has("holdings");
+  const targetsRow = has("settings")
+    ? (db.prepare("SELECT value FROM settings WHERE key = ?").get(TARGETS_KEY) as { value: string } | undefined)
+    : undefined;
+  let rawTargets: unknown = null;
+  try {
+    rawTargets = targetsRow ? JSON.parse(targetsRow.value) : null;
+  } catch {
+    rawTargets = null;
+  }
+  return {
+    securities: tables
+      ? all(`SELECT id, symbol, name, kind, asset_class AS assetClass, role, status, expense_ratio AS expenseRatio, why, notes,
+                    created_at AS createdAt, updated_at AS updatedAt FROM securities`)
+      : [],
+    holdings: tables
+      ? all(`SELECT id, account_id AS accountId, security_id AS securityId, as_of AS asOf, shares, value, cost_basis AS costBasis,
+                    role, created_at AS createdAt FROM holdings`)
+      : [],
+    accounts: all(`SELECT id, type, owner, institution, balance, last_updated AS lastUpdated FROM accounts`),
+    targets: parseTargets(rawTargets),
+    asOf,
+  };
+}
+
+/** What each account holds (latest snapshot), the household mix against the written targets, and what to look at */
+export function investmentHoldings(db: Db, asOf?: string) {
+  return {
+    note:
+      "Values are typed from each broker on the snapshot date (usually the 1st); there are no live prices. Each account " +
+      "uses its latest snapshot on or before asOf. securities is the household's list: status keep / watch / remove and " +
+      "role core / play are decisions, not market data. Play money counts against playCap. Education and planning only.",
+    ...holdingsOverview(loadHoldingsData(db, asOf)),
   };
 }

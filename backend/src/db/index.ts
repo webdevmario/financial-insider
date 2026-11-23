@@ -242,5 +242,38 @@ sqlite.exec(`
   );
 `);
 
+// Investments: the list of securities and what each account held on each snapshot date
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS securities (
+    id TEXT PRIMARY KEY NOT NULL,
+    symbol TEXT NOT NULL,
+    name TEXT,
+    kind TEXT DEFAULT 'other' NOT NULL,
+    asset_class TEXT DEFAULT 'other' NOT NULL,
+    role TEXT DEFAULT 'core' NOT NULL,
+    status TEXT DEFAULT 'keep' NOT NULL,
+    expense_ratio REAL,
+    why TEXT,
+    notes TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS securities_symbol ON securities(symbol);
+
+  CREATE TABLE IF NOT EXISTS holdings (
+    id TEXT PRIMARY KEY NOT NULL,
+    account_id TEXT NOT NULL,
+    security_id TEXT NOT NULL,
+    as_of TEXT NOT NULL,
+    shares REAL,
+    value REAL NOT NULL,
+    cost_basis REAL,
+    role TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS holdings_account_security_date ON holdings(account_id, security_id, as_of);
+  CREATE INDEX IF NOT EXISTS holdings_as_of ON holdings(as_of);
+`);
+
 export const db = drizzle(sqlite, { schema });
 export { sqlite };

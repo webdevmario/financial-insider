@@ -14,6 +14,7 @@ import { migratePayees } from "./lib/statements/payees.js";
 import payeesRouter from "./routes/payees.js";
 import cardsRouter from "./routes/cards.js";
 import carsRouter from "./routes/cars.js";
+import holdingsRouter from "./routes/holdings.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -62,6 +63,7 @@ app.use("/api/transactions", transactionsRouter);
 app.use("/api/payees", payeesRouter);
 app.use("/api/cards", cardsRouter);
 app.use("/api/cars", carsRouter);
+app.use("/api/holdings", holdingsRouter);
 app.use("/api", settingsRouter); // settings, dashboard, data routes
 
 // Serve frontend in production

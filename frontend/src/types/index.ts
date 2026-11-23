@@ -550,3 +550,125 @@ export interface CarDocMatch {
   otherDocumentId: string | null;
   score: number;
 }
+
+// ── Investments ────────────────────────────────────────────────
+export type SecurityKind = "fund" | "stock" | "crypto" | "cash" | "contract" | "other";
+export type AssetClass = "us_stock" | "intl_stock" | "bond" | "cash" | "crypto" | "other";
+export type HoldingRole = "core" | "play";
+export type SecurityStatus = "keep" | "watch" | "remove";
+
+export interface Security {
+  id: string;
+  symbol: string;
+  name: string | null;
+  kind: SecurityKind;
+  assetClass: AssetClass;
+  role: HoldingRole;
+  status: SecurityStatus;
+  expenseRatio: number | null;
+  why: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+export interface InvestmentTargets {
+  usPct: number;
+  intlPct: number;
+  bondPct: number;
+  bandPts: number;
+  playCapPct: number;
+  singleStockPct: number;
+  idleCash: number;
+  feeWarnPct: number;
+}
+
+export interface HoldingLine {
+  holdingId: string;
+  securityId: string;
+  symbol: string;
+  name: string | null;
+  kind: SecurityKind;
+  assetClass: AssetClass;
+  role: HoldingRole;
+  status: SecurityStatus;
+  expenseRatio: number | null;
+  shares: number | null;
+  value: number;
+  costBasis: number | null;
+  gain: number | null;
+  pctOfAccount: number;
+}
+
+export interface HoldingsAccount {
+  accountId: string;
+  label: string;
+  type: string | null;
+  owner: string | null;
+  institution: string | null;
+  asOf: string;
+  total: number;
+  balance: number | null;
+  balanceUpdated: string | null;
+  snapshotDates: string[];
+  rows: HoldingLine[];
+}
+
+export interface InvestmentFlag {
+  level: "warn" | "info";
+  code: string;
+  message: string;
+  symbol?: string;
+  accountId?: string;
+}
+
+export interface HoldingsOverview {
+  asOf: string | null;
+  targets: InvestmentTargets;
+  total: number;
+  byClass: {
+    assetClass: AssetClass;
+    label: string;
+    value: number;
+    pct: number;
+    targetPct: number | null;
+    low: number | null;
+    high: number | null;
+    state: "low" | "high" | "ok" | null;
+  }[];
+  core: number;
+  play: number;
+  playPct: number;
+  playCap: number;
+  playRoom: number;
+  fees: { blendedPct: number | null; yearlyDollars: number; coveredValue: number; fundsMissingRatio: string[] };
+  flags: InvestmentFlag[];
+  accounts: HoldingsAccount[];
+  securities: (Security & { held: boolean; value: number; pct: number; accounts: string[]; heldAs: HoldingRole[] })[];
+  history: { asOf: string; total: number; usPct: number; intlPct: number; play: number }[];
+}
+
+export interface HoldingsMeta {
+  kinds: SecurityKind[];
+  assetClasses: AssetClass[];
+  assetClassLabels: Record<AssetClass, string>;
+  roles: HoldingRole[];
+  statuses: SecurityStatus[];
+  targets: InvestmentTargets;
+  accounts: Account[];
+}
+
+export interface SnapshotRowInput {
+  securityId?: string | null;
+  symbol?: string;
+  shares: number | null;
+  value: number;
+  costBasis: number | null;
+  role: HoldingRole | null;
+}
+
+export interface Snapshot {
+  accountId: string;
+  asOf: string | null;
+  rows: { id: string; securityId: string; symbol: string; shares: number | null; value: number; costBasis: number | null; role: HoldingRole | null; asOf: string }[];
+}

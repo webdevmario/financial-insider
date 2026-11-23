@@ -253,6 +253,38 @@ export const vehicleRules = sqliteTable("vehicle_rules", {
   createdAt: text("created_at").notNull(),
 });
 
+// ── Investments ────────────────────────────────────────────────────
+// The household's list of funds, stocks and other things it holds or has decided about: what each one is,
+// whether it's core money or play money, and whether to keep, watch or remove it
+export const securities = sqliteTable("securities", {
+  id: text("id").primaryKey(),
+  symbol: text("symbol").notNull(), // Ticker, or a short code for a 401k fund with none ("401K-SP500"); unique, upper case
+  name: text("name"),
+  kind: text("kind").notNull().default("other"), // fund | stock | crypto | cash | contract | other
+  assetClass: text("asset_class").notNull().default("other"), // us_stock | intl_stock | bond | cash | crypto | other
+  role: text("role").notNull().default("core"), // core | play: the default for holdings of it
+  status: text("status").notNull().default("keep"), // keep | watch | remove
+  expenseRatio: real("expense_ratio"), // Percent a year, 0.03 = 0.03%
+  why: text("why"), // One line: why we own it
+  notes: text("notes"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at"),
+});
+
+// What an account held on a date. A snapshot is every row for one account on one as-of date; values are typed
+// from the broker on the 1st (no live prices)
+export const holdings = sqliteTable("holdings", {
+  id: text("id").primaryKey(),
+  accountId: text("account_id").notNull(), // accounts.id
+  securityId: text("security_id").notNull(), // securities.id
+  asOf: text("as_of").notNull(), // YYYY-MM-DD
+  shares: real("shares"),
+  value: real("value").notNull(),
+  costBasis: real("cost_basis"),
+  role: text("role"), // core | play; null = the security's role (cash can be core in one account and play in another)
+  createdAt: text("created_at").notNull(),
+});
+
 // ── Settings (key-value store) ─────────────────────────────────────
 // Stores: paycheck, income, paycheckHistory, budgetTargets
 export const settings = sqliteTable("settings", {
@@ -281,3 +313,5 @@ export type Vehicle = typeof vehicles.$inferSelect;
 export type CarDocument = typeof carDocuments.$inferSelect;
 export type VehicleLink = typeof vehicleLinks.$inferSelect;
 export type VehicleRule = typeof vehicleRules.$inferSelect;
+export type Security = typeof securities.$inferSelect;
+export type Holding = typeof holdings.$inferSelect;
