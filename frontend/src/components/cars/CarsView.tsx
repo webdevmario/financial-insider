@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import { fmt, fmtDate, fmtP } from "../../lib/formatters";
-import { COST_LABELS, DOC_TYPE_LABELS, carTitle, miles, toBase64 } from "../../lib/cars";
+import { COST_LABELS, DOC_TYPE_LABELS, carTitle, miles } from "../../lib/cars";
 import StatCard from "../layout/StatCard";
 import LoadingState from "../layout/LoadingState";
 import Segmented from "../layout/Segmented";
@@ -25,7 +25,7 @@ export default function CarsView({ onToast }: CarsViewProps) {
   const [docs, setDocs] = useState<CarDocument[]>([]);
   const [rules, setRules] = useState<CarRule[]>([]);
   const [assets, setAssets] = useState<Account[]>([]);
-  const [folder, setFolder] = useState("");
+  const [scanUrl, setScanUrl] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
 
   const [formOpen, setFormOpen] = useState(false);
@@ -35,8 +35,6 @@ export default function CarsView({ onToast }: CarsViewProps) {
   const [assign, setAssign] = useState<{ group: CarGaps["unassigned"][number] } | { rule: CarRule } | null>(null);
   const [gapTab, setGapTab] = useState<GapTab>("unassigned");
   const [docFilter, setDocFilter] = useState<DocFilter>("new");
-  const [uploading, setUploading] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(() => {
     return Promise.all([api.cars.overview(), api.cars.documents(), api.cars.rules(), api.cars.meta()])
@@ -45,7 +43,7 @@ export default function CarsView({ onToast }: CarsViewProps) {
         setDocs(d);
         setRules(r);
         setAssets(meta.vehicleAssets);
-        setFolder(meta.folder);
+        setScanUrl(meta.scanUrl);
       })
       .catch((err) => onToast(err instanceof Error ? err.message : "Failed to load cars", true));
   }, [onToast]);
@@ -55,36 +53,21 @@ export default function CarsView({ onToast }: CarsViewProps) {
     load().finally(() => setLoading(false));
   }, [load]);
 
+  /** "+2 supporting" for a document with supporting documents (they're listed inside it, not on their own) */
+  const supportCount = (id: string) => {
+    const n = docs.filter((d) => d.parentId === id).length;
+    return n ? `+${n} supporting` : null;
+  };
+
   const changed = useCallback(() => {
     setVersion((v) => v + 1);
     load();
   }, [load]);
 
-  async function upload(files: FileList) {
-    const list = [...files];
-    let added = 0;
-    let dupes = 0;
-    for (let i = 0; i < list.length; i++) {
-      setUploading(`Uploading ${i + 1} of ${list.length}`);
-      try {
-        const r = await api.cars.upload(list[i].name, await toBase64(list[i]));
-        if (r.duplicate) dupes++;
-        else added++;
-      } catch (err) {
-        onToast(`${list[i].name}: ${err instanceof Error ? err.message : "upload failed"}`, true);
-      }
-    }
-    setUploading(null);
-    if (added || dupes) {
-      onToast(`${added} document${added === 1 ? "" : "s"} added${dupes ? `, ${dupes} already here` : ""}. Run /car-docs in Claude Code to read them.`);
-    }
-    changed();
-  }
-
   async function scan() {
     try {
       const r = await api.cars.scan();
-      onToast(r.added ? `${r.added} new document${r.added === 1 ? "" : "s"} found` : "No new files in the folder");
+      onToast(r.added ? `${r.added} new document${r.added === 1 ? "" : "s"} from Papers` : "Nothing new in Papers");
       changed();
     } catch (err) {
       onToast(err instanceof Error ? err.message : "Scan failed", true);
@@ -104,22 +87,12 @@ export default function CarsView({ onToast }: CarsViewProps) {
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <h2 className="text-[22px] font-semibold">Cars</h2>
         <div className="flex gap-2">
-          <button className="btn" disabled={!!uploading} onClick={() => fileRef.current?.click()}>
-            {uploading || "Upload documents"}
-          </button>
+          {scanUrl && (
+            // Documents live in Papers: scanning there files them under Cars, and they show up here as new
+            <a className="btn" href={`${scanUrl}&return=${encodeURIComponent(location.href)}`}>Add document</a>
+          )}
           <button className="btn btn-primary" onClick={() => { setEditing(null); setFormOpen(true); }}>+ Add Car</button>
         </div>
-        <input
-          ref={fileRef}
-          type="file"
-          multiple
-          accept=".pdf,image/*,.heic,.heif,.txt,.eml,.html,.htm,.md,.csv,.doc,.docx"
-          className="hidden"
-          onChange={(e) => {
-            if (e.target.files?.length) upload(e.target.files);
-            e.target.value = "";
-          }}
-        />
       </div>
 
       <div className="grid grid-cols-3 max-md:grid-cols-1 gap-5 mb-6">
@@ -147,7 +120,7 @@ export default function CarsView({ onToast }: CarsViewProps) {
           <div className="text-4xl mb-3 opacity-40">🚗</div>
           <p className="text-sm mb-1">No cars yet.</p>
           <p className="text-xs text-text-muted mb-4 max-w-md mx-auto">
-            Add your cars, then drop receipts, invoices, bills of sale and insurance pages into the folder or upload them here.
+            Add your cars, then scan receipts, invoices, bills of sale and insurance pages in Papers, under Cars.
             {household.unassignedTotal > 0 && ` ${fmt(household.unassignedTotal)} in car charges is already in your bank data, waiting to be assigned.`}
           </p>
           <button className="btn btn-primary" onClick={() => { setEditing(null); setFormOpen(true); }}>+ Add First Car</button>
@@ -238,30 +211,31 @@ export default function CarsView({ onToast }: CarsViewProps) {
         )}
       </Section>
 
-      <Section title="Documents" hint={folder ? `Drop files in ${folder} or upload them.` : undefined} id="car-docs"
-        extra={<button className="btn btn-sm" onClick={scan}>Check folder</button>}>
+      <Section title="Documents" hint="Documents filed under Cars in Papers." id="car-docs"
+        extra={<button className="btn btn-sm" onClick={scan}>Check Papers</button>}>
         <Segmented<DocFilter>
           value={docFilter}
           onChange={setDocFilter}
           className="mb-3"
           options={[
             { value: "new", label: `To read (${unread})` },
-            { value: "done", label: `Read (${docs.filter((d) => d.status === "done").length})` },
+            { value: "done", label: `Read (${docs.filter((d) => d.status === "done" && !d.parentId).length})` },
             { value: "skipped", label: "Skipped" },
           ]}
         />
         {shownDocs.length === 0 ? (
-          <Empty>{docFilter === "new" ? "Nothing waiting. New files show up here as soon as they land in the folder." : "None."}</Empty>
+          <Empty>{docFilter === "new" ? "Nothing waiting. Documents filed under Cars in Papers show up here." : "None."}</Empty>
         ) : (
           <List>
-            {shownDocs.map((d) => (
+            {shownDocs.filter((d) => !d.parentId || !shownDocs.some((m) => m.id === d.parentId)).map((d) => (
               <Row
                 key={d.id}
                 title={d.status === "new" ? d.fileName : d.vendor || d.fileName}
                 sub={
                   d.status === "new"
                     ? `Added ${fmtDate(d.addedAt.slice(0, 10))}`
-                    : [fmtDate(d.date), d.docType ? DOC_TYPE_LABELS[d.docType] : null, carName(d.vehicleId), d.odometer != null ? miles(d.odometer) : null]
+                    : [fmtDate(d.date), d.docType ? DOC_TYPE_LABELS[d.docType] : null, carName(d.vehicleId), d.odometer != null ? miles(d.odometer) : null,
+                      supportCount(d.id)]
                         .filter(Boolean).join(" · ")
                 }
                 amount={d.total != null ? fmtP(d.total) : undefined}
@@ -307,7 +281,7 @@ export default function CarsView({ onToast }: CarsViewProps) {
         onChanged={changed}
         onToast={onToast}
       />
-      <DocumentModal doc={openDoc} cars={cars} onClose={() => setOpenDoc(null)} onSaved={changed} onToast={onToast} />
+      <DocumentModal doc={openDoc} cars={cars} docs={docs} onOpen={setOpenDoc} onClose={() => setOpenDoc(null)} onSaved={changed} onToast={onToast} />
       <AssignModal target={assign} cars={cars} onClose={() => setAssign(null)} onSaved={changed} onToast={onToast} />
     </div>
   );

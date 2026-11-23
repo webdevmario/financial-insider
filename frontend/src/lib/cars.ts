@@ -156,10 +156,3 @@ export function defaultUpgradeInputs(current: VehicleSummary | null): UpgradeInp
   };
 }
 
-/** File → base64 (no data: prefix), in chunks so large files don't overflow the call stack */
-export async function toBase64(file: File): Promise<string> {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  let binary = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(binary);
-}

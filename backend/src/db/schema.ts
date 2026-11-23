@@ -203,12 +203,12 @@ export const vehicles = sqliteTable("vehicles", {
 });
 
 // Raw documents dropped in the car documents folder: receipts, invoices, bills of sale, insurance pages
-export const vehicleDocuments = sqliteTable("vehicle_documents", {
+// A car document held in the vault (Papers). The file, its scans and its text live there; FI keeps what
+// the car math needs: which car and charge it belongs to, and the fields read from it, cached so car costs
+// still compute when the vault is down. id is the vault document id.
+export const carDocuments = sqliteTable("car_documents", {
   id: text("id").primaryKey(),
-  fileName: text("file_name").notNull(),
-  sourcePath: text("source_path").notNull(), // Relative to the car documents folder
-  fileHash: text("file_hash").notNull(),
-  size: integer("size").notNull(),
+  fileName: text("file_name").notNull(), // Display name, cached from the vault
   status: text("status").notNull().default("new"), // new (not read yet) | done | skipped (not a car document)
   vehicleId: text("vehicle_id"),
   docType: text("doc_type"), // purchase | sale | loan | repair | maintenance | tires | insurance | registration | inspection | fuel | parking | other
@@ -222,6 +222,9 @@ export const vehicleDocuments = sqliteTable("vehicle_documents", {
   transactionId: text("transaction_id"), // The bank charge that paid it
   paidOutside: integer("paid_outside").notNull().default(0), // 1 = paid in cash or from an account that isn't imported: counts its total
   notes: text("notes"),
+  // Supporting document of another (a CARFAX alert, an estimate email, a card slip for an invoice): kept
+  // and readable, but the main document carries the car's cost, the bank charge and the mileage
+  parentId: text("parent_id"),
   addedAt: text("added_at").notNull(),
   updatedAt: text("updated_at"),
 });
@@ -307,7 +310,7 @@ export type Payee = typeof payees.$inferSelect;
 export type PayeeAlias = typeof payeeAliases.$inferSelect;
 export type CreditCard = typeof creditCards.$inferSelect;
 export type Vehicle = typeof vehicles.$inferSelect;
-export type VehicleDocument = typeof vehicleDocuments.$inferSelect;
+export type CarDocument = typeof carDocuments.$inferSelect;
 export type VehicleLink = typeof vehicleLinks.$inferSelect;
 export type VehicleRule = typeof vehicleRules.$inferSelect;
 export type Security = typeof securities.$inferSelect;

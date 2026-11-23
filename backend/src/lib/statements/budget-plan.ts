@@ -13,7 +13,8 @@
  * - card payments already made on the card side that haven't come out of checking yet
  * - savings and anything else held back (asked for in the conversation, not computed here)
  * Work expenses come back with the month-end paycheck. Those due in the half are listed but
- * left out; in the second half, those charged in the first half are added back.
+ * left out (not ones whose linked bill is paused or cancelled); in the second half, those
+ * charged in the first half are added back.
  *
  * This module only suggests lines from the data; the /budget skill reviews them with the user.
  */
@@ -110,7 +111,8 @@ export type Half = "first" | "second";
 
 export function computeBudgetPlan(month = today().slice(0, 7), half: Half = "second") {
   const all = db.select().from(transactions).all();
-  const bills = db.select().from(subscriptions).all().filter(isActiveBill);
+  const allBills = db.select().from(subscriptions).all();
+  const bills = allBills.filter(isActiveBill);
   const payeeList = db.select().from(payees).all();
   const accounts = db.select().from(statementAccounts).all();
   const cards = accounts.filter((a) => a.kind === "credit");
@@ -260,10 +262,14 @@ export function computeBudgetPlan(month = today().slice(0, 7), half: Half = "sec
   // Work expenses expected in the window: listed but left out by default (in the second half
   // they come back with the month-end paycheck; in the first half, after it ends)
   const workLines: PlanLine[] = [];
+  // A work expense linked to a paused or cancelled bill has stopped: don't expect it again
+  const stoppedBillIds = new Set(allBills.filter((b) => !isActiveBill(b)).map((b) => b.id));
+  const stoppedPayeeIds = new Set(payeeList.filter((p) => p.billId && stoppedBillIds.has(p.billId)).map((p) => p.id));
   const yearAgo = `${Number(month.slice(0, 4)) - 1}${month.slice(4)}`;
   const byPayee = new Map<string, Transaction[]>();
   for (const t of all) {
     if (t.category !== REIMBURSED || !isCost(t)) continue;
+    if (t.payeeId && stoppedPayeeIds.has(t.payeeId)) continue;
     const k = t.payeeId ?? t.merchant;
     (byPayee.get(k) ?? byPayee.set(k, []).get(k)!).push(t);
   }

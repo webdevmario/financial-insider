@@ -454,10 +454,8 @@ export interface CarCostEntry {
 
 export interface CarDocument {
   id: string;
+  /** Name shown for it, from Papers (the vault), where the document itself lives */
   fileName: string;
-  sourcePath: string;
-  path: string | null;
-  size: number;
   status: "new" | "done" | "skipped";
   vehicleId: string | null;
   docType: CarDocType | null;
@@ -471,6 +469,12 @@ export interface CarDocument {
   transactionId: string | null;
   paidOutside: boolean;
   notes: string | null;
+  /** What the document says (its scanned text in Papers): only on GET /cars/documents/:id */
+  text?: string | null;
+  /** Opens the document in Papers, when its address is set up */
+  vaultUrl: string | null;
+  /** Supporting document of another (a CARFAX alert for an invoice): the main one carries cost, charge and mileage */
+  parentId: string | null;
   addedAt: string;
   updatedAt: string | null;
 }

@@ -337,7 +337,7 @@ export const api = {
   },
   cars: {
     overview: () => cachedGet<CarsOverview>("/cars"),
-    meta: () => cachedGet<{ costTypes: CostType[]; docTypes: string[]; folder: string; vehicleAssets: Account[] }>("/cars/meta"),
+    meta: () => cachedGet<{ costTypes: CostType[]; docTypes: string[]; scanUrl: string | null; vehicleAssets: Account[] }>("/cars/meta"),
     vehicle: (id: string) => cachedGet<VehicleDetail>(`/cars/vehicles/${id}`),
     create: (data: Partial<Vehicle>) => request<Vehicle>("/cars", { method: "POST", body: JSON.stringify(data) }),
     update: (id: string, data: Partial<Vehicle>) =>
@@ -347,13 +347,9 @@ export const api = {
       const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]).toString();
       return cachedGet<CarDocument[]>(`/cars/documents${qs ? `?${qs}` : ""}`);
     },
-    scan: () => request<{ added: number; moved: number; missing: number; newDocs: number }>("/cars/documents/scan", { method: "POST" }),
-    upload: (name: string, content: string) =>
-      request<{ document: CarDocument | null; duplicate: boolean }>("/cars/documents/upload", {
-        method: "POST",
-        body: JSON.stringify({ name, content }),
-      }, 60000),
-    updateDocument: (id: string, data: Partial<Omit<CarDocument, "items">> & { items?: CarDocument["items"]; share?: number; costType?: CostType }) =>
+    /** Looks in Papers for new car documents now */
+    scan: () => request<{ added: number; removed: number }>("/cars/documents/scan", { method: "POST" }),
+    updateDocument: (id: string, data: Partial<Omit<CarDocument, "items">> & { items?: CarDocument["items"]; share?: number; costType?: CostType; parentId?: string | null }) =>
       request<CarDocument>(`/cars/documents/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     deleteDocument: (id: string) => request<{ success: boolean }>(`/cars/documents/${id}`, { method: "DELETE" }),
     matches: (id: string, params: { total?: number | null; date?: string | null; vendor?: string | null } = {}) => {

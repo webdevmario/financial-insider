@@ -355,7 +355,7 @@ export function loadCarData(db: Db, today = localToday()): CarData {
   const has = (table: string) =>
     !!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table);
   const all = <T>(sql: string): T[] => db.prepare(sql).all() as T[];
-  const carTables = has("vehicles") && has("vehicle_documents") && has("vehicle_links") && has("vehicle_rules");
+  const carTables = has("vehicles") && has("vehicle_links") && has("vehicle_rules");
   return {
     cars: carTables
       ? all(`SELECT id, name, year, make, model, vin, plate, driver, account_id AS accountId, purchase_date AS purchaseDate,
@@ -374,11 +374,12 @@ export function loadCarData(db: Db, today = localToday()): CarData {
                     date_from AS dateFrom, date_to AS dateTo, notes, created_at AS createdAt
                FROM vehicle_rules`)
       : [],
-    docs: carTables
-      ? all(`SELECT id, file_name AS fileName, source_path AS sourcePath, file_hash AS fileHash, size, status,
-                    vehicle_id AS vehicleId, doc_type AS docType, date, vendor, odometer, total, summary, items, details,
-                    transaction_id AS transactionId, paid_outside AS paidOutside, notes, added_at AS addedAt, updated_at AS updatedAt
-               FROM vehicle_documents`)
+    // Car documents live in the vault; car_documents keeps the fields the math needs
+    docs: has("car_documents")
+      ? all(`SELECT id, file_name AS fileName, status, vehicle_id AS vehicleId, doc_type AS docType, date, vendor, odometer,
+                    total, summary, items, details, transaction_id AS transactionId, paid_outside AS paidOutside, notes,
+                    parent_id AS parentId, added_at AS addedAt, updated_at AS updatedAt
+               FROM car_documents`)
       : [],
     txns: all(`SELECT id, date, month, amount, merchant, category, kind, payee_id AS payeeId FROM transactions`),
     assets: all(`SELECT id, type, balance, last_updated AS lastUpdated, institution, owner FROM accounts`),

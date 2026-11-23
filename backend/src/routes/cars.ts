@@ -1,14 +1,14 @@
 import { Router } from "express";
-import { existsSync } from "fs";
+import { Readable } from "stream";
 import { and, eq, gte, inArray, lte } from "drizzle-orm";
 import { db } from "../db/index.js";
 import {
-  transactions, vehicleDocuments, vehicleLinks, vehicleRules, vehicles,
-  type Vehicle, type VehicleDocument,
+  carDocuments, transactions, vehicleLinks, vehicleRules, vehicles,
+  type CarDocument, type Vehicle,
 } from "../db/schema.js";
 import { today } from "../lib/date.js";
 import { CAR_CATEGORIES, COST_TYPES, DOC_TYPES, carsOverview, costEntries, docCostType, loadCarData, summarizeVehicle } from "../lib/cars/costs.js";
-import { carDocsDir, contentType, documentPath, fileAwayDocument, saveCarDocUpload, scanCarDocs } from "../lib/cars/folder.js";
+import { VaultError, getVaultDoc, syncFromVault, syncVaultLinksFor, vaultFetch, vaultScanUrl } from "../lib/cars/vault.js";
 import { accounts } from "../db/schema.js";
 
 const router = Router();
@@ -84,7 +84,7 @@ function findVehicle(id: string) {
 }
 
 function findDoc(id: string) {
-  return db.select().from(vehicleDocuments).where(eq(vehicleDocuments.id, id)).get();
+  return db.select().from(carDocuments).where(eq(carDocuments.id, id)).get();
 }
 
 function parseJson(raw: string | null): unknown {
@@ -96,20 +96,28 @@ function parseJson(raw: string | null): unknown {
   }
 }
 
-function docOut(d: VehicleDocument) {
+/** Where the document opens in the vault (Papers), on the tailnet */
+function vaultDocUrl(id: string): string | null {
+  const web = process.env.VAULT_WEB_URL?.replace(/\/$/, "");
+  return web ? `${web}/doc/${encodeURIComponent(id)}` : null;
+}
+
+function docOut(d: CarDocument) {
   return {
     ...d,
     paidOutside: !!d.paidOutside,
     items: parseJson(d.items) ?? [],
     details: parseJson(d.details),
-    path: documentPath(d),
+    vaultUrl: vaultDocUrl(d.id),
   };
 }
+
 
 // ── Overview ──────────────────────────────────────────────────────
 
 // GET /api/cars: every car with its costs, the gaps to fill and the household context
-router.get("/", (_req, res) => {
+router.get("/", async (_req, res) => {
+  await syncFromVault();
   res.json(carsOverview());
 });
 
@@ -118,7 +126,7 @@ router.get("/meta", (_req, res) => {
   res.json({
     costTypes: COST_TYPES,
     docTypes: DOC_TYPES,
-    folder: carDocsDir(),
+    scanUrl: vaultScanUrl(),
     vehicleAssets: db.select().from(accounts).all().filter((a) => /vehicle|car|auto/i.test(a.type)),
   });
 });
@@ -172,7 +180,7 @@ router.delete("/vehicles/:id", (req, res) => {
   if (!findVehicle(id)) return res.status(404).json({ error: "Not found" });
   db.transaction((tx) => {
     tx.delete(vehicleLinks).where(eq(vehicleLinks.vehicleId, id)).run();
-    tx.update(vehicleDocuments).set({ vehicleId: null }).where(eq(vehicleDocuments.vehicleId, id)).run();
+    tx.update(carDocuments).set({ vehicleId: null }).where(eq(carDocuments.vehicleId, id)).run();
     tx.delete(vehicles).where(eq(vehicles.id, id)).run();
   });
   res.json({ success: true });
@@ -180,60 +188,61 @@ router.delete("/vehicles/:id", (req, res) => {
 
 // ── Documents ─────────────────────────────────────────────────────
 
-// GET /api/cars/documents?status=new&vehicleId=
-router.get("/documents", (req, res) => {
+// GET /api/cars/documents?status=new&vehicleId=: car documents, with any new ones from the vault's Cars area
+router.get("/documents", async (req, res) => {
+  await syncFromVault();
   const conds = [];
-  if (typeof req.query.status === "string") conds.push(eq(vehicleDocuments.status, req.query.status));
-  if (typeof req.query.vehicleId === "string") conds.push(eq(vehicleDocuments.vehicleId, req.query.vehicleId));
-  const rows = db.select().from(vehicleDocuments).where(conds.length ? and(...conds) : undefined).all();
+  if (typeof req.query.status === "string") conds.push(eq(carDocuments.status, req.query.status));
+  if (typeof req.query.vehicleId === "string") conds.push(eq(carDocuments.vehicleId, req.query.vehicleId));
+  const rows = db.select().from(carDocuments).where(conds.length ? and(...conds) : undefined).all();
   rows.sort((a, b) => (b.date || b.addedAt).localeCompare(a.date || a.addedAt));
   res.json(rows.map(docOut));
 });
 
-// POST /api/cars/documents/scan: look for new files now instead of waiting for the watcher
-router.post("/documents/scan", (_req, res) => {
-  try {
-    res.json(scanCarDocs());
-  } catch (err) {
-    fail(res, err, 500);
-  }
+// POST /api/cars/documents/scan: look in the vault for new car documents now (the "Check Papers" button)
+router.post("/documents/scan", async (_req, res) => {
+  const r = await syncFromVault(true);
+  if (!r) return fail(res, "The vault isn't reachable", 503);
+  res.json(r);
 });
 
-// POST /api/cars/documents/upload { name, content } (base64)
-router.post("/documents/upload", (req, res) => {
-  const { name, content } = req.body || {};
-  if (!content) return fail(res, "No file");
-  try {
-    const { doc, duplicate } = saveCarDocUpload(String(name || "document"), String(content));
-    res.json({ document: doc ? docOut(doc) : null, duplicate });
-  } catch (err) {
-    fail(res, err);
-  }
-});
-
-// GET /api/cars/documents/:id
-router.get("/documents/:id", (req, res) => {
+// GET /api/cars/documents/:id: one document, with what it says (its scanned text, from the vault)
+router.get("/documents/:id", async (req, res) => {
   const d = findDoc(req.params.id);
   if (!d) return res.status(404).json({ error: "Not found" });
-  res.json(docOut(d));
+  let text: string | null = null;
+  try {
+    text = (await getVaultDoc(d.id)).text ?? null;
+  } catch {
+    /* the vault is down: the cached fields still show */
+  }
+  res.json({ ...docOut(d), text });
 });
 
-// GET /api/cars/documents/:id/file: the original, to view in the browser
-router.get("/documents/:id/file", (req, res) => {
+// GET /api/cars/documents/:id/file: the document from the vault, to view in the browser
+router.get("/documents/:id/file", async (req, res) => {
   const d = findDoc(req.params.id);
-  const path = d && documentPath(d);
-  if (!d || !path || !existsSync(path)) return res.status(404).json({ error: "File not found" });
-  res.type(contentType(d.fileName));
-  res.set("Content-Disposition", `inline; filename="${d.fileName.replace(/"/g, "")}"`);
-  res.sendFile(path);
+  if (!d) return res.status(404).json({ error: "Not found" });
+  try {
+    const r = await vaultFetch(`/documents/${encodeURIComponent(d.id)}/file`);
+    if (!r.ok || !r.body) return res.status(r.status === 404 ? 404 : 502).json({ error: "File not found in the vault" });
+    res.type(r.headers.get("content-type") || "application/pdf");
+    res.set("Content-Disposition", `inline; filename="${d.fileName.replace(/"/g, "")}"`);
+    Readable.fromWeb(r.body as import("stream/web").ReadableStream).pipe(res);
+  } catch (err) {
+    fail(res, err, err instanceof VaultError ? err.status : 502);
+  }
 });
 
 /**
  * PATCH /api/cars/documents/:id: what a document says, from the /car-docs skill or the app.
  * Body: any of vehicleId, docType, date, vendor, odometer, total, summary, items, details, notes,
  * transactionId (the bank charge that paid it), paidOutside, status (new | done | skipped),
- * share (this car's part of the charge, default 1), costType (to override the one the type implies).
+ * share (this car's part of the charge, default 1), costType (to override the one the type implies),
+ * parentId (make it a supporting document of another, null to make it its own again).
  * A transactionId with a car links that charge to the car; the document is filed away once done.
+ * A supporting document takes its main document's car, never holds a charge, and doesn't count on its
+ * own; a charge it held moves to the main document when that has none.
  */
 router.patch("/documents/:id", (req, res) => {
   const doc = findDoc(req.params.id);
@@ -255,6 +264,24 @@ router.patch("/documents/:id", (req, res) => {
   if ("paidOutside" in body) fields.paidOutside = body.paidOutside ? 1 : 0;
   if ("items" in body) fields.items = body.items == null ? null : JSON.stringify(body.items);
   if ("details" in body) fields.details = body.details == null ? null : JSON.stringify(body.details);
+
+  // Supporting document of another: always attached to the main one, never to another supporter
+  let main: CarDocument | undefined;
+  if ("parentId" in body) {
+    const pid = str(body.parentId);
+    if (pid) {
+      main = findDoc(pid);
+      if (main?.parentId) main = findDoc(main.parentId);
+      if (!main) return fail(res, "No such document to attach it to");
+      if (main.id === doc.id) return fail(res, "That document already supports this one");
+      Object.assign(fields, { parentId: main.id, vehicleId: main.vehicleId, transactionId: null, paidOutside: 0 });
+      if (body.status == null && doc.status === "new") fields.status = "done";
+    } else {
+      fields.parentId = null;
+    }
+  } else if (doc.parentId && (fields.transactionId || ("vehicleId" in fields && fields.vehicleId !== doc.vehicleId))) {
+    return fail(res, "This is a supporting document: its car and charge come from its main document");
+  }
   if (fields.vehicleId && !findVehicle(fields.vehicleId as string)) return fail(res, "No such car");
   if (fields.transactionId) {
     const t = db.select().from(transactions).where(eq(transactions.id, fields.transactionId as string)).get();
@@ -265,13 +292,18 @@ router.patch("/documents/:id", (req, res) => {
   const share = body.share == null ? 1 : num(body.share);
   if (share == null || share <= 0 || share > 1) return fail(res, "share must be more than 0 and at most 1");
 
-  const next = { ...doc, ...fields } as VehicleDocument;
+  const next = { ...doc, ...fields } as CarDocument;
+  // The charge a newly attached supporter held, to hand to its main document
+  const handoff = main && doc.transactionId && doc.vehicleId && !main.transactionId && !main.paidOutside && main.vehicleId
+    ? db.select().from(vehicleLinks)
+      .where(and(eq(vehicleLinks.transactionId, doc.transactionId), eq(vehicleLinks.vehicleId, doc.vehicleId))).get()
+    : undefined;
   db.transaction((tx) => {
     // The charge this document used to point at no longer belongs to the car through it
     if (doc.transactionId && doc.vehicleId && (doc.transactionId !== next.transactionId || doc.vehicleId !== next.vehicleId)) {
       tx.delete(vehicleLinks).where(and(eq(vehicleLinks.transactionId, doc.transactionId), eq(vehicleLinks.vehicleId, doc.vehicleId))).run();
     }
-    tx.update(vehicleDocuments).set({ ...fields, updatedAt: new Date().toISOString() }).where(eq(vehicleDocuments.id, doc.id)).run();
+    tx.update(carDocuments).set({ ...fields, updatedAt: new Date().toISOString() }).where(eq(carDocuments.id, doc.id)).run();
     const costType = body.costType || docCostType(next.docType);
     if (next.transactionId && next.vehicleId && costType) {
       const existing = tx.select().from(vehicleLinks)
@@ -284,8 +316,33 @@ router.patch("/documents/:id", (req, res) => {
         }).run();
       }
     }
+    if (main) {
+      // Its own supporters move with it, so there's only ever one level
+      tx.update(carDocuments).set({ parentId: main.id, vehicleId: main.vehicleId })
+        .where(eq(carDocuments.parentId, doc.id)).run();
+      if (handoff) {
+        tx.update(carDocuments).set({ transactionId: doc.transactionId, paidOutside: 0, updatedAt: new Date().toISOString() })
+          .where(eq(carDocuments.id, main.id)).run();
+        const exists = tx.select().from(vehicleLinks)
+          .where(and(eq(vehicleLinks.transactionId, doc.transactionId!), eq(vehicleLinks.vehicleId, main.vehicleId!))).get();
+        if (!exists) {
+          tx.insert(vehicleLinks).values({
+            id: newId(), transactionId: doc.transactionId!, vehicleId: main.vehicleId!, share: handoff.share,
+            costType: docCostType(main.docType) || handoff.costType, createdAt: today(),
+          }).run();
+        }
+      }
+    } else if (!next.parentId && "vehicleId" in fields && fields.vehicleId !== doc.vehicleId) {
+      // Supporting documents follow their main document to another car
+      tx.update(carDocuments).set({ vehicleId: next.vehicleId }).where(eq(carDocuments.parentId, doc.id)).run();
+    }
   });
-  if (next.status === "done") fileAwayDocument(doc.id);
+  // The vault's links follow: this document, the main one it joined, and supporters that moved with it
+  syncVaultLinksFor([
+    doc.id,
+    ...(main ? [main.id] : []),
+    ...db.select({ id: carDocuments.id }).from(carDocuments).where(eq(carDocuments.parentId, main?.id ?? doc.id)).all().map((r) => r.id),
+  ]);
   res.json(docOut(findDoc(doc.id)!));
 });
 
@@ -305,7 +362,7 @@ router.get("/documents/:id/matches", (req, res) => {
     .where(and(gte(transactions.date, shift(-10)), lte(transactions.date, shift(14)), inArray(transactions.kind, ["spend", "fee"])))
     .all();
   const docsByTxn = new Map(
-    db.select().from(vehicleDocuments).all().filter((d) => d.transactionId && d.id !== doc.id).map((d) => [d.transactionId!, d.id])
+    db.select().from(carDocuments).all().filter((d) => d.transactionId && d.id !== doc.id).map((d) => [d.transactionId!, d.id])
   );
   const words = (s: string | null) => new Set((s || "").toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2));
   const vendorWords = words(vendor);
@@ -331,7 +388,7 @@ router.get("/documents/:id/matches", (req, res) => {
   res.json({ date: when, total, vendor, candidates });
 });
 
-// DELETE /api/cars/documents/:id: forget the record (and its charge link); the file stays in the folder
+// DELETE /api/cars/documents/:id: not a car document after all; forget its car and charge (it stays in the vault)
 router.delete("/documents/:id", (req, res) => {
   const doc = findDoc(req.params.id);
   if (!doc) return res.status(404).json({ error: "Not found" });
@@ -339,8 +396,11 @@ router.delete("/documents/:id", (req, res) => {
     if (doc.transactionId && doc.vehicleId) {
       tx.delete(vehicleLinks).where(and(eq(vehicleLinks.transactionId, doc.transactionId), eq(vehicleLinks.vehicleId, doc.vehicleId))).run();
     }
-    tx.update(vehicleDocuments).set({ status: "skipped", vehicleId: null, transactionId: null }).where(eq(vehicleDocuments.id, doc.id)).run();
+    tx.update(carDocuments).set({ status: "skipped", vehicleId: null, transactionId: null, parentId: null }).where(eq(carDocuments.id, doc.id)).run();
+    // Its supporting documents stand on their own again
+    tx.update(carDocuments).set({ parentId: null }).where(eq(carDocuments.parentId, doc.id)).run();
   });
+  syncVaultLinksFor([doc.id]);
   res.json({ success: true });
 });
 
