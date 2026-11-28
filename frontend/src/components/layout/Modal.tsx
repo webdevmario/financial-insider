@@ -264,7 +264,7 @@ export default function Modal({
             role={variant === "confirm" ? "alertdialog" : "dialog"}
             aria-modal="true"
             aria-labelledby={`${id}-title`}
-            className={`sheet relative flex flex-col bg-bg-card border border-border rounded-2xl w-[520px] max-w-[90vw] max-h-[85%] shadow-[0_24px_48px_rgba(0,0,0,0.4)]
+            className={`sheet relative flex flex-col bg-bg-overlay border border-border rounded-2xl w-[520px] max-w-[90vw] max-h-[85%] shadow-[0_24px_48px_rgba(0,0,0,0.4)]
               max-md:w-full max-md:max-w-full max-md:max-h-[calc(100%-max(24px,env(safe-area-inset-top)))] max-md:rounded-b-none max-md:border-x-0 max-md:border-b-0 max-md:animate-[sheetUp_0.25s_ease-out] ${className}`}
           >
             {/* Header: title tight to the top, close pinned to the corner. Doubles as the drag handle on phones */}

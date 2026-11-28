@@ -83,7 +83,7 @@ function CumulativeChart({ years }: { years: Year[] }) {
           {ends.map((e) => (
             <g key={e.year}>
               <circle cx={x(e.i)} cy={y(e.v)} r={4} fill={colorFor(years, e.year)} stroke={CHART.surface} strokeWidth={2} />
-              <text x={x(e.i) + 8} y={e.ly} dy="0.32em" fontSize={11} fill="#8b8fa3">{e.year}</text>
+              <text x={x(e.i) + 8} y={e.ly} dy="0.32em" fontSize={11} fill={CHART.label}>{e.year}</text>
             </g>
           ))}
         </svg>

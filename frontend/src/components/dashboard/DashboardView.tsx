@@ -12,8 +12,8 @@ const ASSET_GROUPS: Record<string, string[]> = {
   Property: ["Home Equity", "Vehicle"],
 };
 const GROUP_COLORS: Record<string, string> = {
-  Investments: "#a78bfa",
-  Cash: "#34d399",
+  Investments: "#D2B2FF",
+  Cash: "#77C7AF",
   Property: "#6366f1",
   Other: "#64748b",
 };
@@ -91,7 +91,7 @@ export default function DashboardView({ onOpenGoals }: { onOpenGoals: () => void
       {/* Two-column layout */}
       <div className="grid grid-cols-2 max-md:grid-cols-1 gap-5">
         {/* Asset Breakdown */}
-        <div className="bg-bg-card border border-border rounded-xl p-6 hover:border-[#363a50] transition-colors">
+        <div className="bg-bg-card border border-border rounded-xl p-6">
           <div className="text-[14px] font-semibold uppercase tracking-wider text-text-dim mb-5">
             Asset Breakdown
           </div>
@@ -112,7 +112,7 @@ export default function DashboardView({ onOpenGoals }: { onOpenGoals: () => void
                       <span className="inline-flex items-center justify-center w-4 h-4 rounded-full border-[1.5px] border-text-muted text-text-muted text-[9px] font-bold cursor-default hover:border-accent hover:text-accent transition-all">
                         i
                       </span>
-                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 bg-[#1e2130] border border-border text-text-dim text-xs px-3 py-2.5 rounded-lg min-w-[140px] opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-[0_8px_24px_rgba(0,0,0,0.4)] z-20 leading-relaxed">
+                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 bg-bg-overlay border border-border text-text-dim text-xs px-3 py-2.5 rounded-lg min-w-[140px] opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-[0_8px_24px_rgba(0,0,0,0.4)] z-20 leading-relaxed">
                         {[...(groupTypes[g] || [])].sort().join(", ")}
                       </span>
                     </span>
@@ -127,7 +127,7 @@ export default function DashboardView({ onOpenGoals }: { onOpenGoals: () => void
         </div>
 
         {/* Top Bills */}
-        <div className="bg-bg-card border border-border rounded-xl p-6 hover:border-[#363a50] transition-colors">
+        <div className="bg-bg-card border border-border rounded-xl p-6">
           <div className="text-[14px] font-semibold uppercase tracking-wider text-text-dim mb-5">
             Top Bills
           </div>
@@ -149,7 +149,7 @@ export default function DashboardView({ onOpenGoals }: { onOpenGoals: () => void
         <button
           type="button"
           onClick={onOpenGoals}
-          className="block w-full text-left mt-5 bg-bg-card border border-border rounded-xl p-6 hover:border-[#363a50] transition-colors"
+          className="block w-full text-left mt-5 bg-bg-card border border-border rounded-xl p-6 hover:bg-bg-card-hover transition-colors"
         >
           <div className="flex items-center justify-between mb-5">
             <span className="text-[14px] font-semibold uppercase tracking-wider text-text-dim">Goals</span>

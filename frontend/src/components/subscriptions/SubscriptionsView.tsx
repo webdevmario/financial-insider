@@ -276,7 +276,7 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
           <div className="flex-1 relative">
             <button
               type="button"
-              className="w-full text-left bg-bg-input rounded-lg px-4 py-3.5 transition-all hover:ring-1 hover:ring-accent/40 focus:ring-1 focus:ring-accent/40 outline-none"
+              className="w-full text-left bg-bg-input rounded-lg px-4 py-3.5 transition-all hover:ring-1 hover:ring-accent/40"
               onClick={() => setPpPopover(ppPopover === "pp1" ? null : "pp1")}
             >
               <div className="flex items-center justify-between">
@@ -293,7 +293,7 @@ export default function SubscriptionsView({ onToast }: SubscriptionsViewProps) {
           <div className="flex-1 relative">
             <button
               type="button"
-              className="w-full text-left bg-bg-input rounded-lg px-4 py-3.5 transition-all hover:ring-1 hover:ring-accent/40 focus:ring-1 focus:ring-accent/40 outline-none"
+              className="w-full text-left bg-bg-input rounded-lg px-4 py-3.5 transition-all hover:ring-1 hover:ring-accent/40"
               onClick={() => setPpPopover(ppPopover === "pp2" ? null : "pp2")}
             >
               <div className="flex items-center justify-between">

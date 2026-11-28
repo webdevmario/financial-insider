@@ -73,7 +73,7 @@ export default function AccountsView({ onToast }: AccountsViewProps) {
           {sorted.map(([type, accs]) => {
             const total = accs.reduce((s, a) => s + (a.balance || 0), 0);
             return (
-              <div key={type} className="bg-bg-card border border-border rounded-xl p-6 min-h-[200px] hover:border-[#363a50] transition-colors">
+              <div key={type} className="bg-bg-card border border-border rounded-xl p-6 min-h-[200px]">
                 <div className="flex items-center justify-between mb-5">
                   <span className="text-[14px] font-semibold uppercase tracking-wider text-text-dim">
                     {ACCT_ICONS[type] || "📁"} {type}
@@ -100,7 +100,7 @@ export default function AccountsView({ onToast }: AccountsViewProps) {
                               <span className="inline-flex items-center justify-center w-4 h-4 rounded-full border-[1.5px] border-text-muted text-text-muted text-[9px] font-bold cursor-default hover:border-accent hover:text-accent transition-all">
                                 i
                               </span>
-                              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 bg-[#1e2130] border border-border text-text-dim text-xs px-3 py-2.5 rounded-lg min-w-[200px] max-w-[320px] opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-[0_8px_24px_rgba(0,0,0,0.4)] z-20 leading-relaxed whitespace-pre-wrap">
+                              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 bg-bg-overlay border border-border text-text-dim text-xs px-3 py-2.5 rounded-lg min-w-[200px] max-w-[320px] opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-[0_8px_24px_rgba(0,0,0,0.4)] z-20 leading-relaxed whitespace-pre-wrap">
                                 {a.notes}
                               </span>
                             </span>

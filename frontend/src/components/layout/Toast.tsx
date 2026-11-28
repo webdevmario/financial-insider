@@ -18,7 +18,7 @@ export default function Toast({ message, isError, onClose }: ToastProps) {
     return () => clearTimeout(t);
   }, [onClose]);
 
-  const box = `bg-bg-card border rounded-xl px-5 py-3.5 text-[13px] shadow-[0_8px_32px_rgba(0,0,0,0.3)] ${
+  const box = `bg-bg-overlay border rounded-xl px-5 py-3.5 text-[13px] shadow-[0_8px_32px_rgba(0,0,0,0.3)] ${
     isError ? "border-red" : "border-green"
   }`;
 

@@ -27,12 +27,13 @@ Self-hosted household finance tracker. Runs on the Mac mini (port 3001, launchd)
 - The PWA service worker caches old builds. After a deploy, reload once; in a test browser, unregister the worker.
 - A worktree has no `node_modules` until `pnpm install --frozen-lockfile`.
 
-## Open work (as of 2026-11-23)
+## Open work (as of 2026-11-27)
 
 1. **Investments tab, first use on 2026-12-01.** Merged and deployed in PR #58. Nothing is saved yet. Next: a snapshot per investment account and keep / watch / remove on each security. The plan and checklist are private: `~/.claude/planning/financial-insider/README.md`, section "Next session: Dec 1, 2026".
 2. **Savings bucket math on 2026-12-01.** Private, no code: same README section. May need a fresh savings CSV import, since imported savings data is out of date.
 3. **Branch and worktree cleanup.** Unmerged: `claude/alias-suggestion`, `claude/transaction-date` (both 2026-11-15), `claude/financial-insider-review-ce4615` (2026-09-28). Seven worktrees under `.claude/worktrees/`. Run `~/Documents/claude/bin/status financial-insider` and ask Mario before deleting anything.
 4. **Card rewards fix waiting on Mario** (REVIEW D in `~/Documents/claude/under-review/REVIEW.md`): the cards page overstates one card's rewards.
+5. **UI refresh against `~/Documents/claude/projects/design-md/DESIGN.md`.** Phase 1 (colour tokens, contrast, focus rings, input borders) is on branch `claude/design-md-financial-insider-f2aabe`. Next phases: (2) type scale: replace the ad hoc `text-[11px]`-style sizes with a few named sizes, weights 400 and 600 only; (3) components: 48px targets on IconButton, Segmented and the bottom nav, outline icons instead of emoji, button types, icons on alerts; (4) per tab: brand colour only on things you can click (StatCard bars, `text-accent` headings, progress bars), copy and hierarchy.
 
 ## Decided against
 

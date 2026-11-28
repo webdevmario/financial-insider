@@ -140,10 +140,10 @@ function ImportOverlay({ runs, busy, onDone }: { runs: FileRun[]; busy: boolean;
       aria-modal="true"
       aria-busy={busy}
       aria-labelledby="import-title"
-      className="fixed inset-0 z-[400] grid place-items-center p-4 bg-[#07080d]/80 backdrop-blur-md animate-[fadeIn_0.18s_ease]"
+      className="fixed inset-0 z-[400] grid place-items-center p-4 bg-black/60 backdrop-blur-md animate-[fadeIn_0.18s_ease]"
       style={{ paddingTop: "max(1rem, env(safe-area-inset-top))", paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
     >
-      <div className="w-full max-w-[400px] bg-bg-card border border-border rounded-2xl shadow-[0_24px_80px_rgba(0,0,0,0.55)] overflow-hidden animate-[popIn_0.22s_cubic-bezier(0.2,0.9,0.3,1.2)]">
+      <div className="w-full max-w-[400px] bg-bg-overlay border border-border rounded-2xl shadow-[0_24px_80px_rgba(0,0,0,0.55)] overflow-hidden animate-[popIn_0.22s_cubic-bezier(0.2,0.9,0.3,1.2)]">
         <div className="px-6 pt-7 pb-5 text-center">
           <div className="mx-auto mb-4 w-14 h-14 relative grid place-items-center">
             {busy ? (

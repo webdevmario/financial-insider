@@ -291,7 +291,7 @@ function CarCard({ s, onOpen }: { s: VehicleSummary; onOpen: () => void }) {
   const v = s.vehicle;
   const trend = s.upkeepPrior12 > 0 ? (s.upkeepLast12 - s.upkeepPrior12) / s.upkeepPrior12 : null;
   return (
-    <button onClick={onOpen} className="text-left bg-bg-card border border-border rounded-xl p-5 hover:border-[#363a50] transition-colors">
+    <button onClick={onOpen} className="text-left bg-bg-card border border-border rounded-xl p-5 hover:bg-bg-card-hover transition-colors">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="min-w-0">
           <div className="font-semibold truncate">{v.name}</div>

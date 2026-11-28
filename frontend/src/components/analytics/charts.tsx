@@ -6,9 +6,10 @@ import { useEffect, useRef, useState } from "react";
  * each one stays with its entity: a year keeps its color whatever is shown.
  */
 export const CHART = {
-  surface: "#181a24",
-  grid: "#2a2d3e",
-  axis: "#5c5f73",
+  surface: "#1D1E26", // background-raised
+  grid: "#383940", // stroke-weak
+  axis: "#A5A5A8", // white 60%: 4.5:1 for tick labels
+  label: "#CDCECF", // text-weak
   series: ["#3987e5", "#d95926", "#199e70"],
 } as const;
 
