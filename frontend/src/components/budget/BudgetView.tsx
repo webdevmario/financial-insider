@@ -425,9 +425,9 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
               <div
                 className={`h-full rounded-lg transition-[width] duration-500 ${
                   pct > 90
-                    ? "bg-gradient-to-r from-red to-[#ef4444]"
+                    ? "bg-red"
                     : pct > 70
-                      ? "bg-gradient-to-r from-amber to-[#f59e0b]"
+                      ? "bg-amber"
                       : "bg-gradient-to-r from-green to-cyan"
                 }`}
                 style={{ width: `${Math.min(pct, 100)}%` }}
@@ -482,7 +482,7 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
         {noteOpen && (
           <div className="mt-2">
             <textarea
-              className="w-full bg-bg-card border border-border rounded-lg p-3 text-sm text-text resize-none focus:outline-none focus:border-accent transition-colors"
+              className="w-full bg-bg-input border border-border-strong rounded-lg p-3 text-sm text-text resize-none focus:border-accent transition-colors"
               rows={3}
               placeholder={`Notes for ${moLabel(selectedMonth)}...`}
               value={noteText}
@@ -519,7 +519,7 @@ export default function BudgetView({ onToast }: BudgetViewProps) {
                 key={e.id}
                 className={`flex items-center justify-between py-3.5 px-4 my-1 rounded-[10px] gap-3 transition-colors hover:bg-white/[0.03] cursor-pointer ${
                   justAdded === e.id
-                    ? "animate-[flashGreen_1.8s_ease-out] bg-green/[0.13] shadow-[0_0_0_1px_rgba(52,211,153,0.25)]"
+                    ? "animate-[flashGreen_1.8s_ease-out] bg-green/[0.13] shadow-[0_0_0_1px_rgb(119_199_175/25%)]"
                     : ""
                 }`}
                 onClick={() => openEditExpense(e)}

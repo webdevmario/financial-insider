@@ -202,7 +202,7 @@ function GoalCard({
 
   return (
     <div
-      className="bg-bg-card border border-border rounded-xl p-5 cursor-pointer hover:border-[#363a50] transition-colors"
+      className="bg-bg-card border border-border rounded-xl p-5 cursor-pointer hover:bg-bg-card-hover transition-colors"
       onClick={onEdit}
     >
       <div className="flex items-start justify-between gap-3 mb-3">

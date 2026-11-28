@@ -78,8 +78,7 @@ export default function CostChanges({ data }: { data: Data }) {
 
   return (
     <section>
-      <div className="relative overflow-hidden rounded-2xl border border-accent/25 bg-[linear-gradient(135deg,rgba(74,108,247,0.16),rgba(24,26,36,0.9)_55%)] px-7 py-6 max-md:px-5 max-md:py-5">
-        <div aria-hidden className="pointer-events-none absolute -right-16 -top-20 w-64 h-64 rounded-full bg-accent/10 blur-3xl" />
+      <div className="relative overflow-hidden rounded-2xl border border-border bg-bg-card px-7 py-6 max-md:px-5 max-md:py-5">
         <div className="relative flex items-baseline justify-between gap-3 flex-wrap mb-3">
           <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-accent">What costs more</div>
           <div className="text-[11px] text-text-muted">

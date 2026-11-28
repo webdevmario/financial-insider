@@ -86,7 +86,7 @@ export default function App() {
       {/* Top Nav */}
       <nav className="sticky top-0 z-50 flex items-center justify-between px-8 h-[60px] bg-bg/85 backdrop-blur-xl border-b border-border max-md:px-4">
         <div className="flex items-center gap-2.5 font-semibold text-lg tracking-tight">
-          <div className="relative w-7 h-7 bg-accent rounded-lg flex items-center justify-center text-sm text-white shadow-[0_0_16px_rgba(74,108,247,0.3)]">
+          <div className="relative w-7 h-7 bg-accent rounded-lg flex items-center justify-center text-sm text-text-ink">
             ⬡
             <ConnectionDot notice={connection} />
           </div>
